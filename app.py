@@ -26,6 +26,7 @@ app.add_middleware(
 # Firebase Setup
 firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
 
+db = None
 if firebase_json_env:
     try:
         cred_dict = json.loads(firebase_json_env)
@@ -34,10 +35,8 @@ if firebase_json_env:
         db = firestore.client()
         print("✅ Firebase Firestore Connected Successfully!")
     except Exception as e:
-        db = None
         print("❌ Firebase Connection Error:", e)
 else:
-    db = None
     print("❌ FIREBASE_CREDENTIALS Environment Variable missing!")
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
@@ -45,7 +44,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 semaphore = asyncio.Semaphore(2)
 
-# Default Metrics agar Firestore me koi custom metric na mile
+# Default Metrics
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there a chance to offer an additional product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent pitch an upsell item?"},
@@ -55,7 +54,6 @@ DEFAULT_METRICS = [
     {"key": "pl_product_pitched", "label": "PL Product Pitched", "description": "Did the agent pitch a Private Label product?"}
 ]
 
-# Helper function: Dynamic Metrics Fetching
 def get_stored_metrics() -> List[Dict[str, Any]]:
     if not db:
         return DEFAULT_METRICS
@@ -95,7 +93,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg space-y-4">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-base font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
-                <button onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
+                <button type="button" onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
                     + Add New Metric
                 </button>
             </div>
@@ -174,25 +172,25 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <!-- Modal for Add/Edit Dynamic Metric -->
-    <div id="metricModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center p-4">
+    <div id="metricModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md space-y-4">
             <h3 id="modalTitle" class="text-lg font-bold text-slate-200">Add Dynamic Metric</h3>
             <input type="hidden" id="metricId">
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Metric Key (Unique, lowercase_snake_case)</label>
-                <input type="text" id="metricKey" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="e.g. greeting_completed">
+                <label class="text-xs text-slate-400 block mb-1">Metric Key (Unique, e.g. greeting_completed)</label>
+                <input type="text" id="metricKey" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-500" placeholder="e.g. greeting_completed">
             </div>
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Display Label</label>
-                <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="e.g. Standard Greeting Done">
+                <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-500" placeholder="e.g. Standard Greeting Done">
             </div>
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Evaluation Rule / Prompt Description</label>
-                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="Describe when this boolean metric should be TRUE or FALSE..."></textarea>
+                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-500" placeholder="Describe rule for TRUE/FALSE..."></textarea>
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs rounded-xl text-slate-300">Cancel</button>
-                <button onclick="saveMetric()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs rounded-xl text-white font-bold">Save Metric</button>
+                <button type="button" onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs rounded-xl text-slate-300">Cancel</button>
+                <button type="button" onclick="saveMetric()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs rounded-xl text-white font-bold">Save Metric</button>
             </div>
         </div>
     </div>
@@ -206,44 +204,46 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadMetrics() {
             try {
                 var res = await fetch("/api/metrics");
+                if(!res.ok) throw new Error("Failed to fetch metrics");
                 currentMetrics = await res.json();
                 renderMetricsList();
             } catch(e) {
                 console.error("Failed to load metrics:", e);
+                document.getElementById('metricsList').innerHTML = '<div class="text-rose-400 text-xs">Error loading metrics!</div>';
             }
         }
 
         function renderMetricsList() {
             var container = document.getElementById('metricsList');
             container.innerHTML = "";
+            if(!currentMetrics || currentMetrics.length === 0) {
+                container.innerHTML = '<div class="text-slate-500 text-xs">No metrics configured.</div>';
+                return;
+            }
             currentMetrics.forEach(function(m) {
                 var card = document.createElement('div');
                 card.className = "bg-slate-900/60 border border-slate-700/60 p-3 rounded-xl flex justify-between items-start";
                 card.innerHTML = 
                     '<div>' +
-                        '<div class="font-bold text-xs text-slate-200">' + m.label + '</div>' +
+                        '<div class="font-bold text-xs text-slate-200">' + (m.label || m.key) + '</div>' +
                         '<div class="text-[10px] text-slate-400 font-mono">' + m.key + '</div>' +
                         '<div class="text-[11px] text-slate-400 mt-1">' + (m.description || '') + '</div>' +
                     '</div>' +
-                    '<div class="flex gap-1.5 ml-2">' +
-                        '<button onclick="editMetric(\'' + (m.id || m.key) + '\')" class="text-blue-400 hover:text-blue-300 text-xs">✏️</button>' +
-                        '<button onclick="deleteMetric(\'' + (m.id || m.key) + '\')" class="text-rose-400 hover:text-rose-300 text-xs">🗑️</button>' +
+                    '<div class="flex gap-2 ml-2">' +
+                        '<button type="button" onclick="editMetric(\'' + (m.id || m.key) + '\')" class="text-blue-400 hover:text-blue-300 text-xs font-bold">Edit</button>' +
+                        '<button type="button" onclick="deleteMetric(\'' + (m.id || m.key) + '\')" class="text-rose-400 hover:text-rose-300 text-xs font-bold">Delete</button>' +
                     '</div>';
                 container.appendChild(card);
             });
         }
 
         function openMetricModal(metric) {
-            document.getElementById('metricId').value = metric ? (metric.id || metric.key) : '';
+            document.getElementById('metricId').value = (metric && metric.id) ? metric.id : ((metric && metric.key) ? metric.key : '');
             document.getElementById('metricKey').value = metric ? metric.key : '';
             document.getElementById('metricLabel').value = metric ? metric.label : '';
-            document.getElementById('metricDesc').value = metric ? metric.description : '';
+            document.getElementById('metricDesc').value = metric ? (metric.description || '') : '';
             document.getElementById('modalTitle').innerText = metric ? 'Edit Metric' : 'Add Dynamic Metric';
-            if(metric) {
-                document.getElementById('metricKey').disabled = true;
-            } else {
-                document.getElementById('metricKey').disabled = false;
-            }
+            document.getElementById('metricKey').disabled = !!metric;
             document.getElementById('metricModal').classList.remove('hidden');
         }
 
@@ -263,12 +263,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             var description = document.getElementById('metricDesc').value.trim();
 
             if(!key || !label) {
-                alert("Metric Key aur Label dono zaroori hain!");
+                alert("Metric Key and Label are required!");
                 return;
             }
 
             var method = id ? "PUT" : "POST";
-            var url = id ? "/api/metrics/" + id : "/api/metrics";
+            var url = id ? "/api/metrics/" + encodeURIComponent(id) : "/api/metrics";
 
             try {
                 var res = await fetch(url, {
@@ -276,20 +276,23 @@ HTML_CONTENT = """<!DOCTYPE html>
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ key, label, description })
                 });
-                if(!res.ok) throw new Error("Metric save nahi ho saka!");
+                if(!res.ok) {
+                    var errData = await res.json();
+                    throw new Error(errData.detail || "Failed to save metric");
+                }
                 closeMetricModal();
-                loadMetrics();
+                await loadMetrics();
             } catch(e) {
                 alert("Error: " + e.message);
             }
         }
 
         async function deleteMetric(id) {
-            if(!confirm("Kya aap sach me is metric ko delete karna chahte hain?")) return;
+            if(!confirm("Are you sure you want to delete this metric?")) return;
             try {
-                var res = await fetch("/api/metrics/" + id, { method: "DELETE" });
+                var res = await fetch("/api/metrics/" + encodeURIComponent(id), { method: "DELETE" });
                 if(!res.ok) throw new Error("Delete failed");
-                loadMetrics();
+                await loadMetrics();
             } catch(e) {
                 alert("Error: " + e.message);
             }
@@ -304,7 +307,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function uploadAudioBatch() {
             if(selectedFiles.length === 0) {
-                alert("Pehle audio file(s) select karein!");
+                alert("Please select audio file(s) first!");
                 return;
             }
 
@@ -319,7 +322,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 var res = await fetch("/api/analyze-batch", { method: "POST", body: formData });
                 var batchData = await res.json();
-                if(!res.ok) throw new Error(batchData.detail || "Server error");
+                if(!res.ok) throw new Error(batchData.detail || "Server error during analysis");
 
                 currentBatchResults = batchData.results || [];
                 renderBatchResults(currentBatchResults);
@@ -364,7 +367,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var dynamicMetricsHtml = "";
                 currentMetrics.forEach(function(m) {
                     var val = dynamicMetrics[m.key];
-                    dynamicMetricsHtml += '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">' + m.label + ': ' + fmtBool(val) + '</div>';
+                    dynamicMetricsHtml += '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">' + (m.label || m.key) + ': ' + fmtBool(val) + '</div>';
                 });
 
                 card.innerHTML = 
@@ -396,13 +399,14 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
+            hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>';
             try {
                 var res = await fetch("/api/history");
                 var list = await res.json();
                 historyDataList = list || [];
                 
                 if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase. (Check server logs if FIREBASE_CREDENTIALS is missing)</td></tr>';
                     return;
                 }
                 hTable.innerHTML = "";
@@ -434,12 +438,13 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function exportHistoryExcel() {
-            if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
+            if(!historyDataList || historyDataList.length === 0) return alert("History is empty!");
             var workbook = XLSX.utils.book_new();
             var sheet = XLSX.utils.json_to_sheet(historyDataList.map(item => ({
                 "File Name": item.filename,
                 "QA Score": item.score,
                 "WPM": item.wpm,
+                "Summary": item.summary,
                 "Created At": item.created_at
             })));
             XLSX.utils.book_append_sheet(workbook, sheet, "History");
@@ -472,9 +477,6 @@ async def get_metrics():
 
 @app.post("/api/metrics")
 async def create_metric(payload: Dict[str, Any] = Body(...)):
-    if not db:
-        raise HTTPException(status_code=500, detail="Firestore is not connected")
-    
     key = payload.get("key", "").strip()
     label = payload.get("label", "").strip()
     description = payload.get("description", "").strip()
@@ -491,33 +493,30 @@ async def create_metric(payload: Dict[str, Any] = Body(...)):
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    db.collection("custom_metrics").document(key).set(metric_doc)
+    if db:
+        db.collection("custom_metrics").document(key).set(metric_doc)
+
     return {"status": "success", "data": metric_doc}
 
 @app.put("/api/metrics/{metric_id}")
 async def update_metric(metric_id: str, payload: Dict[str, Any] = Body(...)):
-    if not db:
-        raise HTTPException(status_code=500, detail="Firestore is not connected")
-    
-    doc_ref = db.collection("custom_metrics").document(metric_id)
-    if not doc_ref.get().exists:
-        raise HTTPException(status_code=404, detail="Metric not found")
-
     metric_doc = {
         "label": payload.get("label", "").strip(),
         "description": payload.get("description", "").strip(),
         "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    doc_ref.update(metric_doc)
+    if db:
+        doc_ref = db.collection("custom_metrics").document(metric_id)
+        if doc_ref.get().exists:
+            doc_ref.update(metric_doc)
+
     return {"status": "success", "data": metric_doc}
 
 @app.delete("/api/metrics/{metric_id}")
 async def delete_metric(metric_id: str):
-    if not db:
-        raise HTTPException(status_code=500, detail="Firestore is not connected")
-    
-    db.collection("custom_metrics").document(metric_id).delete()
+    if db:
+        db.collection("custom_metrics").document(metric_id).delete()
     return {"status": "success", "deleted_id": metric_id}
 
 # ==================== SPEECH & QUALITY AI ENGINE ====================
@@ -552,7 +551,6 @@ def transcribe_bytes(audio_bytes):
 def evaluate_quality(transcript, dynamic_metrics):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     
-    # Prompt me dynamic metrics ki definition inject karna
     metrics_schema_prompt = {}
     metrics_rules_text = ""
     for m in dynamic_metrics:
@@ -593,10 +591,8 @@ async def process_single_file(file: UploadFile):
         audio_bytes = await file.read()
         loop = asyncio.get_event_loop()
         
-        # 1. Fetch current dynamic metrics configuration
         dynamic_metrics = get_stored_metrics()
 
-        # 2. Transcribe & Evaluate
         transcript, metrics = await loop.run_in_executor(None, transcribe_bytes, audio_bytes)
         evaluation = await loop.run_in_executor(None, evaluate_quality, transcript, dynamic_metrics)
         
