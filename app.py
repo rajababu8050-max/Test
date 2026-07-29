@@ -90,9 +90,9 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
 
         <!-- Multi-Results Container -->
-        <div id="batchResultsContainer" class="hidden space-y-4">
+        <div id="batchResultsContainer" class="hidden space-y-6">
             <div class="flex justify-between items-center text-slate-300 font-semibold border-b border-slate-800 pb-2 flex-wrap gap-2">
-                <span>Batch Processing Results</span>
+                <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
                     <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
                         📊 Export Detailed Excel (.xlsx)
@@ -102,6 +102,33 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </button>
                 </div>
             </div>
+
+            <!-- Aggregate Pharma Upsell Table Box -->
+            <div id="summaryTableContainer" class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-blue-400">💊 Pharma Upsell Aggregate Summary</h3>
+                        <p class="text-xs text-slate-400" id="summaryTimeSlot">Batch Analytics</p>
+                    </div>
+                    <span id="totalCallsBadge" class="bg-blue-500/20 text-blue-300 text-xs font-bold px-3 py-1 rounded-full border border-blue-500/30">Total Calls: 0</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300 border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900/80 text-slate-200 uppercase text-xs border-b border-slate-700">
+                                <th class="p-3">Metric</th>
+                                <th class="p-3 text-center">Count</th>
+                                <th class="p-3 text-center">%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryTableBody" class="divide-y divide-slate-700/50 text-xs md:text-sm">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <h3 class="text-md font-bold text-slate-300 pt-2 border-b border-slate-800 pb-2">📁 Individual Call Breakdowns</h3>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
@@ -184,6 +211,68 @@ HTML_CONTENT = """<!DOCTYPE html>
             var container = document.getElementById('resultsList');
             container.innerHTML = "";
 
+            var validResults = results.filter(function(r) { return r.status === "success"; });
+            var totalCalls = validResults.length;
+
+            // Calculate Aggregate Summary Metrics
+            var countOpp = 0;
+            var countPitchDone = 0;
+            var countIneffective = 0;
+            var countSuccess = 0;
+            var countUnsuccess = 0;
+            var countQtyAttempt = 0;
+            var countPL = 0;
+
+            validResults.forEach(function(item) {
+                var pharma = item.data?.evaluation?.pharma_upsell_metrics || {};
+                
+                if (pharma.upsell_opportunity_available) countOpp++;
+                if (pharma.upsell_pitch_done) countPitchDone++;
+                if (pharma.upsell_pitch_ineffective) countIneffective++;
+                if (pharma.successful_upsell) countSuccess++;
+                if (pharma.quantity_increase_attempt) countQtyAttempt++;
+                if (pharma.pl_product_pitched) countPL++;
+
+                if (pharma.upsell_pitch_done && !pharma.successful_upsell) {
+                    countUnsuccess++;
+                }
+            });
+
+            var countPitchNotDoneOrIneffective = (totalCalls - countPitchDone) + countIneffective;
+
+            function calcPct(val) {
+                if (totalCalls === 0) return "0%";
+                return Math.round((val / totalCalls) * 100) + "%";
+            }
+
+            // Render Aggregate Table
+            document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
+            var nowStr = new Date().toLocaleString();
+            document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + nowStr;
+
+            var summaryRows = [
+                { metric: "Total Calls Reviewed", count: totalCalls, pct: "100%" },
+                { metric: "Upsell Opportunity Available", count: countOpp, pct: calcPct(countOpp) },
+                { metric: "Upsell Pitch Done", count: countPitchDone, pct: calcPct(countPitchDone) },
+                { metric: "Upsell Pitch Not Done / Ineffective", count: countPitchNotDoneOrIneffective, pct: calcPct(countPitchNotDoneOrIneffective) },
+                { metric: "Successful Upsell", count: countSuccess, pct: calcPct(countSuccess) },
+                { metric: "Unsuccessful Upsell", count: countUnsuccess, pct: calcPct(countUnsuccess) },
+                { metric: "Quantity Increase Attempt", count: countQtyAttempt, pct: calcPct(countQtyAttempt) },
+                { metric: "PL Product Pitched", count: countPL, pct: calcPct(countPL) }
+            ];
+
+            var summaryHtml = "";
+            summaryRows.forEach(function(row) {
+                summaryHtml += 
+                    '<tr class="hover:bg-slate-700/30 transition">' +
+                        '<td class="p-2.5 font-medium text-slate-200">' + row.metric + '</td>' +
+                        '<td class="p-2.5 text-center font-bold text-blue-400">' + row.count + '</td>' +
+                        '<td class="p-2.5 text-center font-extrabold text-emerald-400">' + row.pct + '</td>' +
+                    '</tr>';
+            });
+            document.getElementById('summaryTableBody').innerHTML = summaryHtml;
+
+            // Render Individual Cards
             results.forEach(function(item) {
                 if(item.status !== "success") {
                     container.innerHTML += '<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed to analyze <b>' + item.filename + '</b>: ' + (item.error || 'Error') + '</div>';
@@ -312,6 +401,40 @@ HTML_CONTENT = """<!DOCTYPE html>
                 return;
             }
 
+            var validResults = currentBatchResults.filter(function(r) { return r.status === "success"; });
+            var totalCalls = validResults.length;
+
+            var countOpp = 0, countPitchDone = 0, countIneffective = 0, countSuccess = 0, countUnsuccess = 0, countQtyAttempt = 0, countPL = 0;
+
+            validResults.forEach(function(item) {
+                var pharma = item.data?.evaluation?.pharma_upsell_metrics || {};
+                if (pharma.upsell_opportunity_available) countOpp++;
+                if (pharma.upsell_pitch_done) countPitchDone++;
+                if (pharma.upsell_pitch_ineffective) countIneffective++;
+                if (pharma.successful_upsell) countSuccess++;
+                if (pharma.quantity_increase_attempt) countQtyAttempt++;
+                if (pharma.pl_product_pitched) countPL++;
+                if (pharma.upsell_pitch_done && !pharma.successful_upsell) countUnsuccess++;
+            });
+
+            var countPitchNotDoneOrIneffective = (totalCalls - countPitchDone) + countIneffective;
+
+            function calcPct(val) {
+                if (totalCalls === 0) return "0%";
+                return Math.round((val / totalCalls) * 100) + "%";
+            }
+
+            var aggregateRows = [
+                { "Metric": "Total Calls Reviewed", "Count": totalCalls, "%": "100%" },
+                { "Metric": "Upsell Opportunity Available", "Count": countOpp, "%": calcPct(countOpp) },
+                { "Metric": "Upsell Pitch Done", "Count": countPitchDone, "%": calcPct(countPitchDone) },
+                { "Metric": "Upsell Pitch Not Done / Ineffective", "Count": countPitchNotDoneOrIneffective, "%": calcPct(countPitchNotDoneOrIneffective) },
+                { "Metric": "Successful Upsell", "Count": countSuccess, "%": calcPct(countSuccess) },
+                { "Metric": "Unsuccessful Upsell", "Count": countUnsuccess, "%": calcPct(countUnsuccess) },
+                { "Metric": "Quantity Increase Attempt", "Count": countQtyAttempt, "%": calcPct(countQtyAttempt) },
+                { "Metric": "PL Product Pitched", "Count": countPL, "%": calcPct(countPL) }
+            ];
+
             var summaryRows = [];
             var transcriptRows = [];
 
@@ -335,8 +458,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                         "Quantity Increase Attempt": pharma.quantity_increase_attempt ? "Yes" : "No",
                         "PL Product Pitched": pharma.pl_product_pitched ? "Yes" : "No",
                         "Complete Call Summary": evalData.summary || "",
-                        "Key Strengths": (evalData.strengths || []).map(function(s, idx) { return (idx+1) + ". " + s; }).join("\\n"),
-                        "Areas of Improvement": (evalData.improvements || []).map(function(i, idx) { return (idx+1) + ". " + i; }).join("\\n")
+                        "Key Strengths": (evalData.strengths || []).map(function(s, idx) { return (idx+1) + ". " + s; }).join("\n"),
+                        "Areas of Improvement": (evalData.improvements || []).map(function(i, idx) { return (idx+1) + ". " + i; }).join("\n")
                     });
 
                     transcript.forEach(function(t) {
@@ -351,24 +474,28 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var workbook = XLSX.utils.book_new();
 
+            var aggregateSheet = XLSX.utils.json_to_sheet(aggregateRows);
+            aggregateSheet['!cols'] = [{ wch: 35 }, { wch: 12 }, { wch: 12 }];
+            XLSX.utils.book_append_sheet(workbook, aggregateSheet, "Batch Metric Summary");
+
             var summarySheet = XLSX.utils.json_to_sheet(summaryRows);
             summarySheet['!cols'] = [
                 { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 18 },
                 { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 18 },
                 { wch: 22 }, { wch: 18 }, { wch: 50 }, { wch: 35 }, { wch: 35 }
             ];
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Pharma Call Audit Summary");
+            XLSX.utils.book_append_sheet(workbook, summarySheet, "Per Call QA Details");
 
             if(transcriptRows.length > 0) {
                 var transcriptSheet = XLSX.utils.json_to_sheet(transcriptRows);
                 transcriptSheet['!cols'] = [
                     { wch: 25 }, { wch: 15 }, { wch: 85 }
                 ];
-                XLSX.utils.book_append_sheet(workbook, transcriptSheet, "Full Call Transcripts");
+                XLSX.utils.book_append_sheet(workbook, transcriptSheet, "Full Transcripts");
             }
 
             var dateStr = new Date().toISOString().slice(0, 10);
-            XLSX.writeFile(workbook, "Pharma_Call_Audit_Analysis_" + dateStr + ".xlsx");
+            XLSX.writeFile(workbook, "Pharma_Call_Audit_Report_" + dateStr + ".xlsx");
         }
 
         function exportHistoryExcel() {
