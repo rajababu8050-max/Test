@@ -53,19 +53,19 @@ HTML_CONTENT = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro</title>
+    <title>AI Call Quality Auditor Pro - Pharma Upsell Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
-    <div class="max-w-5xl mx-auto space-y-6">
+    <div class="max-w-6xl mx-auto space-y-6">
         
         <div class="text-center space-y-2">
             <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
                 AI Call Quality Auditor Pro
             </h1>
-            <p class="text-slate-400 text-sm">Upload audio files for voice metrics, LLM evaluation & Excel/PDF export</p>
+            <p class="text-slate-400 text-sm">Pharma Upsell Metrics Evaluation & Batch Quality Auditing</p>
         </div>
 
         <!-- Upload Card -->
@@ -85,7 +85,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
             <div id="loader" class="hidden mt-4 text-xs text-blue-400 animate-pulse font-medium">
-                ⏳ Auditing speech, generating comprehensive summary & detailed transcript... Please wait...
+                ⏳ Auditing speech, analyzing Pharma Upsell metrics & generating summary... Please wait...
             </div>
         </div>
 
@@ -122,12 +122,15 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <tr>
                             <th class="p-2">File</th>
                             <th class="p-2">Score</th>
-                            <th class="p-2">Pace</th>
+                            <th class="p-2">Upsell Opp.</th>
+                            <th class="p-2">Pitch Done</th>
+                            <th class="p-2">Successful</th>
+                            <th class="p-2">PL Pitched</th>
                             <th class="p-2">Date</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="7" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -189,6 +192,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 var data = item.data || {};
                 var evalData = data.evaluation || {};
+                var pharma = evalData.pharma_upsell_metrics || {};
                 var metrics = data.metrics || {};
                 var transcript = data.transcript || [];
                 
@@ -211,11 +215,17 @@ HTML_CONTENT = """<!DOCTYPE html>
                     improvementsHtml += '<li>' + i + '</li>';
                 });
 
+                var fmtBool = function(val) {
+                    return val ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
+                };
+
                 card.innerHTML = 
                     '<div class="flex justify-between items-center border-b border-slate-700 pb-3">' +
                         '<h3 class="font-bold text-blue-400 text-sm">📁 ' + item.filename + '</h3>' +
                         '<span class="text-emerald-400 font-extrabold text-lg">' + (evalData.overall_score || 0) + '/100</span>' +
                     '</div>' +
+                    
+                    '<!-- Call Audio Metrics -->' +
                     '<div class="grid grid-cols-3 gap-2 text-center text-xs">' +
                         '<div class="bg-slate-900/50 p-2 rounded-lg">' +
                             '<span class="text-slate-500 block text-[10px]">PACE</span>' +
@@ -230,6 +240,20 @@ HTML_CONTENT = """<!DOCTYPE html>
                             '<span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span>' +
                         '</div>' +
                     '</div>' +
+
+                    '<!-- Pharma Upsell Audit Grid -->' +
+                    '<div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 space-y-2">' +
+                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Pharma Upsell Metrics</div>' +
+                        '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Upsell Opp. Available: ' + fmtBool(pharma.upsell_opportunity_available) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Upsell Pitch Done: ' + fmtBool(pharma.upsell_pitch_done) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Pitch Ineffective: ' + fmtBool(pharma.upsell_pitch_ineffective) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Successful Upsell: ' + fmtBool(pharma.successful_upsell) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Quantity Increase Attempt: ' + fmtBool(pharma.quantity_increase_attempt) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">PL Product Pitched: ' + fmtBool(pharma.pl_product_pitched) + '</div>' +
+                        '</div>' +
+                    '</div>' +
+
                     '<div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 space-y-1">' +
                         '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
                         '<p class="text-slate-300 leading-relaxed">' + (evalData.summary || "N/A") + '</p>' +
@@ -260,16 +284,20 @@ HTML_CONTENT = """<!DOCTYPE html>
                 historyDataList = list || [];
                 var hTable = document.getElementById('historyTable');
                 if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits in Firebase.</td></tr>';
+                    hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No past audits in Firebase.</td></tr>';
                     return;
                 }
                 hTable.innerHTML = "";
                 list.forEach(function(item) {
+                    var p = item.pharma_metrics || {};
                     hTable.innerHTML += 
                         '<tr class="border-b border-slate-700/50">' +
                             '<td class="p-2 font-medium text-slate-200">' + item.filename + '</td>' +
                             '<td class="p-2 text-emerald-400 font-bold">' + item.score + '/100</td>' +
-                            '<td class="p-2 text-blue-400">' + item.wpm + ' WPM</td>' +
+                            '<td class="p-2">' + (p.upsell_opportunity_available ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.upsell_pitch_done ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.successful_upsell ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.pl_product_pitched ? '✅' : '❌') + '</td>' +
                             '<td class="p-2 text-slate-500">' + item.created_at + '</td>' +
                         '</tr>';
                 });
@@ -291,6 +319,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 if(item.status === "success") {
                     var data = item.data || {};
                     var evalData = data.evaluation || {};
+                    var pharma = evalData.pharma_upsell_metrics || {};
                     var metrics = data.metrics || {};
                     var transcript = data.transcript || [];
 
@@ -299,7 +328,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                         "QA Score (/100)": evalData.overall_score || 0,
                         "Pace (WPM)": metrics.wpm || 0,
                         "Call Duration (Sec)": Math.round(metrics.duration || 0),
-                        "Total Words Spoken": metrics.total_words || 0,
+                        "Upsell Opportunity Available": pharma.upsell_opportunity_available ? "Yes" : "No",
+                        "Upsell Pitch Done": pharma.upsell_pitch_done ? "Yes" : "No",
+                        "Upsell Pitch Ineffective": pharma.upsell_pitch_ineffective ? "Yes" : "No",
+                        "Successful Upsell": pharma.successful_upsell ? "Yes" : "No",
+                        "Quantity Increase Attempt": pharma.quantity_increase_attempt ? "Yes" : "No",
+                        "PL Product Pitched": pharma.pl_product_pitched ? "Yes" : "No",
                         "Complete Call Summary": evalData.summary || "",
                         "Key Strengths": (evalData.strengths || []).map(function(s, idx) { return (idx+1) + ". " + s; }).join("\\n"),
                         "Areas of Improvement": (evalData.improvements || []).map(function(i, idx) { return (idx+1) + ". " + i; }).join("\\n")
@@ -320,9 +354,10 @@ HTML_CONTENT = """<!DOCTYPE html>
             var summarySheet = XLSX.utils.json_to_sheet(summaryRows);
             summarySheet['!cols'] = [
                 { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 18 },
-                { wch: 18 }, { wch: 60 }, { wch: 40 }, { wch: 40 }
+                { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 18 },
+                { wch: 22 }, { wch: 18 }, { wch: 50 }, { wch: 35 }, { wch: 35 }
             ];
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Call Audit Summary");
+            XLSX.utils.book_append_sheet(workbook, summarySheet, "Pharma Call Audit Summary");
 
             if(transcriptRows.length > 0) {
                 var transcriptSheet = XLSX.utils.json_to_sheet(transcriptRows);
@@ -333,7 +368,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
 
             var dateStr = new Date().toISOString().slice(0, 10);
-            XLSX.writeFile(workbook, "Detailed_Call_Audit_Analysis_" + dateStr + ".xlsx");
+            XLSX.writeFile(workbook, "Pharma_Call_Audit_Analysis_" + dateStr + ".xlsx");
         }
 
         function exportHistoryExcel() {
@@ -343,10 +378,15 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
 
             var exportRows = historyDataList.map(function(item) {
+                var p = item.pharma_metrics || {};
                 return {
                     "File Name": item.filename,
                     "QA Score": item.score,
                     "Pace (WPM)": item.wpm,
+                    "Upsell Opp.": p.upsell_opportunity_available ? "Yes" : "No",
+                    "Upsell Pitched": p.upsell_pitch_done ? "Yes" : "No",
+                    "Successful Upsell": p.successful_upsell ? "Yes" : "No",
+                    "PL Pitched": p.pl_product_pitched ? "Yes" : "No",
                     "Detailed Call Summary": item.summary || "",
                     "Audit Date & Time": item.created_at
                 };
@@ -354,7 +394,8 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var worksheet = XLSX.utils.json_to_sheet(exportRows);
             worksheet['!cols'] = [
-                { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 60 }, { wch: 20 }
+                { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
+                { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 50 }, { wch: 20 }
             ];
 
             var workbook = XLSX.utils.book_new();
@@ -368,7 +409,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var element = document.getElementById('batchResultsContainer');
             var opt = {
                 margin:       0.3,
-                filename:     "Batch_Call_Audit_Report_" + new Date().toISOString().slice(0,10) + ".pdf",
+                filename:     "Batch_Pharma_Call_Audit_Report_" + new Date().toISOString().slice(0,10) + ".pdf",
                 image:        { type: 'jpeg', quality: 0.98 },
                 html2canvas:  { scale: 2, backgroundColor: '#0f172a' },
                 jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
@@ -434,25 +475,41 @@ def transcribe_bytes(audio_bytes):
     return formatted_transcript, metrics
 
 def evaluate_quality(transcript):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
     headers = {"Content-Type": "application/json"}
     
     prompt = f"""
-    Aap ek Senior Call Center Quality Assurance (QA) Manager hain.
-    Niche diya gaya call transcript poori tarah analyze karke AGENT ka Quality Score (0-100) aur comprehensive audit report tayyar karein.
+    Aap ek Senior Pharma Call Center Quality Assurance (QA) Manager hain.
+    Niche diya gaya call transcript poori tarah analyze karke AGENT ka Quality Score (0-100), Pharma Upsell Metrics aur comprehensive audit report tayyar karein.
     
     Transcript:
     {json.dumps(transcript, indent=2)}
     
+    Pharma Upsell Metrics Evaluation Criteria (Set boolean true/false for each):
+    1. upsell_opportunity_available: Kya customer ke order/inquiry me complementary medicine, health supplement, extra quantity, ya substitute product cross-sell/upsell karne ka mauka tha?
+    2. upsell_pitch_done: Kya agent ne kisi bhi tarah ka upsell product/offer pitch karne ki koshish ki?
+    3. upsell_pitch_ineffective: Kya agent ki pitch kamzor/ineffective thi jisse customer ne mana kar diya ya agent clear explanation nahi de paya?
+    4. successful_upsell: Kya customer ne upsell offer accept karke additional product kharida?
+    5. quantity_increase_attempt: Kya agent ne ordered product ki quantity/pack size badhane ki koshish ki (e.g., 1 strip ki jagah 3 strips ya monthly pack)?
+    6. pl_product_pitched: Kya agent ne Private Label (PL) / Store Brand / Substitute product suggest/pitch kiya?
+
     Requirements:
-    1. 'summary' field me call ka COMPREHENSIVE aur DETAILED SUMMARY (in-depth 4-6 lines) Hindi/Hinglish me likhein. Iss summary me Customer ki query/problem, Agent ne kaise handle kiya, kya resolution diya ya kya follow-up promised hai, sab clearly mention ho.
-    2. 'strengths' field me Agent ke strong points add karein.
-    3. 'improvements' field me areas of improvement detail me add karein.
+    - 'summary' field me call ka COMPREHENSIVE aur DETAILED SUMMARY (in-depth 4-6 lines) Hindi/Hinglish me likhein.
+    - 'strengths' field me Agent ke strong points add karein.
+    - 'improvements' field me areas of improvement detail me add karein.
     
     Output STRICTLY valid JSON format me dein without markdown code block tags:
     {{
         "overall_score": 85,
-        "summary": "Detailed call summary covering customer query, agent response, resolution provided, and overall conversation flow...",
+        "summary": "Detailed call summary covering customer query, agent response, upsell attempt, and overall conversation flow...",
+        "pharma_upsell_metrics": {{
+            "upsell_opportunity_available": true,
+            "upsell_pitch_done": true,
+            "upsell_pitch_ineffective": false,
+            "successful_upsell": false,
+            "quantity_increase_attempt": true,
+            "pl_product_pitched": false
+        }},
         "strengths": ["Point 1", "Point 2"],
         "improvements": ["Point 1", "Point 2"]
     }}
@@ -484,6 +541,7 @@ async def process_single_file(file: UploadFile):
                     "filename": file.filename,
                     "score": evaluation.get("overall_score", 0),
                     "summary": evaluation.get("summary", ""),
+                    "pharma_metrics": evaluation.get("pharma_upsell_metrics", {}),
                     "wpm": metrics["wpm"],
                     "created_at": created_time,
                     "timestamp": firestore.SERVER_TIMESTAMP
@@ -532,6 +590,7 @@ async def get_history():
                     "filename": data.get("filename", ""),
                     "score": data.get("score", 0),
                     "summary": data.get("summary", ""),
+                    "pharma_metrics": data.get("pharma_metrics", {}),
                     "wpm": data.get("wpm", 0),
                     "created_at": data.get("created_at", "")
                 })
@@ -546,6 +605,7 @@ async def get_history():
                     "filename": data.get("filename", ""),
                     "score": data.get("score", 0),
                     "summary": data.get("summary", ""),
+                    "pharma_metrics": data.get("pharma_metrics", {}),
                     "wpm": data.get("wpm", 0),
                     "created_at": data.get("created_at", "")
                 })
