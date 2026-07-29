@@ -3,10 +3,10 @@ import json
 import re
 import asyncio
 import requests
-from typing import List, Dict, Any
+from typing import List
 from datetime import datetime
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -26,7 +26,6 @@ app.add_middleware(
 # Firebase Setup
 firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
 
-db = None
 if firebase_json_env:
     try:
         cred_dict = json.loads(firebase_json_env)
@@ -35,44 +34,16 @@ if firebase_json_env:
         db = firestore.client()
         print("✅ Firebase Firestore Connected Successfully!")
     except Exception as e:
+        db = None
         print("❌ Firebase Connection Error:", e)
 else:
-    print("⚠️ FIREBASE_CREDENTIALS Environment Variable missing!")
+    db = None
+    print("❌ FIREBASE_CREDENTIALS Environment Variable missing!")
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 semaphore = asyncio.Semaphore(2)
-
-DEFAULT_METRICS = [
-    {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there a chance to offer an additional product?"},
-    {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent pitch an upsell item?"},
-    {"key": "upsell_pitch_ineffective", "label": "Pitch Ineffective", "description": "Was the pitch unclear or poorly timed?"},
-    {"key": "successful_upsell", "label": "Successful Upsell", "description": "Did the customer accept the upsell?"},
-    {"key": "quantity_increase_attempt", "label": "Quantity Increase Attempt", "description": "Did the agent attempt to increase item quantity?"},
-    {"key": "pl_product_pitched", "label": "PL Product Pitched", "description": "Did the agent pitch a Private Label product?"}
-]
-
-IN_MEMORY_METRICS = list(DEFAULT_METRICS)
-
-def get_stored_metrics() -> List[Dict[str, Any]]:
-    if not db:
-        return IN_MEMORY_METRICS
-    try:
-        docs = list(db.collection("custom_metrics").stream())
-        if not docs:
-            for m in DEFAULT_METRICS:
-                db.collection("custom_metrics").document(m["key"]).set(m)
-            return DEFAULT_METRICS
-        metrics = []
-        for doc in docs:
-            data = doc.to_dict()
-            data["id"] = doc.id
-            metrics.append(data)
-        return metrics
-    except Exception as e:
-        print("❌ Error fetching dynamic metrics:", e)
-        return IN_MEMORY_METRICS
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en">
@@ -84,8 +55,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans pb-40">
-
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-6xl mx-auto space-y-6">
         
         <div class="text-center space-y-2">
@@ -93,19 +63,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 AI Call Quality Auditor Pro
             </h1>
             <p class="text-slate-400 text-sm">Pharma Upsell Metrics Evaluation & Batch Quality Auditing</p>
-        </div>
-
-        <!-- Dynamic Metrics Manager Card -->
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg space-y-3">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
-                <h3 class="text-sm font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
-                <button type="button" onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">
-                    + Add New Metric
-                </button>
-            </div>
-            <div id="metricsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                <div class="text-slate-500 text-xs">Loading metrics...</div>
-            </div>
         </div>
 
         <!-- Upload Card -->
@@ -134,16 +91,16 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="flex justify-between items-center text-slate-300 font-semibold border-b border-slate-800 pb-2 flex-wrap gap-2">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
-                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg">
+                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
                         📊 Export Detailed Excel (.xlsx)
                     </button>
-                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl">
+                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">
                         📥 Export PDF Report
                     </button>
                 </div>
             </div>
 
-            <!-- Aggregate Summary Table Box -->
+            <!-- Aggregate Pharma Upsell Table Box -->
             <div id="summaryTableContainer" class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
@@ -176,7 +133,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-sm font-semibold text-slate-300">🔥 Firebase Cloud Audits History</h3>
                 <div class="flex gap-2">
-                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium">
+                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1">
                         📊 Export History to Excel
                     </button>
                     <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">Refresh</button>
@@ -188,12 +145,15 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <tr>
                             <th class="p-2">File</th>
                             <th class="p-2">Score</th>
-                            <th class="p-2">Summary</th>
+                            <th class="p-2">Upsell Opp.</th>
+                            <th class="p-2">Pitch Done</th>
+                            <th class="p-2">Successful</th>
+                            <th class="p-2">PL Pitched</th>
                             <th class="p-2">Date</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="7" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -201,164 +161,15 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     </div>
 
-    <!-- On-screen Mobile Logger Box at Bottom -->
-    <div class="fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700 p-2 text-[10px] font-mono text-emerald-400 max-h-28 overflow-y-auto z-40" id="debugLog">
-        <div>📱 System Initialized. Logs will appear here:</div>
-    </div>
-
-    <!-- Modal for Add/Edit Dynamic Metric -->
-    <div id="metricModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 w-full max-w-md space-y-3">
-            <h3 id="modalTitle" class="text-base font-bold text-slate-200">Add Dynamic Metric</h3>
-            <input type="hidden" id="metricId">
-            <div>
-                <label class="text-xs text-slate-400 block mb-1">Metric Key (e.g. greeting_done)</label>
-                <input type="text" id="metricKey" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="e.g. greeting_done">
-            </div>
-            <div>
-                <label class="text-xs text-slate-400 block mb-1">Display Label</label>
-                <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="e.g. Standard Greeting Done">
-            </div>
-            <div>
-                <label class="text-xs text-slate-400 block mb-1">Description / Rule</label>
-                <textarea id="metricDesc" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="When is this true/false?"></textarea>
-            </div>
-            <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-xs rounded-xl text-slate-300">Cancel</button>
-                <button type="button" onclick="saveMetric()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs rounded-xl text-white font-bold">Save Metric</button>
-            </div>
-        </div>
-    </div>
-
     <script>
-        function logMsg(msg, isError) {
-            var box = document.getElementById('debugLog');
-            if(box) {
-                var d = document.createElement('div');
-                d.className = isError ? "text-rose-400 font-bold" : "text-emerald-400";
-                d.innerText = "[" + new Date().toLocaleTimeString() + "] " + msg;
-                box.appendChild(d);
-                box.scrollTop = box.scrollHeight;
-            }
-        }
-
-        window.onerror = function(msg, url, line) {
-            logMsg("JS Crash: " + msg + " (Line " + line + ")", true);
-            return false;
-        };
-
         var selectedFiles = [];
         var currentBatchResults = [];
         var historyDataList = [];
-        var currentMetrics = [];
-
-        async function loadMetrics() {
-            logMsg("Fetching dynamic metrics...");
-            try {
-                var res = await fetch("/api/metrics");
-                if(!res.ok) throw new Error("HTTP " + res.status);
-                currentMetrics = await res.json();
-                logMsg("Metrics loaded: " + currentMetrics.length);
-            } catch(e) {
-                logMsg("Failed to load metrics: " + e.message, true);
-                currentMetrics = [];
-            }
-            renderMetricsList();
-        }
-
-        function renderMetricsList() {
-            var container = document.getElementById('metricsList');
-            container.innerHTML = "";
-            if(!currentMetrics || currentMetrics.length === 0) {
-                container.innerHTML = '<div class="text-slate-500 text-xs">No metrics found. Click "+ Add New Metric".</div>';
-                return;
-            }
-            currentMetrics.forEach(function(m) {
-                var card = document.createElement('div');
-                card.className = "bg-slate-900/60 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center";
-                var k = m.key || m.id;
-                card.innerHTML = 
-                    '<div>' +
-                        '<div class="font-bold text-xs text-slate-200">' + (m.label || k) + '</div>' +
-                        '<div class="text-[10px] text-slate-400 font-mono">' + k + '</div>' +
-                    '</div>' +
-                    '<div class="flex gap-2">' +
-                        '<button type="button" onclick="editMetric(\'' + k + '\')" class="text-blue-400 hover:text-blue-300 text-xs font-bold">Edit</button>' +
-                        '<button type="button" onclick="deleteMetric(\'' + k + '\')" class="text-rose-400 hover:text-rose-300 text-xs font-bold">Delete</button>' +
-                    '</div>';
-                container.appendChild(card);
-            });
-        }
-
-        function openMetricModal(metric) {
-            document.getElementById('metricId').value = metric ? (metric.id || metric.key) : '';
-            document.getElementById('metricKey').value = metric ? metric.key : '';
-            document.getElementById('metricLabel').value = metric ? metric.label : '';
-            document.getElementById('metricDesc').value = metric ? (metric.description || '') : '';
-            document.getElementById('modalTitle').innerText = metric ? 'Edit Metric' : 'Add Dynamic Metric';
-            document.getElementById('metricKey').disabled = !!metric;
-            document.getElementById('metricModal').classList.remove('hidden');
-        }
-
-        function closeMetricModal() {
-            document.getElementById('metricModal').classList.add('hidden');
-        }
-
-        function editMetric(key) {
-            var m = currentMetrics.find(x => (x.key === key || x.id === key));
-            if(m) openMetricModal(m);
-        }
-
-        async function saveMetric() {
-            var id = document.getElementById('metricId').value;
-            var key = document.getElementById('metricKey').value.trim();
-            var label = document.getElementById('metricLabel').value.trim();
-            var description = document.getElementById('metricDesc').value.trim();
-
-            if(!key || !label) {
-                alert("Key and Label are required!");
-                return;
-            }
-
-            var method = id ? "PUT" : "POST";
-            var url = id ? "/api/metrics/" + encodeURIComponent(id) : "/api/metrics";
-
-            try {
-                logMsg("Saving metric " + key + "...");
-                var res = await fetch(url, {
-                    method: method,
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ key, label, description })
-                });
-                if(!res.ok) throw new Error("HTTP " + res.status);
-                logMsg("Metric saved successfully!");
-                closeMetricModal();
-                loadMetrics();
-            } catch(e) {
-                logMsg("Save error: " + e.message, true);
-                alert("Error: " + e.message);
-            }
-        }
-
-        async function deleteMetric(key) {
-            if(!confirm("Delete metric " + key + "?")) return;
-            try {
-                logMsg("Deleting metric " + key + "...");
-                var res = await fetch("/api/metrics/" + encodeURIComponent(key), { method: "DELETE" });
-                if(!res.ok) throw new Error("HTTP " + res.status);
-                logMsg("Metric deleted!");
-                loadMetrics();
-            } catch(e) {
-                logMsg("Delete error: " + e.message, true);
-                alert("Error: " + e.message);
-            }
-        }
 
         function fileSelected(e) {
             selectedFiles = Array.from(e.target.files);
             if(selectedFiles.length > 0) {
                 document.getElementById('fileName').innerText = selectedFiles.length + " file(s) selected";
-                logMsg(selectedFiles.length + " file(s) selected");
             }
         }
 
@@ -370,7 +181,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('batchResultsContainer').classList.add('hidden');
-            logMsg("Starting batch analysis for " + selectedFiles.length + " files...");
             
             var formData = new FormData();
             selectedFiles.forEach(function(file) {
@@ -380,15 +190,13 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 var res = await fetch("/api/analyze-batch", { method: "POST", body: formData });
                 var batchData = await res.json();
-                if(!res.ok) throw new Error(batchData.detail || ("HTTP " + res.status));
+                if(!res.ok) throw new Error(batchData.detail || "Server error");
 
-                logMsg("Analysis completed!");
                 currentBatchResults = batchData.results || [];
                 renderBatchResults(currentBatchResults);
                 document.getElementById('batchResultsContainer').classList.remove('hidden');
                 setTimeout(loadHistory, 1000);
             } catch(err) {
-                logMsg("Batch Analysis Error: " + err.message, true);
                 alert("Error: " + err.message);
             } finally {
                 document.getElementById('loader').classList.add('hidden');
@@ -402,15 +210,20 @@ HTML_CONTENT = """<!DOCTYPE html>
             var validResults = results.filter(function(r) { return r.status === "success"; });
             var totalCalls = validResults.length;
 
-            var counts = {};
-            (currentMetrics || []).forEach(function(m) { counts[m.key] = 0; });
+            var countOpp = 0, countPitchDone = 0, countIneffective = 0, countSuccess = 0, countUnsuccess = 0, countQtyAttempt = 0, countPL = 0;
 
             validResults.forEach(function(item) {
-                var pharma = item.data?.evaluation?.pharma_upsell_metrics || item.data?.evaluation?.dynamic_metrics || {};
-                (currentMetrics || []).forEach(function(m) {
-                    if (pharma[m.key]) counts[m.key]++;
-                });
+                var pharma = item.data?.evaluation?.pharma_upsell_metrics || {};
+                if (pharma.upsell_opportunity_available) countOpp++;
+                if (pharma.upsell_pitch_done) countPitchDone++;
+                if (pharma.upsell_pitch_ineffective) countIneffective++;
+                if (pharma.successful_upsell) countSuccess++;
+                if (pharma.quantity_increase_attempt) countQtyAttempt++;
+                if (pharma.pl_product_pitched) countPL++;
+                if (pharma.upsell_pitch_done && !pharma.successful_upsell) countUnsuccess++;
             });
+
+            var countPitchNotDoneOrIneffective = (totalCalls - countPitchDone) + countIneffective;
 
             function calcPct(val) {
                 if (totalCalls === 0) return "0%";
@@ -420,13 +233,21 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
             document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + new Date().toLocaleString();
 
-            var summaryHtml = '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">' + totalCalls + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>';
+            var summaryRows = [
+                { metric: "Total Calls Reviewed", count: totalCalls, pct: "100%" },
+                { metric: "Upsell Opportunity Available", count: countOpp, pct: calcPct(countOpp) },
+                { metric: "Upsell Pitch Done", count: countPitchDone, pct: calcPct(countPitchDone) },
+                { metric: "Upsell Pitch Not Done / Ineffective", count: countPitchNotDoneOrIneffective, pct: calcPct(countPitchNotDoneOrIneffective) },
+                { metric: "Successful Upsell", count: countSuccess, pct: calcPct(countSuccess) },
+                { metric: "Unsuccessful Upsell", count: countUnsuccess, pct: calcPct(countUnsuccess) },
+                { metric: "Quantity Increase Attempt", count: countQtyAttempt, pct: calcPct(countQtyAttempt) },
+                { metric: "PL Product Pitched", count: countPL, pct: calcPct(countPL) }
+            ];
 
-            (currentMetrics || []).forEach(function(m) {
-                var c = counts[m.key] || 0;
-                summaryHtml += '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">' + (m.label || m.key) + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + c + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + calcPct(c) + '</td></tr>';
+            var summaryHtml = "";
+            summaryRows.forEach(function(row) {
+                summaryHtml += '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">' + row.metric + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + row.count + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + row.pct + '</td></tr>';
             });
-
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
             results.forEach(function(item) {
@@ -437,7 +258,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 var data = item.data || {};
                 var evalData = data.evaluation || {};
-                var pharma = evalData.pharma_upsell_metrics || evalData.dynamic_metrics || {};
+                var pharma = evalData.pharma_upsell_metrics || {};
                 var metrics = data.metrics || {};
                 var transcript = data.transcript || [];
                 
@@ -454,11 +275,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     return val ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
                 };
 
-                var dynamicMetricsHtml = "";
-                (currentMetrics || []).forEach(function(m) {
-                    dynamicMetricsHtml += '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">' + (m.label || m.key) + ': ' + fmtBool(pharma[m.key]) + '</div>';
-                });
-
                 card.innerHTML = 
                     '<div class="flex justify-between items-center border-b border-slate-700 pb-3">' +
                         '<h3 class="font-bold text-blue-400 text-sm">📁 ' + item.filename + '</h3>' +
@@ -470,8 +286,15 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">WORDS</span><span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span></div>' +
                     '</div>' +
                     '<div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 space-y-2">' +
-                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics</div>' +
-                        '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' + dynamicMetricsHtml + '</div>' +
+                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Pharma Upsell Metrics</div>' +
+                        '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Upsell Opp. Available: ' + fmtBool(pharma.upsell_opportunity_available) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Upsell Pitch Done: ' + fmtBool(pharma.upsell_pitch_done) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Pitch Ineffective: ' + fmtBool(pharma.upsell_pitch_ineffective) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Successful Upsell: ' + fmtBool(pharma.successful_upsell) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Quantity Increase Attempt: ' + fmtBool(pharma.quantity_increase_attempt) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">PL Product Pitched: ' + fmtBool(pharma.pl_product_pitched) + '</div>' +
+                        '</div>' +
                     '</div>' +
                     '<div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 space-y-1">' +
                         '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
@@ -488,30 +311,32 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
-            logMsg("Fetching audit history...");
             try {
                 var res = await fetch("/api/history");
                 var list = await res.json();
                 historyDataList = list || [];
-                logMsg("History loaded: " + historyDataList.length + " items");
                 
                 if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found.</td></tr>';
+                    hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
                     return;
                 }
                 hTable.innerHTML = "";
                 list.forEach(function(item) {
+                    var p = item.pharma_metrics || {};
                     hTable.innerHTML += 
                         '<tr class="border-b border-slate-700/50">' +
                             '<td class="p-2 font-medium text-slate-200">' + (item.filename || 'N/A') + '</td>' +
                             '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
-                            '<td class="p-2 text-slate-300 text-xs truncate max-w-xs">' + (item.summary || 'N/A') + '</td>' +
+                            '<td class="p-2">' + (p.upsell_opportunity_available ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.upsell_pitch_done ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.successful_upsell ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.pl_product_pitched ? '✅' : '❌') + '</td>' +
                             '<td class="p-2 text-slate-500">' + (item.created_at || 'N/A') + '</td>' +
                         '</tr>';
                 });
             } catch(e) {
-                logMsg("History Load Error: " + e.message, true);
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                console.error("History load error:", e);
+                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
         }
 
@@ -534,7 +359,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "File Name": item.filename,
                 "QA Score": item.score,
                 "WPM": item.wpm,
-                "Summary": item.summary,
                 "Created At": item.created_at
             })));
             XLSX.utils.book_append_sheet(workbook, sheet, "History");
@@ -546,10 +370,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             html2pdf().from(element).save("Batch_Pharma_Call_Audit_Report.pdf");
         }
 
-        window.onload = function() { 
-            loadMetrics();
-            loadHistory(); 
-        };
+        window.onload = function() { loadHistory(); };
     </script>
 </body>
 </html>
@@ -558,54 +379,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui():
     return HTML_CONTENT
-
-@app.get("/api/metrics")
-async def get_metrics():
-    return get_stored_metrics()
-
-@app.post("/api/metrics")
-async def create_metric(payload: Dict[str, Any] = Body(...)):
-    key = payload.get("key", "").strip()
-    label = payload.get("label", "").strip()
-    description = payload.get("description", "").strip()
-
-    if not key or not label:
-        raise HTTPException(status_code=400, detail="Key and Label required")
-
-    key = re.sub(r'[^a-zA-Z0-9_]', '_', key.lower())
-
-    metric_doc = {
-        "key": key,
-        "label": label,
-        "description": description,
-        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-
-    if db:
-        db.collection("custom_metrics").document(key).set(metric_doc)
-
-    return {"status": "success", "data": metric_doc}
-
-@app.put("/api/metrics/{metric_id}")
-async def update_metric(metric_id: str, payload: Dict[str, Any] = Body(...)):
-    metric_doc = {
-        "label": payload.get("label", "").strip(),
-        "description": payload.get("description", "").strip(),
-        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
-
-    if db:
-        doc_ref = db.collection("custom_metrics").document(metric_id)
-        if doc_ref.get().exists:
-            doc_ref.update(metric_doc)
-
-    return {"status": "success", "data": metric_doc}
-
-@app.delete("/api/metrics/{metric_id}")
-async def delete_metric(metric_id: str):
-    if db:
-        db.collection("custom_metrics").document(metric_id).delete()
-    return {"status": "success", "deleted_id": metric_id}
 
 def transcribe_bytes(audio_bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
@@ -634,31 +407,23 @@ def transcribe_bytes(audio_bytes):
     wpm = int((total_words / duration) * 60) if duration > 0 else 0
     return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
-def evaluate_quality(transcript, dynamic_metrics):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
-    
-    metrics_schema_prompt = {}
-    metrics_rules_text = ""
-    for m in dynamic_metrics:
-        m_key = m["key"]
-        m_label = m.get("label", m_key)
-        m_desc = m.get("description", "")
-        metrics_schema_prompt[m_key] = True
-        metrics_rules_text += f"- `{m_key}` ({m_label}): {m_desc}\n"
-
+def evaluate_quality(transcript):
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     prompt = f"""
-    Analyze transcript for Pharma Agent Quality Score (0-100) & Dynamic Evaluation Metrics.
-    
-    DYNAMIC METRICS TO EVALUATE:
-    {metrics_rules_text}
-
+    Analyze transcript for Pharma Agent Quality Score (0-100) & Pharma Upsell Metrics.
     Transcript: {json.dumps(transcript, indent=2)}
-    
     Return JSON ONLY:
     {{
         "overall_score": 85,
         "summary": "Detailed call summary...",
-        "pharma_upsell_metrics": {json.dumps(metrics_schema_prompt, indent=2)},
+        "pharma_upsell_metrics": {{
+            "upsell_opportunity_available": true,
+            "upsell_pitch_done": true,
+            "upsell_pitch_ineffective": false,
+            "successful_upsell": false,
+            "quantity_increase_attempt": true,
+            "pl_product_pitched": false
+        }},
         "strengths": ["Strong point"],
         "improvements": ["Improvement point"]
     }}
@@ -675,11 +440,8 @@ async def process_single_file(file: UploadFile):
     try:
         audio_bytes = await file.read()
         loop = asyncio.get_event_loop()
-        
-        dynamic_metrics = get_stored_metrics()
-
         transcript, metrics = await loop.run_in_executor(None, transcribe_bytes, audio_bytes)
-        evaluation = await loop.run_in_executor(None, evaluate_quality, transcript, dynamic_metrics)
+        evaluation = await loop.run_in_executor(None, evaluate_quality, transcript)
         
         created_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -731,6 +493,7 @@ async def get_history():
                 "created_at": data.get("created_at", "")
             })
         
+        # Sort in memory by creation time
         history.sort(key=lambda x: x["created_at"], reverse=True)
         return history
     except Exception as e:
