@@ -26,6 +26,7 @@ app.add_middleware(
 # Firebase Setup
 firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
 
+db = None
 if firebase_json_env:
     try:
         cred_dict = json.loads(firebase_json_env)
@@ -34,11 +35,9 @@ if firebase_json_env:
         db = firestore.client()
         print("✅ Firebase Firestore Connected Successfully!")
     except Exception as e:
-        db = None
         print("❌ Firebase Connection Error:", e)
 else:
-    db = None
-    print("❌ FIREBASE_CREDENTIALS Environment Variable missing!")
+    print("⚠️ FIREBASE_CREDENTIALS Environment Variable missing!")
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -55,9 +54,11 @@ DEFAULT_METRICS = [
     {"key": "pl_product_pitched", "label": "PL Product Pitched", "description": "Did the agent pitch a Private Label product?"}
 ]
 
+IN_MEMORY_METRICS = list(DEFAULT_METRICS)
+
 def get_stored_metrics() -> List[Dict[str, Any]]:
     if not db:
-        return DEFAULT_METRICS
+        return IN_MEMORY_METRICS
     try:
         docs = list(db.collection("custom_metrics").stream())
         if not docs:
@@ -72,7 +73,7 @@ def get_stored_metrics() -> List[Dict[str, Any]]:
         return metrics
     except Exception as e:
         print("❌ Error fetching dynamic metrics:", e)
-        return DEFAULT_METRICS
+        return IN_MEMORY_METRICS
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en">
@@ -85,6 +86,16 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+
+    <!-- Mobile Debugging Popup (Catch errors on phone screen) -->
+    <div id="mobileErrorLog" class="hidden fixed top-2 left-2 right-2 z-50 bg-rose-900 border-2 border-rose-500 text-rose-100 p-3 rounded-xl text-xs space-y-2 shadow-2xl">
+        <div class="flex justify-between font-bold border-b border-rose-700 pb-1">
+            <span>⚠️ Error Occurred (Mobile Debugger)</span>
+            <button type="button" onclick="document.getElementById('mobileErrorLog').classList.add('hidden')">✕</button>
+        </div>
+        <div id="mobileErrorText" class="font-mono text-[11px] break-all"></div>
+    </div>
+
     <div class="max-w-6xl mx-auto space-y-6">
         
         <div class="text-center space-y-2">
@@ -94,11 +105,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             <p class="text-slate-400 text-sm">Pharma Upsell Metrics Evaluation & Batch Quality Auditing</p>
         </div>
 
-        <!-- Dynamic Metrics Manager -->
+        <!-- Dynamic Metrics Manager Card -->
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg space-y-3">
             <div class="flex justify-between items-center border-b border-slate-700 pb-2">
                 <h3 class="text-sm font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
-                <button type="button" onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">
+                <button type="button" onclick="openMetricModal(null)" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">
                     + Add New Metric
                 </button>
             </div>
@@ -200,13 +211,13 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     </div>
 
-    <!-- Modal for Add/Edit Metric -->
+    <!-- Modal for Add/Edit Dynamic Metric -->
     <div id="metricModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center p-4 z-50">
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 w-full max-w-md space-y-3">
             <h3 id="modalTitle" class="text-base font-bold text-slate-200">Add Dynamic Metric</h3>
             <input type="hidden" id="metricId">
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Metric Key (lowercase_snake_case)</label>
+                <label class="text-xs text-slate-400 block mb-1">Metric Key (e.g. greeting_done)</label>
                 <input type="text" id="metricKey" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="e.g. greeting_done">
             </div>
             <div>
@@ -215,7 +226,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Description / Rule</label>
-                <textarea id="metricDesc" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="Description for evaluation..."></textarea>
+                <textarea id="metricDesc" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="When is this true/false?"></textarea>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-xs rounded-xl text-slate-300">Cancel</button>
@@ -225,6 +236,26 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <script>
+        // Global Error Handlers for Mobile Debugging
+        window.onerror = function(msg, url, lineNo) {
+            var errorBox = document.getElementById('mobileErrorLog');
+            var errorText = document.getElementById('mobileErrorText');
+            if(errorBox && errorText) {
+                errorText.innerText = "JS Error: " + msg + " (Line " + lineNo + ")";
+                errorBox.classList.remove('hidden');
+            }
+            return false;
+        };
+
+        window.onunhandledrejection = function(event) {
+            var errorBox = document.getElementById('mobileErrorLog');
+            var errorText = document.getElementById('mobileErrorText');
+            if(errorBox && errorText) {
+                errorText.innerText = "Async Error: " + (event.reason.message || event.reason);
+                errorBox.classList.remove('hidden');
+            }
+        };
+
         var selectedFiles = [];
         var currentBatchResults = [];
         var historyDataList = [];
@@ -233,6 +264,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadMetrics() {
             try {
                 var res = await fetch("/api/metrics");
+                if(!res.ok) throw new Error("Metrics endpoint failed (" + res.status + ")");
                 currentMetrics = await res.json();
             } catch(e) {
                 console.error("Failed to load metrics:", e);
@@ -245,7 +277,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var container = document.getElementById('metricsList');
             container.innerHTML = "";
             if(!currentMetrics || currentMetrics.length === 0) {
-                container.innerHTML = '<div class="text-slate-500 text-xs">No custom metrics found.</div>';
+                container.innerHTML = '<div class="text-slate-500 text-xs">No metrics found. Click "+ Add New Metric" above.</div>';
                 return;
             }
             currentMetrics.forEach(function(m) {
@@ -304,7 +336,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ key, label, description })
                 });
-                if(!res.ok) throw new Error("Save failed");
+                if(!res.ok) throw new Error("Failed to save metric (" + res.status + ")");
                 closeMetricModal();
                 loadMetrics();
             } catch(e) {
@@ -347,7 +379,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 var res = await fetch("/api/analyze-batch", { method: "POST", body: formData });
                 var batchData = await res.json();
-                if(!res.ok) throw new Error(batchData.detail || "Server error");
+                if(!res.ok) throw new Error(batchData.detail || "Server error during analysis");
 
                 currentBatchResults = batchData.results || [];
                 renderBatchResults(currentBatchResults);
@@ -522,7 +554,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 async def serve_ui():
     return HTML_CONTENT
 
-# Dynamic Metrics Routes
+# Dynamic Metrics API
 @app.get("/api/metrics")
 async def get_metrics():
     return get_stored_metrics()
@@ -571,7 +603,7 @@ async def delete_metric(metric_id: str):
         db.collection("custom_metrics").document(metric_id).delete()
     return {"status": "success", "deleted_id": metric_id}
 
-# Transcribe & Gemini Evaluation
+# Speech & AI Processing
 def transcribe_bytes(audio_bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
     headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
