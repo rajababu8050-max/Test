@@ -37,14 +37,14 @@ if firebase_json_env:
     except Exception as e:
         print("❌ Firebase Connection Error:", e)
 else:
-    print("❌ FIREBASE_CREDENTIALS Environment Variable missing!")
+    print("⚠️ FIREBASE_CREDENTIALS Environment Variable missing! Running with default in-memory storage.")
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 semaphore = asyncio.Semaphore(2)
 
-# Default Metrics
+# Default Standard Metrics
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there a chance to offer an additional product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent pitch an upsell item?"},
@@ -54,20 +54,28 @@ DEFAULT_METRICS = [
     {"key": "pl_product_pitched", "label": "PL Product Pitched", "description": "Did the agent pitch a Private Label product?"}
 ]
 
+# In-memory fallback if Firebase DB is not configured
+IN_MEMORY_METRICS = list(DEFAULT_METRICS)
+
 def get_stored_metrics() -> List[Dict[str, Any]]:
     if not db:
-        return DEFAULT_METRICS
+        return IN_MEMORY_METRICS
     try:
-        docs = db.collection("custom_metrics").stream()
+        docs = list(db.collection("custom_metrics").stream())
+        if not docs:
+            # Seed default metrics to Firestore if empty
+            for m in DEFAULT_METRICS:
+                db.collection("custom_metrics").document(m["key"]).set(m)
+            return DEFAULT_METRICS
         metrics = []
         for doc in docs:
             data = doc.to_dict()
             data["id"] = doc.id
             metrics.append(data)
-        return metrics if metrics else DEFAULT_METRICS
+        return metrics
     except Exception as e:
-        print("❌ Error fetching dynamic metrics:", e)
-        return DEFAULT_METRICS
+        print("❌ Error fetching dynamic metrics from Firebase:", e)
+        return IN_MEMORY_METRICS
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en">
@@ -93,12 +101,12 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg space-y-4">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-base font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
-                <button type="button" onclick="openMetricModal(null)" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
+                <button type="button" onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
                     + Add New Metric
                 </button>
             </div>
             <div id="metricsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div class="text-slate-500 text-xs">Loading configured metrics...</div>
+                <div class="text-slate-500 text-xs">Loading metrics...</div>
             </div>
         </div>
 
@@ -119,7 +127,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
             <div id="loader" class="hidden mt-4 text-xs text-blue-400 animate-pulse font-medium">
-                ⏳ Auditing speech, analyzing dynamic metrics & generating report... Please wait...
+                ⏳ Auditing speech, analyzing metrics & generating summary... Please wait...
             </div>
         </div>
 
@@ -134,6 +142,30 @@ HTML_CONTENT = """<!DOCTYPE html>
                     <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl">
                         📥 Export PDF Report
                     </button>
+                </div>
+            </div>
+
+            <!-- Aggregate Summary Table Box -->
+            <div id="summaryTableContainer" class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                    <div>
+                        <h3 class="text-base font-bold text-blue-400">💊 Batch Aggregate Metrics Summary</h3>
+                        <p class="text-xs text-slate-400" id="summaryTimeSlot">Batch Analytics</p>
+                    </div>
+                    <span id="totalCallsBadge" class="bg-blue-500/20 text-blue-300 text-xs font-bold px-3 py-1 rounded-full border border-blue-500/30">Total Calls: 0</span>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm text-slate-300 border-collapse">
+                        <thead>
+                            <tr class="bg-slate-900/80 text-slate-200 uppercase text-xs border-b border-slate-700">
+                                <th class="p-3">Metric</th>
+                                <th class="p-3 text-center">Count</th>
+                                <th class="p-3 text-center">%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryTableBody" class="divide-y divide-slate-700/50 text-xs md:text-sm">
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -185,8 +217,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="e.g. Greeting Completed">
             </div>
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Evaluation Description</label>
-                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="When is this true/false?"></textarea>
+                <label class="text-xs text-slate-400 block mb-1">Evaluation Rule Description</label>
+                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="Describe rule when this is TRUE or FALSE..."></textarea>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs rounded-xl text-slate-300">Cancel</button>
@@ -206,10 +238,18 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetch("/api/metrics");
                 if(!res.ok) throw new Error("Failed to fetch metrics");
                 currentMetrics = await res.json();
-                renderMetricsList();
             } catch(e) {
                 console.error("Failed to load metrics:", e);
+                currentMetrics = [
+                    {key: "upsell_opportunity_available", label: "Upsell Opportunity Available", description: "Was there a chance to offer an additional product?"},
+                    {key: "upsell_pitch_done", label: "Upsell Pitch Done", description: "Did the agent pitch an upsell item?"},
+                    {key: "upsell_pitch_ineffective", label: "Pitch Ineffective", description: "Was the pitch unclear or poorly timed?"},
+                    {key: "successful_upsell", label: "Successful Upsell", description: "Did the customer accept the upsell?"},
+                    {key: "quantity_increase_attempt", label: "Quantity Increase Attempt", description: "Did the agent attempt to increase item quantity?"},
+                    {key: "pl_product_pitched", label: "PL Product Pitched", description: "Did the agent pitch a Private Label product?"}
+                ];
             }
+            renderMetricsList();
         }
 
         function renderMetricsList() {
@@ -251,7 +291,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function editMetric(id) {
-            var m = currentMetrics.find(x => (x.id === id || x.key === id));
+            var m = (currentMetrics || []).find(x => (x.id === id || x.key === id));
             if(m) openMetricModal(m);
         }
 
@@ -303,7 +343,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function uploadAudioBatch() {
             if(selectedFiles.length === 0) {
-                alert("Please select audio file(s)!");
+                alert("Please select audio file(s) first!");
                 return;
             }
 
@@ -335,6 +375,37 @@ HTML_CONTENT = """<!DOCTYPE html>
             var container = document.getElementById('resultsList');
             container.innerHTML = "";
 
+            var validResults = results.filter(function(r) { return r.status === "success"; });
+            var totalCalls = validResults.length;
+
+            // Calculate Aggregate Counts Dynamically for all metrics
+            var metricCounts = {};
+            (currentMetrics || []).forEach(function(m) { metricCounts[m.key] = 0; });
+
+            validResults.forEach(function(item) {
+                var dynamicEval = item.data?.evaluation?.dynamic_metrics || item.data?.evaluation?.pharma_upsell_metrics || {};
+                (currentMetrics || []).forEach(function(m) {
+                    if (dynamicEval[m.key]) metricCounts[m.key]++;
+                });
+            });
+
+            function calcPct(val) {
+                if (totalCalls === 0) return "0%";
+                return Math.round((val / totalCalls) * 100) + "%";
+            }
+
+            document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
+            document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + new Date().toLocaleString();
+
+            var summaryHtml = '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">' + totalCalls + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>';
+
+            (currentMetrics || []).forEach(function(m) {
+                var count = metricCounts[m.key] || 0;
+                summaryHtml += '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">' + (m.label || m.key) + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + count + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + calcPct(count) + '</td></tr>';
+            });
+            document.getElementById('summaryTableBody').innerHTML = summaryHtml;
+
+            // Render Individual Cards
             results.forEach(function(item) {
                 if(item.status !== "success") {
                     container.innerHTML += '<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed to analyze <b>' + item.filename + '</b>: ' + (item.error || 'Error') + '</div>';
@@ -361,7 +432,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 };
 
                 var dynamicMetricsHtml = "";
-                currentMetrics.forEach(function(m) {
+                (currentMetrics || []).forEach(function(m) {
                     var val = dynamicMetrics[m.key];
                     dynamicMetricsHtml += '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">' + (m.label || m.key) + ': ' + fmtBool(val) + '</div>';
                 });
@@ -491,6 +562,9 @@ async def create_metric(payload: Dict[str, Any] = Body(...)):
 
     if db:
         db.collection("custom_metrics").document(key).set(metric_doc)
+    else:
+        # Fallback in memory
+        IN_MEMORY_METRICS.append(metric_doc)
 
     return {"status": "success", "data": metric_doc}
 
@@ -506,6 +580,11 @@ async def update_metric(metric_id: str, payload: Dict[str, Any] = Body(...)):
         doc_ref = db.collection("custom_metrics").document(metric_id)
         if doc_ref.get().exists:
             doc_ref.update(metric_doc)
+    else:
+        for idx, m in enumerate(IN_MEMORY_METRICS):
+            if m.get("id") == metric_id or m.get("key") == metric_id:
+                IN_MEMORY_METRICS[idx]["label"] = metric_doc["label"]
+                IN_MEMORY_METRICS[idx]["description"] = metric_doc["description"]
 
     return {"status": "success", "data": metric_doc}
 
@@ -513,6 +592,10 @@ async def update_metric(metric_id: str, payload: Dict[str, Any] = Body(...)):
 async def delete_metric(metric_id: str):
     if db:
         db.collection("custom_metrics").document(metric_id).delete()
+    else:
+        global IN_MEMORY_METRICS
+        IN_MEMORY_METRICS = [m for m in IN_MEMORY_METRICS if m.get("key") != metric_id and m.get("id") != metric_id]
+
     return {"status": "success", "deleted_id": metric_id}
 
 # ==================== SPEECH & QUALITY AI ENGINE ====================
@@ -551,7 +634,7 @@ def evaluate_quality(transcript, dynamic_metrics):
     metrics_rules_text = ""
     for m in dynamic_metrics:
         m_key = m["key"]
-        m_label = m["label"]
+        m_label = m.get("label", m_key)
         m_desc = m.get("description", "")
         metrics_schema_prompt[m_key] = True
         metrics_rules_text += f"- `{m_key}` ({m_label}): {m_desc}\n"
