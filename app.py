@@ -37,7 +37,7 @@ if firebase_json_env:
     except Exception as e:
         print("❌ Firebase Connection Error:", e)
 else:
-    print("⚠️ FIREBASE_CREDENTIALS Environment Variable missing! Running with default in-memory storage.")
+    print("⚠️ FIREBASE_CREDENTIALS Environment Variable missing!")
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -54,7 +54,6 @@ DEFAULT_METRICS = [
     {"key": "pl_product_pitched", "label": "PL Product Pitched", "description": "Did the agent pitch a Private Label product?"}
 ]
 
-# In-memory fallback if Firebase DB is not configured
 IN_MEMORY_METRICS = list(DEFAULT_METRICS)
 
 def get_stored_metrics() -> List[Dict[str, Any]]:
@@ -63,7 +62,6 @@ def get_stored_metrics() -> List[Dict[str, Any]]:
     try:
         docs = list(db.collection("custom_metrics").stream())
         if not docs:
-            # Seed default metrics to Firestore if empty
             for m in DEFAULT_METRICS:
                 db.collection("custom_metrics").document(m["key"]).set(m)
             return DEFAULT_METRICS
@@ -74,7 +72,7 @@ def get_stored_metrics() -> List[Dict[str, Any]]:
             metrics.append(data)
         return metrics
     except Exception as e:
-        print("❌ Error fetching dynamic metrics from Firebase:", e)
+        print("❌ Error fetching dynamic metrics:", e)
         return IN_MEMORY_METRICS
 
 HTML_CONTENT = """<!DOCTYPE html>
@@ -101,12 +99,12 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg space-y-4">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-base font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
-                <button type="button" onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
+                <button type="button" onclick="handleAddMetricClick()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
                     + Add New Metric
                 </button>
             </div>
             <div id="metricsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div class="text-slate-500 text-xs">Loading metrics...</div>
+                <div class="text-slate-500 text-xs">Loading configured metrics...</div>
             </div>
         </div>
 
@@ -127,11 +125,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
             <div id="loader" class="hidden mt-4 text-xs text-blue-400 animate-pulse font-medium">
-                ⏳ Auditing speech, analyzing metrics & generating summary... Please wait...
+                ⏳ Auditing speech, analyzing dynamic metrics & generating summary... Please wait...
             </div>
         </div>
 
-        <!-- Multi-Results Container -->
+        <!-- Batch Summary Container -->
         <div id="batchResultsContainer" class="hidden space-y-6">
             <div class="flex justify-between items-center text-slate-300 font-semibold border-b border-slate-800 pb-2 flex-wrap gap-2">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
@@ -149,7 +147,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="summaryTableContainer" class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
-                        <h3 class="text-base font-bold text-blue-400">💊 Batch Aggregate Metrics Summary</h3>
+                        <h3 class="text-base font-bold text-blue-400">💊 Pharma Upsell Aggregate Summary</h3>
                         <p class="text-xs text-slate-400" id="summaryTimeSlot">Batch Analytics</p>
                     </div>
                     <span id="totalCallsBadge" class="bg-blue-500/20 text-blue-300 text-xs font-bold px-3 py-1 rounded-full border border-blue-500/30">Total Calls: 0</span>
@@ -173,7 +171,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- History Table Section -->
+        <!-- Firebase Cloud History -->
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-sm font-semibold text-slate-300">🔥 Firebase Cloud Audits History</h3>
@@ -217,8 +215,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="e.g. Greeting Completed">
             </div>
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Evaluation Rule Description</label>
-                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="Describe rule when this is TRUE or FALSE..."></textarea>
+                <label class="text-xs text-slate-400 block mb-1">Evaluation Description</label>
+                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="When is this true/false?"></textarea>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs rounded-xl text-slate-300">Cancel</button>
@@ -240,14 +238,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 currentMetrics = await res.json();
             } catch(e) {
                 console.error("Failed to load metrics:", e);
-                currentMetrics = [
-                    {key: "upsell_opportunity_available", label: "Upsell Opportunity Available", description: "Was there a chance to offer an additional product?"},
-                    {key: "upsell_pitch_done", label: "Upsell Pitch Done", description: "Did the agent pitch an upsell item?"},
-                    {key: "upsell_pitch_ineffective", label: "Pitch Ineffective", description: "Was the pitch unclear or poorly timed?"},
-                    {key: "successful_upsell", label: "Successful Upsell", description: "Did the customer accept the upsell?"},
-                    {key: "quantity_increase_attempt", label: "Quantity Increase Attempt", description: "Did the agent attempt to increase item quantity?"},
-                    {key: "pl_product_pitched", label: "PL Product Pitched", description: "Did the agent pitch a Private Label product?"}
-                ];
+                currentMetrics = [];
             }
             renderMetricsList();
         }
@@ -256,28 +247,33 @@ HTML_CONTENT = """<!DOCTYPE html>
             var container = document.getElementById('metricsList');
             container.innerHTML = "";
             if(!currentMetrics || currentMetrics.length === 0) {
-                container.innerHTML = '<div class="text-slate-500 text-xs">No metrics configured.</div>';
+                container.innerHTML = '<div class="text-slate-500 text-xs">No metrics configured. Click "+ Add New Metric" above.</div>';
                 return;
             }
             currentMetrics.forEach(function(m) {
                 var card = document.createElement('div');
                 card.className = "bg-slate-900/60 border border-slate-700/60 p-3 rounded-xl flex justify-between items-start";
+                var metricKey = m.key || m.id;
                 card.innerHTML = 
                     '<div>' +
-                        '<div class="font-bold text-xs text-slate-200">' + (m.label || m.key) + '</div>' +
-                        '<div class="text-[10px] text-slate-400 font-mono">' + m.key + '</div>' +
+                        '<div class="font-bold text-xs text-slate-200">' + (m.label || metricKey) + '</div>' +
+                        '<div class="text-[10px] text-slate-400 font-mono">' + metricKey + '</div>' +
                         '<div class="text-[11px] text-slate-400 mt-1">' + (m.description || '') + '</div>' +
                     '</div>' +
                     '<div class="flex gap-2 ml-2">' +
-                        '<button type="button" onclick="editMetric(\'' + (m.id || m.key) + '\')" class="text-blue-400 hover:text-blue-300 text-xs font-bold">Edit</button>' +
-                        '<button type="button" onclick="deleteMetric(\'' + (m.id || m.key) + '\')" class="text-rose-400 hover:text-rose-300 text-xs font-bold">Delete</button>' +
+                        '<button type="button" onclick="editMetric(\'' + metricKey + '\')" class="text-blue-400 hover:text-blue-300 text-xs font-bold">Edit</button>' +
+                        '<button type="button" onclick="deleteMetric(\'' + metricKey + '\')" class="text-rose-400 hover:text-rose-300 text-xs font-bold">Delete</button>' +
                     '</div>';
                 container.appendChild(card);
             });
         }
 
+        function handleAddMetricClick() {
+            openMetricModal(null);
+        }
+
         function openMetricModal(metric) {
-            document.getElementById('metricId').value = (metric && metric.id) ? metric.id : ((metric && metric.key) ? metric.key : '');
+            document.getElementById('metricId').value = metric ? (metric.id || metric.key) : '';
             document.getElementById('metricKey').value = metric ? metric.key : '';
             document.getElementById('metricLabel').value = metric ? metric.label : '';
             document.getElementById('metricDesc').value = metric ? (metric.description || '') : '';
@@ -290,8 +286,8 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('metricModal').classList.add('hidden');
         }
 
-        function editMetric(id) {
-            var m = (currentMetrics || []).find(x => (x.id === id || x.key === id));
+        function editMetric(key) {
+            var m = (currentMetrics || []).find(x => (x.key === key || x.id === key));
             if(m) openMetricModal(m);
         }
 
@@ -302,7 +298,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var description = document.getElementById('metricDesc').value.trim();
 
             if(!key || !label) {
-                alert("Key and Label required!");
+                alert("Key and Label are required!");
                 return;
             }
 
@@ -319,18 +315,18 @@ HTML_CONTENT = """<!DOCTYPE html>
                 closeMetricModal();
                 await loadMetrics();
             } catch(e) {
-                alert("Error: " + e.message);
+                alert("Error saving metric: " + e.message);
             }
         }
 
-        async function deleteMetric(id) {
-            if(!confirm("Delete metric?")) return;
+        async function deleteMetric(key) {
+            if(!confirm("Are you sure you want to delete this metric?")) return;
             try {
-                var res = await fetch("/api/metrics/" + encodeURIComponent(id), { method: "DELETE" });
+                var res = await fetch("/api/metrics/" + encodeURIComponent(key), { method: "DELETE" });
                 if(!res.ok) throw new Error("Delete failed");
                 await loadMetrics();
             } catch(e) {
-                alert("Error: " + e.message);
+                alert("Error deleting metric: " + e.message);
             }
         }
 
@@ -343,7 +339,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function uploadAudioBatch() {
             if(selectedFiles.length === 0) {
-                alert("Please select audio file(s) first!");
+                alert("Pehle audio file(s) select karein!");
                 return;
             }
 
@@ -365,7 +361,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 document.getElementById('batchResultsContainer').classList.remove('hidden');
                 setTimeout(loadHistory, 1000);
             } catch(err) {
-                alert("Error: " + err.message);
+                alert("Error during analysis: " + err.message);
             } finally {
                 document.getElementById('loader').classList.add('hidden');
             }
@@ -378,14 +374,14 @@ HTML_CONTENT = """<!DOCTYPE html>
             var validResults = results.filter(function(r) { return r.status === "success"; });
             var totalCalls = validResults.length;
 
-            // Calculate Aggregate Counts Dynamically for all metrics
-            var metricCounts = {};
-            (currentMetrics || []).forEach(function(m) { metricCounts[m.key] = 0; });
+            // Calculate Counts for Summary Table
+            var counts = {};
+            (currentMetrics || []).forEach(function(m) { counts[m.key] = 0; });
 
             validResults.forEach(function(item) {
-                var dynamicEval = item.data?.evaluation?.dynamic_metrics || item.data?.evaluation?.pharma_upsell_metrics || {};
+                var dynamicMetrics = item.data?.evaluation?.dynamic_metrics || item.data?.evaluation?.pharma_upsell_metrics || {};
                 (currentMetrics || []).forEach(function(m) {
-                    if (dynamicEval[m.key]) metricCounts[m.key]++;
+                    if (dynamicMetrics[m.key]) counts[m.key]++;
                 });
             });
 
@@ -400,12 +396,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             var summaryHtml = '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">' + totalCalls + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>';
 
             (currentMetrics || []).forEach(function(m) {
-                var count = metricCounts[m.key] || 0;
-                summaryHtml += '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">' + (m.label || m.key) + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + count + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + calcPct(count) + '</td></tr>';
+                var c = counts[m.key] || 0;
+                summaryHtml += '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">' + (m.label || m.key) + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + c + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + calcPct(c) + '</td></tr>';
             });
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
-            // Render Individual Cards
+            // Individual Call Breakdowns
             results.forEach(function(item) {
                 if(item.status !== "success") {
                     container.innerHTML += '<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed to analyze <b>' + item.filename + '</b>: ' + (item.error || 'Error') + '</div>';
@@ -448,7 +444,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">WORDS</span><span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span></div>' +
                     '</div>' +
                     '<div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 space-y-2">' +
-                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Call Metrics Evaluation</div>' +
+                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
                         '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' + dynamicMetricsHtml + '</div>' +
                     '</div>' +
                     '<div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 space-y-1">' +
@@ -466,14 +462,13 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
-            hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>';
             try {
                 var res = await fetch("/api/history");
                 var list = await res.json();
                 historyDataList = list || [];
                 
                 if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found.</td></tr>';
+                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
                     return;
                 }
                 hTable.innerHTML = "";
@@ -501,11 +496,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "Summary": i.data?.evaluation?.summary || ""
             })));
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
-            XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
+            XLSX.writeFile(workbook, "Pharma_Call_Audit_Report.xlsx");
         }
 
         function exportHistoryExcel() {
-            if(!historyDataList || historyDataList.length === 0) return alert("History is empty!");
+            if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
             var workbook = XLSX.utils.book_new();
             var sheet = XLSX.utils.json_to_sheet(historyDataList.map(item => ({
                 "File Name": item.filename,
@@ -520,7 +515,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         function downloadPDF() {
             var element = document.getElementById('batchResultsContainer');
-            html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
+            html2pdf().from(element).save("Batch_Pharma_Call_Audit_Report.pdf");
         }
 
         window.onload = function() { 
@@ -549,7 +544,7 @@ async def create_metric(payload: Dict[str, Any] = Body(...)):
     description = payload.get("description", "").strip()
 
     if not key or not label:
-        raise HTTPException(status_code=400, detail="Key and Label required")
+        raise HTTPException(status_code=400, detail="Key and Label are required")
 
     key = re.sub(r'[^a-zA-Z0-9_]', '_', key.lower())
 
@@ -563,7 +558,7 @@ async def create_metric(payload: Dict[str, Any] = Body(...)):
     if db:
         db.collection("custom_metrics").document(key).set(metric_doc)
     else:
-        # Fallback in memory
+        # Fallback to in-memory array
         IN_MEMORY_METRICS.append(metric_doc)
 
     return {"status": "success", "data": metric_doc}
@@ -582,7 +577,7 @@ async def update_metric(metric_id: str, payload: Dict[str, Any] = Body(...)):
             doc_ref.update(metric_doc)
     else:
         for idx, m in enumerate(IN_MEMORY_METRICS):
-            if m.get("id") == metric_id or m.get("key") == metric_id:
+            if m.get("key") == metric_id:
                 IN_MEMORY_METRICS[idx]["label"] = metric_doc["label"]
                 IN_MEMORY_METRICS[idx]["description"] = metric_doc["description"]
 
@@ -594,7 +589,7 @@ async def delete_metric(metric_id: str):
         db.collection("custom_metrics").document(metric_id).delete()
     else:
         global IN_MEMORY_METRICS
-        IN_MEMORY_METRICS = [m for m in IN_MEMORY_METRICS if m.get("key") != metric_id and m.get("id") != metric_id]
+        IN_MEMORY_METRICS = [m for m in IN_MEMORY_METRICS if m.get("key") != metric_id]
 
     return {"status": "success", "deleted_id": metric_id}
 
@@ -628,6 +623,7 @@ def transcribe_bytes(audio_bytes):
     return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
 def evaluate_quality(transcript, dynamic_metrics):
+    # Gemini 1.5 Flash - Official Stable API Endpoint
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     metrics_schema_prompt = {}
