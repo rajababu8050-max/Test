@@ -93,7 +93,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg space-y-4">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-base font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
-                <button type="button" onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
+                <button type="button" onclick="openMetricModal(null)" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
                     + Add New Metric
                 </button>
             </div>
@@ -177,16 +177,16 @@ HTML_CONTENT = """<!DOCTYPE html>
             <h3 id="modalTitle" class="text-lg font-bold text-slate-200">Add Dynamic Metric</h3>
             <input type="hidden" id="metricId">
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Metric Key (Unique, e.g. greeting_completed)</label>
-                <input type="text" id="metricKey" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-500" placeholder="e.g. greeting_completed">
+                <label class="text-xs text-slate-400 block mb-1">Metric Key (e.g. greeting_done)</label>
+                <input type="text" id="metricKey" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="e.g. greeting_done">
             </div>
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Display Label</label>
-                <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-500" placeholder="e.g. Standard Greeting Done">
+                <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="e.g. Greeting Completed">
             </div>
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Evaluation Rule / Prompt Description</label>
-                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200 placeholder-slate-500" placeholder="Describe rule for TRUE/FALSE..."></textarea>
+                <label class="text-xs text-slate-400 block mb-1">Evaluation Description</label>
+                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="When is this true/false?"></textarea>
             </div>
             <div class="flex justify-end gap-2 pt-2">
                 <button type="button" onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs rounded-xl text-slate-300">Cancel</button>
@@ -209,7 +209,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 renderMetricsList();
             } catch(e) {
                 console.error("Failed to load metrics:", e);
-                document.getElementById('metricsList').innerHTML = '<div class="text-rose-400 text-xs">Error loading metrics!</div>';
             }
         }
 
@@ -263,7 +262,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var description = document.getElementById('metricDesc').value.trim();
 
             if(!key || !label) {
-                alert("Metric Key and Label are required!");
+                alert("Key and Label required!");
                 return;
             }
 
@@ -276,10 +275,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ key, label, description })
                 });
-                if(!res.ok) {
-                    var errData = await res.json();
-                    throw new Error(errData.detail || "Failed to save metric");
-                }
+                if(!res.ok) throw new Error("Save failed");
                 closeMetricModal();
                 await loadMetrics();
             } catch(e) {
@@ -288,7 +284,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         async function deleteMetric(id) {
-            if(!confirm("Are you sure you want to delete this metric?")) return;
+            if(!confirm("Delete metric?")) return;
             try {
                 var res = await fetch("/api/metrics/" + encodeURIComponent(id), { method: "DELETE" });
                 if(!res.ok) throw new Error("Delete failed");
@@ -307,7 +303,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function uploadAudioBatch() {
             if(selectedFiles.length === 0) {
-                alert("Please select audio file(s) first!");
+                alert("Please select audio file(s)!");
                 return;
             }
 
@@ -322,7 +318,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 var res = await fetch("/api/analyze-batch", { method: "POST", body: formData });
                 var batchData = await res.json();
-                if(!res.ok) throw new Error(batchData.detail || "Server error during analysis");
+                if(!res.ok) throw new Error(batchData.detail || "Server error");
 
                 currentBatchResults = batchData.results || [];
                 renderBatchResults(currentBatchResults);
@@ -347,7 +343,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 var data = item.data || {};
                 var evalData = data.evaluation || {};
-                var dynamicMetrics = evalData.dynamic_metrics || {};
+                var dynamicMetrics = evalData.dynamic_metrics || evalData.pharma_upsell_metrics || {};
                 var metrics = data.metrics || {};
                 var transcript = data.transcript || [];
                 
@@ -381,7 +377,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">WORDS</span><span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span></div>' +
                     '</div>' +
                     '<div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 space-y-2">' +
-                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
+                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Call Metrics Evaluation</div>' +
                         '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' + dynamicMetricsHtml + '</div>' +
                     '</div>' +
                     '<div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 space-y-1">' +
@@ -406,7 +402,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 historyDataList = list || [];
                 
                 if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase. (Check server logs if FIREBASE_CREDENTIALS is missing)</td></tr>';
+                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found.</td></tr>';
                     return;
                 }
                 hTable.innerHTML = "";
@@ -434,7 +430,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "Summary": i.data?.evaluation?.summary || ""
             })));
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
-            XLSX.writeFile(workbook, "Pharma_Call_Audit_Report.xlsx");
+            XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
         }
 
         function exportHistoryExcel() {
@@ -453,7 +449,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         function downloadPDF() {
             var element = document.getElementById('batchResultsContainer');
-            html2pdf().from(element).save("Batch_Pharma_Call_Audit_Report.pdf");
+            html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
         }
 
         window.onload = function() { 
@@ -482,7 +478,7 @@ async def create_metric(payload: Dict[str, Any] = Body(...)):
     description = payload.get("description", "").strip()
 
     if not key or not label:
-        raise HTTPException(status_code=400, detail="Key and Label are required")
+        raise HTTPException(status_code=400, detail="Key and Label required")
 
     key = re.sub(r'[^a-zA-Z0-9_]', '_', key.lower())
 
@@ -549,7 +545,7 @@ def transcribe_bytes(audio_bytes):
     return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
 def evaluate_quality(transcript, dynamic_metrics):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     metrics_schema_prompt = {}
     metrics_rules_text = ""
