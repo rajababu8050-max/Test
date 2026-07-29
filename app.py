@@ -44,7 +44,6 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 semaphore = asyncio.Semaphore(2)
 
-# Default Standard Metrics
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there a chance to offer an additional product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent pitch an upsell item?"},
@@ -85,16 +84,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
-
-    <!-- Mobile Debugging Popup (Catch errors on phone screen) -->
-    <div id="mobileErrorLog" class="hidden fixed top-2 left-2 right-2 z-50 bg-rose-900 border-2 border-rose-500 text-rose-100 p-3 rounded-xl text-xs space-y-2 shadow-2xl">
-        <div class="flex justify-between font-bold border-b border-rose-700 pb-1">
-            <span>⚠️ Error Occurred (Mobile Debugger)</span>
-            <button type="button" onclick="document.getElementById('mobileErrorLog').classList.add('hidden')">✕</button>
-        </div>
-        <div id="mobileErrorText" class="font-mono text-[11px] break-all"></div>
-    </div>
+<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans pb-40">
 
     <div class="max-w-6xl mx-auto space-y-6">
         
@@ -109,7 +99,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg space-y-3">
             <div class="flex justify-between items-center border-b border-slate-700 pb-2">
                 <h3 class="text-sm font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
-                <button type="button" onclick="openMetricModal(null)" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">
+                <button type="button" onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">
                     + Add New Metric
                 </button>
             </div>
@@ -144,10 +134,10 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="flex justify-between items-center text-slate-300 font-semibold border-b border-slate-800 pb-2 flex-wrap gap-2">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
-                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
+                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg">
                         📊 Export Detailed Excel (.xlsx)
                     </button>
-                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">
+                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl">
                         📥 Export PDF Report
                     </button>
                 </div>
@@ -186,7 +176,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-sm font-semibold text-slate-300">🔥 Firebase Cloud Audits History</h3>
                 <div class="flex gap-2">
-                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1">
+                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium">
                         📊 Export History to Excel
                     </button>
                     <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">Refresh</button>
@@ -209,6 +199,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
 
+    </div>
+
+    <!-- On-screen Mobile Logger Box at Bottom -->
+    <div class="fixed bottom-0 left-0 right-0 bg-slate-950 border-t border-slate-700 p-2 text-[10px] font-mono text-emerald-400 max-h-28 overflow-y-auto z-40" id="debugLog">
+        <div>📱 System Initialized. Logs will appear here:</div>
     </div>
 
     <!-- Modal for Add/Edit Dynamic Metric -->
@@ -236,24 +231,20 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <script>
-        // Global Error Handlers for Mobile Debugging
-        window.onerror = function(msg, url, lineNo) {
-            var errorBox = document.getElementById('mobileErrorLog');
-            var errorText = document.getElementById('mobileErrorText');
-            if(errorBox && errorText) {
-                errorText.innerText = "JS Error: " + msg + " (Line " + lineNo + ")";
-                errorBox.classList.remove('hidden');
+        function logMsg(msg, isError) {
+            var box = document.getElementById('debugLog');
+            if(box) {
+                var d = document.createElement('div');
+                d.className = isError ? "text-rose-400 font-bold" : "text-emerald-400";
+                d.innerText = "[" + new Date().toLocaleTimeString() + "] " + msg;
+                box.appendChild(d);
+                box.scrollTop = box.scrollHeight;
             }
-            return false;
-        };
+        }
 
-        window.onunhandledrejection = function(event) {
-            var errorBox = document.getElementById('mobileErrorLog');
-            var errorText = document.getElementById('mobileErrorText');
-            if(errorBox && errorText) {
-                errorText.innerText = "Async Error: " + (event.reason.message || event.reason);
-                errorBox.classList.remove('hidden');
-            }
+        window.onerror = function(msg, url, line) {
+            logMsg("JS Crash: " + msg + " (Line " + line + ")", true);
+            return false;
         };
 
         var selectedFiles = [];
@@ -262,12 +253,14 @@ HTML_CONTENT = """<!DOCTYPE html>
         var currentMetrics = [];
 
         async function loadMetrics() {
+            logMsg("Fetching dynamic metrics...");
             try {
                 var res = await fetch("/api/metrics");
-                if(!res.ok) throw new Error("Metrics endpoint failed (" + res.status + ")");
+                if(!res.ok) throw new Error("HTTP " + res.status);
                 currentMetrics = await res.json();
+                logMsg("Metrics loaded: " + currentMetrics.length);
             } catch(e) {
-                console.error("Failed to load metrics:", e);
+                logMsg("Failed to load metrics: " + e.message, true);
                 currentMetrics = [];
             }
             renderMetricsList();
@@ -277,7 +270,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var container = document.getElementById('metricsList');
             container.innerHTML = "";
             if(!currentMetrics || currentMetrics.length === 0) {
-                container.innerHTML = '<div class="text-slate-500 text-xs">No metrics found. Click "+ Add New Metric" above.</div>';
+                container.innerHTML = '<div class="text-slate-500 text-xs">No metrics found. Click "+ Add New Metric".</div>';
                 return;
             }
             currentMetrics.forEach(function(m) {
@@ -331,15 +324,18 @@ HTML_CONTENT = """<!DOCTYPE html>
             var url = id ? "/api/metrics/" + encodeURIComponent(id) : "/api/metrics";
 
             try {
+                logMsg("Saving metric " + key + "...");
                 var res = await fetch(url, {
                     method: method,
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ key, label, description })
                 });
-                if(!res.ok) throw new Error("Failed to save metric (" + res.status + ")");
+                if(!res.ok) throw new Error("HTTP " + res.status);
+                logMsg("Metric saved successfully!");
                 closeMetricModal();
                 loadMetrics();
             } catch(e) {
+                logMsg("Save error: " + e.message, true);
                 alert("Error: " + e.message);
             }
         }
@@ -347,10 +343,13 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function deleteMetric(key) {
             if(!confirm("Delete metric " + key + "?")) return;
             try {
+                logMsg("Deleting metric " + key + "...");
                 var res = await fetch("/api/metrics/" + encodeURIComponent(key), { method: "DELETE" });
-                if(!res.ok) throw new Error("Delete failed");
+                if(!res.ok) throw new Error("HTTP " + res.status);
+                logMsg("Metric deleted!");
                 loadMetrics();
             } catch(e) {
+                logMsg("Delete error: " + e.message, true);
                 alert("Error: " + e.message);
             }
         }
@@ -359,6 +358,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             selectedFiles = Array.from(e.target.files);
             if(selectedFiles.length > 0) {
                 document.getElementById('fileName').innerText = selectedFiles.length + " file(s) selected";
+                logMsg(selectedFiles.length + " file(s) selected");
             }
         }
 
@@ -370,6 +370,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             document.getElementById('loader').classList.remove('hidden');
             document.getElementById('batchResultsContainer').classList.add('hidden');
+            logMsg("Starting batch analysis for " + selectedFiles.length + " files...");
             
             var formData = new FormData();
             selectedFiles.forEach(function(file) {
@@ -379,13 +380,15 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 var res = await fetch("/api/analyze-batch", { method: "POST", body: formData });
                 var batchData = await res.json();
-                if(!res.ok) throw new Error(batchData.detail || "Server error during analysis");
+                if(!res.ok) throw new Error(batchData.detail || ("HTTP " + res.status));
 
+                logMsg("Analysis completed!");
                 currentBatchResults = batchData.results || [];
                 renderBatchResults(currentBatchResults);
                 document.getElementById('batchResultsContainer').classList.remove('hidden');
                 setTimeout(loadHistory, 1000);
             } catch(err) {
+                logMsg("Batch Analysis Error: " + err.message, true);
                 alert("Error: " + err.message);
             } finally {
                 document.getElementById('loader').classList.add('hidden');
@@ -485,13 +488,15 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
+            logMsg("Fetching audit history...");
             try {
                 var res = await fetch("/api/history");
                 var list = await res.json();
                 historyDataList = list || [];
+                logMsg("History loaded: " + historyDataList.length + " items");
                 
                 if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found.</td></tr>';
                     return;
                 }
                 hTable.innerHTML = "";
@@ -505,7 +510,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '</tr>';
                 });
             } catch(e) {
-                console.error("History load error:", e);
+                logMsg("History Load Error: " + e.message, true);
                 hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
         }
@@ -554,7 +559,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 async def serve_ui():
     return HTML_CONTENT
 
-# Dynamic Metrics API
 @app.get("/api/metrics")
 async def get_metrics():
     return get_stored_metrics()
@@ -603,7 +607,6 @@ async def delete_metric(metric_id: str):
         db.collection("custom_metrics").document(metric_id).delete()
     return {"status": "success", "deleted_id": metric_id}
 
-# Speech & AI Processing
 def transcribe_bytes(audio_bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
     headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
