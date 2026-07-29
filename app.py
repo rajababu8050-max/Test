@@ -26,7 +26,6 @@ app.add_middleware(
 # Firebase Setup
 firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
 
-db = None
 if firebase_json_env:
     try:
         cred_dict = json.loads(firebase_json_env)
@@ -35,9 +34,11 @@ if firebase_json_env:
         db = firestore.client()
         print("✅ Firebase Firestore Connected Successfully!")
     except Exception as e:
+        db = None
         print("❌ Firebase Connection Error:", e)
 else:
-    print("⚠️ FIREBASE_CREDENTIALS Environment Variable missing!")
+    db = None
+    print("❌ FIREBASE_CREDENTIALS Environment Variable missing!")
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
@@ -54,11 +55,9 @@ DEFAULT_METRICS = [
     {"key": "pl_product_pitched", "label": "PL Product Pitched", "description": "Did the agent pitch a Private Label product?"}
 ]
 
-IN_MEMORY_METRICS = list(DEFAULT_METRICS)
-
 def get_stored_metrics() -> List[Dict[str, Any]]:
     if not db:
-        return IN_MEMORY_METRICS
+        return DEFAULT_METRICS
     try:
         docs = list(db.collection("custom_metrics").stream())
         if not docs:
@@ -73,7 +72,7 @@ def get_stored_metrics() -> List[Dict[str, Any]]:
         return metrics
     except Exception as e:
         print("❌ Error fetching dynamic metrics:", e)
-        return IN_MEMORY_METRICS
+        return DEFAULT_METRICS
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en">
@@ -92,19 +91,19 @@ HTML_CONTENT = """<!DOCTYPE html>
             <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
                 AI Call Quality Auditor Pro
             </h1>
-            <p class="text-slate-400 text-sm">Pharma Upsell Metrics Evaluation & Dynamic Quality Auditing</p>
+            <p class="text-slate-400 text-sm">Pharma Upsell Metrics Evaluation & Batch Quality Auditing</p>
         </div>
 
-        <!-- Dynamic Metrics Management Card -->
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-lg space-y-4">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-base font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
-                <button type="button" onclick="handleAddMetricClick()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl shadow-lg">
+        <!-- Dynamic Metrics Manager -->
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-2">
+                <h3 class="text-sm font-bold text-emerald-400">⚙️ Dynamic Evaluation Metrics Configurator</h3>
+                <button type="button" onclick="openMetricModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-xl">
                     + Add New Metric
                 </button>
             </div>
-            <div id="metricsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div class="text-slate-500 text-xs">Loading configured metrics...</div>
+            <div id="metricsList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                <div class="text-slate-500 text-xs">Loading metrics...</div>
             </div>
         </div>
 
@@ -125,19 +124,19 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
             <div id="loader" class="hidden mt-4 text-xs text-blue-400 animate-pulse font-medium">
-                ⏳ Auditing speech, analyzing dynamic metrics & generating summary... Please wait...
+                ⏳ Auditing speech, analyzing Pharma Upsell metrics & generating summary... Please wait...
             </div>
         </div>
 
-        <!-- Batch Summary Container -->
+        <!-- Multi-Results Container -->
         <div id="batchResultsContainer" class="hidden space-y-6">
             <div class="flex justify-between items-center text-slate-300 font-semibold border-b border-slate-800 pb-2 flex-wrap gap-2">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
-                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl shadow-lg">
+                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
                         📊 Export Detailed Excel (.xlsx)
                     </button>
-                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl">
+                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">
                         📥 Export PDF Report
                     </button>
                 </div>
@@ -171,12 +170,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- Firebase Cloud History -->
+        <!-- History Table Section -->
         <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-sm font-semibold text-slate-300">🔥 Firebase Cloud Audits History</h3>
                 <div class="flex gap-2">
-                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium">
+                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1">
                         📊 Export History to Excel
                     </button>
                     <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">Refresh</button>
@@ -201,26 +200,26 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     </div>
 
-    <!-- Modal for Add/Edit Dynamic Metric -->
+    <!-- Modal for Add/Edit Metric -->
     <div id="metricModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h3 id="modalTitle" class="text-lg font-bold text-slate-200">Add Dynamic Metric</h3>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-5 w-full max-w-md space-y-3">
+            <h3 id="modalTitle" class="text-base font-bold text-slate-200">Add Dynamic Metric</h3>
             <input type="hidden" id="metricId">
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Metric Key (e.g. greeting_done)</label>
-                <input type="text" id="metricKey" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="e.g. greeting_done">
+                <label class="text-xs text-slate-400 block mb-1">Metric Key (lowercase_snake_case)</label>
+                <input type="text" id="metricKey" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="e.g. greeting_done">
             </div>
             <div>
                 <label class="text-xs text-slate-400 block mb-1">Display Label</label>
-                <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="e.g. Greeting Completed">
+                <input type="text" id="metricLabel" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="e.g. Standard Greeting Done">
             </div>
             <div>
-                <label class="text-xs text-slate-400 block mb-1">Evaluation Description</label>
-                <textarea id="metricDesc" rows="3" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2.5 text-xs text-slate-200" placeholder="When is this true/false?"></textarea>
+                <label class="text-xs text-slate-400 block mb-1">Description / Rule</label>
+                <textarea id="metricDesc" rows="2" class="w-full bg-slate-900 border border-slate-700 rounded-xl p-2 text-xs text-slate-200" placeholder="Description for evaluation..."></textarea>
             </div>
             <div class="flex justify-end gap-2 pt-2">
-                <button type="button" onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 text-xs rounded-xl text-slate-300">Cancel</button>
-                <button type="button" onclick="saveMetric()" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs rounded-xl text-white font-bold">Save Metric</button>
+                <button type="button" onclick="closeMetricModal()" class="bg-slate-700 hover:bg-slate-600 px-3 py-1.5 text-xs rounded-xl text-slate-300">Cancel</button>
+                <button type="button" onclick="saveMetric()" class="bg-emerald-600 hover:bg-emerald-500 px-3 py-1.5 text-xs rounded-xl text-white font-bold">Save Metric</button>
             </div>
         </div>
     </div>
@@ -234,7 +233,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadMetrics() {
             try {
                 var res = await fetch("/api/metrics");
-                if(!res.ok) throw new Error("Failed to fetch metrics");
                 currentMetrics = await res.json();
             } catch(e) {
                 console.error("Failed to load metrics:", e);
@@ -247,29 +245,24 @@ HTML_CONTENT = """<!DOCTYPE html>
             var container = document.getElementById('metricsList');
             container.innerHTML = "";
             if(!currentMetrics || currentMetrics.length === 0) {
-                container.innerHTML = '<div class="text-slate-500 text-xs">No metrics configured. Click "+ Add New Metric" above.</div>';
+                container.innerHTML = '<div class="text-slate-500 text-xs">No custom metrics found.</div>';
                 return;
             }
             currentMetrics.forEach(function(m) {
                 var card = document.createElement('div');
-                card.className = "bg-slate-900/60 border border-slate-700/60 p-3 rounded-xl flex justify-between items-start";
-                var metricKey = m.key || m.id;
+                card.className = "bg-slate-900/60 border border-slate-700/60 p-2.5 rounded-xl flex justify-between items-center";
+                var k = m.key || m.id;
                 card.innerHTML = 
                     '<div>' +
-                        '<div class="font-bold text-xs text-slate-200">' + (m.label || metricKey) + '</div>' +
-                        '<div class="text-[10px] text-slate-400 font-mono">' + metricKey + '</div>' +
-                        '<div class="text-[11px] text-slate-400 mt-1">' + (m.description || '') + '</div>' +
+                        '<div class="font-bold text-xs text-slate-200">' + (m.label || k) + '</div>' +
+                        '<div class="text-[10px] text-slate-400 font-mono">' + k + '</div>' +
                     '</div>' +
-                    '<div class="flex gap-2 ml-2">' +
-                        '<button type="button" onclick="editMetric(\'' + metricKey + '\')" class="text-blue-400 hover:text-blue-300 text-xs font-bold">Edit</button>' +
-                        '<button type="button" onclick="deleteMetric(\'' + metricKey + '\')" class="text-rose-400 hover:text-rose-300 text-xs font-bold">Delete</button>' +
+                    '<div class="flex gap-2">' +
+                        '<button type="button" onclick="editMetric(\'' + k + '\')" class="text-blue-400 hover:text-blue-300 text-xs font-bold">Edit</button>' +
+                        '<button type="button" onclick="deleteMetric(\'' + k + '\')" class="text-rose-400 hover:text-rose-300 text-xs font-bold">Delete</button>' +
                     '</div>';
                 container.appendChild(card);
             });
-        }
-
-        function handleAddMetricClick() {
-            openMetricModal(null);
         }
 
         function openMetricModal(metric) {
@@ -287,7 +280,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function editMetric(key) {
-            var m = (currentMetrics || []).find(x => (x.key === key || x.id === key));
+            var m = currentMetrics.find(x => (x.key === key || x.id === key));
             if(m) openMetricModal(m);
         }
 
@@ -313,20 +306,20 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
                 if(!res.ok) throw new Error("Save failed");
                 closeMetricModal();
-                await loadMetrics();
+                loadMetrics();
             } catch(e) {
-                alert("Error saving metric: " + e.message);
+                alert("Error: " + e.message);
             }
         }
 
         async function deleteMetric(key) {
-            if(!confirm("Are you sure you want to delete this metric?")) return;
+            if(!confirm("Delete metric " + key + "?")) return;
             try {
                 var res = await fetch("/api/metrics/" + encodeURIComponent(key), { method: "DELETE" });
                 if(!res.ok) throw new Error("Delete failed");
-                await loadMetrics();
+                loadMetrics();
             } catch(e) {
-                alert("Error deleting metric: " + e.message);
+                alert("Error: " + e.message);
             }
         }
 
@@ -361,7 +354,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 document.getElementById('batchResultsContainer').classList.remove('hidden');
                 setTimeout(loadHistory, 1000);
             } catch(err) {
-                alert("Error during analysis: " + err.message);
+                alert("Error: " + err.message);
             } finally {
                 document.getElementById('loader').classList.add('hidden');
             }
@@ -374,14 +367,13 @@ HTML_CONTENT = """<!DOCTYPE html>
             var validResults = results.filter(function(r) { return r.status === "success"; });
             var totalCalls = validResults.length;
 
-            // Calculate Counts for Summary Table
             var counts = {};
             (currentMetrics || []).forEach(function(m) { counts[m.key] = 0; });
 
             validResults.forEach(function(item) {
-                var dynamicMetrics = item.data?.evaluation?.dynamic_metrics || item.data?.evaluation?.pharma_upsell_metrics || {};
+                var pharma = item.data?.evaluation?.pharma_upsell_metrics || item.data?.evaluation?.dynamic_metrics || {};
                 (currentMetrics || []).forEach(function(m) {
-                    if (dynamicMetrics[m.key]) counts[m.key]++;
+                    if (pharma[m.key]) counts[m.key]++;
                 });
             });
 
@@ -399,9 +391,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var c = counts[m.key] || 0;
                 summaryHtml += '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">' + (m.label || m.key) + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + c + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + calcPct(c) + '</td></tr>';
             });
+
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
-            // Individual Call Breakdowns
             results.forEach(function(item) {
                 if(item.status !== "success") {
                     container.innerHTML += '<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed to analyze <b>' + item.filename + '</b>: ' + (item.error || 'Error') + '</div>';
@@ -410,7 +402,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 var data = item.data || {};
                 var evalData = data.evaluation || {};
-                var dynamicMetrics = evalData.dynamic_metrics || evalData.pharma_upsell_metrics || {};
+                var pharma = evalData.pharma_upsell_metrics || evalData.dynamic_metrics || {};
                 var metrics = data.metrics || {};
                 var transcript = data.transcript || [];
                 
@@ -429,8 +421,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 var dynamicMetricsHtml = "";
                 (currentMetrics || []).forEach(function(m) {
-                    var val = dynamicMetrics[m.key];
-                    dynamicMetricsHtml += '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">' + (m.label || m.key) + ': ' + fmtBool(val) + '</div>';
+                    dynamicMetricsHtml += '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">' + (m.label || m.key) + ': ' + fmtBool(pharma[m.key]) + '</div>';
                 });
 
                 card.innerHTML = 
@@ -444,7 +435,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">WORDS</span><span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span></div>' +
                     '</div>' +
                     '<div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 space-y-2">' +
-                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
+                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics</div>' +
                         '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' + dynamicMetricsHtml + '</div>' +
                     '</div>' +
                     '<div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 space-y-1">' +
@@ -531,8 +522,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 async def serve_ui():
     return HTML_CONTENT
 
-# ==================== DYNAMIC METRICS API ENDPOINTS ====================
-
+# Dynamic Metrics Routes
 @app.get("/api/metrics")
 async def get_metrics():
     return get_stored_metrics()
@@ -544,7 +534,7 @@ async def create_metric(payload: Dict[str, Any] = Body(...)):
     description = payload.get("description", "").strip()
 
     if not key or not label:
-        raise HTTPException(status_code=400, detail="Key and Label are required")
+        raise HTTPException(status_code=400, detail="Key and Label required")
 
     key = re.sub(r'[^a-zA-Z0-9_]', '_', key.lower())
 
@@ -557,9 +547,6 @@ async def create_metric(payload: Dict[str, Any] = Body(...)):
 
     if db:
         db.collection("custom_metrics").document(key).set(metric_doc)
-    else:
-        # Fallback to in-memory array
-        IN_MEMORY_METRICS.append(metric_doc)
 
     return {"status": "success", "data": metric_doc}
 
@@ -575,11 +562,6 @@ async def update_metric(metric_id: str, payload: Dict[str, Any] = Body(...)):
         doc_ref = db.collection("custom_metrics").document(metric_id)
         if doc_ref.get().exists:
             doc_ref.update(metric_doc)
-    else:
-        for idx, m in enumerate(IN_MEMORY_METRICS):
-            if m.get("key") == metric_id:
-                IN_MEMORY_METRICS[idx]["label"] = metric_doc["label"]
-                IN_MEMORY_METRICS[idx]["description"] = metric_doc["description"]
 
     return {"status": "success", "data": metric_doc}
 
@@ -587,14 +569,9 @@ async def update_metric(metric_id: str, payload: Dict[str, Any] = Body(...)):
 async def delete_metric(metric_id: str):
     if db:
         db.collection("custom_metrics").document(metric_id).delete()
-    else:
-        global IN_MEMORY_METRICS
-        IN_MEMORY_METRICS = [m for m in IN_MEMORY_METRICS if m.get("key") != metric_id]
-
     return {"status": "success", "deleted_id": metric_id}
 
-# ==================== SPEECH & QUALITY AI ENGINE ====================
-
+# Transcribe & Gemini Evaluation
 def transcribe_bytes(audio_bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
     headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
@@ -623,7 +600,6 @@ def transcribe_bytes(audio_bytes):
     return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
 def evaluate_quality(transcript, dynamic_metrics):
-    # Gemini 1.5 Flash - Official Stable API Endpoint
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_API_KEY}"
     
     metrics_schema_prompt = {}
@@ -636,19 +612,18 @@ def evaluate_quality(transcript, dynamic_metrics):
         metrics_rules_text += f"- `{m_key}` ({m_label}): {m_desc}\n"
 
     prompt = f"""
-    Analyze the call transcript and evaluate the Agent Quality Score (0-100) along with the following Dynamic Metrics.
+    Analyze transcript for Pharma Agent Quality Score (0-100) & Dynamic Evaluation Metrics.
     
-    DYNAMIC METRICS TO EVALUATE (Return true/false for each):
+    DYNAMIC METRICS TO EVALUATE:
     {metrics_rules_text}
 
-    Transcript:
-    {json.dumps(transcript, indent=2)}
-
-    Return JSON ONLY with this exact structural format:
+    Transcript: {json.dumps(transcript, indent=2)}
+    
+    Return JSON ONLY:
     {{
         "overall_score": 85,
         "summary": "Detailed call summary...",
-        "dynamic_metrics": {json.dumps(metrics_schema_prompt, indent=2)},
+        "pharma_upsell_metrics": {json.dumps(metrics_schema_prompt, indent=2)},
         "strengths": ["Strong point"],
         "improvements": ["Improvement point"]
     }}
@@ -679,7 +654,7 @@ async def process_single_file(file: UploadFile):
                     "filename": file.filename,
                     "score": evaluation.get("overall_score", 0),
                     "summary": evaluation.get("summary", ""),
-                    "dynamic_metrics": evaluation.get("dynamic_metrics", {}),
+                    "pharma_metrics": evaluation.get("pharma_upsell_metrics", {}),
                     "wpm": metrics.get("wpm", 0),
                     "created_at": created_time
                 }
@@ -716,7 +691,7 @@ async def get_history():
                 "filename": data.get("filename", "Unknown"),
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
-                "dynamic_metrics": data.get("dynamic_metrics", {}),
+                "pharma_metrics": data.get("pharma_metrics", {}),
                 "wpm": data.get("wpm", 0),
                 "created_at": data.get("created_at", "")
             })
