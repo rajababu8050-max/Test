@@ -1,13 +1,12 @@
 import os
 import json
 import re
-import time
 import asyncio
 import requests
 from typing import List
 from datetime import datetime
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -24,7 +23,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Firebase Setup via Render Secret Environment Variable
+# Firebase Setup
 firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
 
 if firebase_json_env:
@@ -41,11 +40,9 @@ else:
     db = None
     print("❌ FIREBASE_CREDENTIALS Environment Variable missing!")
 
-# API Keys from Render Environment Variables
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-# Semaphore: Max 2 parallel executions to prevent network/upload timeouts
 semaphore = asyncio.Semaphore(2)
 
 HTML_CONTENT = """<!DOCTYPE html>
@@ -53,7 +50,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro - Pharma Upsell Edition</title>
+    <title>AI Call Quality Auditor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -122,7 +119,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                             </tr>
                         </thead>
                         <tbody id="summaryTableBody" class="divide-y divide-slate-700/50 text-xs md:text-sm">
-                            <!-- Injected dynamically -->
                         </tbody>
                     </table>
                 </div>
@@ -199,7 +195,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 currentBatchResults = batchData.results || [];
                 renderBatchResults(currentBatchResults);
                 document.getElementById('batchResultsContainer').classList.remove('hidden');
-                loadHistory();
+                setTimeout(loadHistory, 1000);
             } catch(err) {
                 alert("Error: " + err.message);
             } finally {
@@ -212,196 +208,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             container.innerHTML = "";
 
             var validResults = results.filter(function(r) { return r.status === "success"; });
-            var totalCalls = validResults.length;
-
-            // Calculate Aggregate Summary Metrics
-            var countOpp = 0;
-            var countPitchDone = 0;
-            var countIneffective = 0;
-            var countSuccess = 0;
-            var countUnsuccess = 0;
-            var countQtyAttempt = 0;
-            var countPL = 0;
-
-            validResults.forEach(function(item) {
-                var pharma = item.data?.evaluation?.pharma_upsell_metrics || {};
-                
-                if (pharma.upsell_opportunity_available) countOpp++;
-                if (pharma.upsell_pitch_done) countPitchDone++;
-                if (pharma.upsell_pitch_ineffective) countIneffective++;
-                if (pharma.successful_upsell) countSuccess++;
-                if (pharma.quantity_increase_attempt) countQtyAttempt++;
-                if (pharma.pl_product_pitched) countPL++;
-
-                if (pharma.upsell_pitch_done && !pharma.successful_upsell) {
-                    countUnsuccess++;
-                }
-            });
-
-            var countPitchNotDoneOrIneffective = (totalCalls - countPitchDone) + countIneffective;
-
-            function calcPct(val) {
-                if (totalCalls === 0) return "0%";
-                return Math.round((val / totalCalls) * 100) + "%";
-            }
-
-            // Render Aggregate Table
-            document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
-            var nowStr = new Date().toLocaleString();
-            document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + nowStr;
-
-            var summaryRows = [
-                { metric: "Total Calls Reviewed", count: totalCalls, pct: "100%" },
-                { metric: "Upsell Opportunity Available", count: countOpp, pct: calcPct(countOpp) },
-                { metric: "Upsell Pitch Done", count: countPitchDone, pct: calcPct(countPitchDone) },
-                { metric: "Upsell Pitch Not Done / Ineffective", count: countPitchNotDoneOrIneffective, pct: calcPct(countPitchNotDoneOrIneffective) },
-                { metric: "Successful Upsell", count: countSuccess, pct: calcPct(countSuccess) },
-                { metric: "Unsuccessful Upsell", count: countUnsuccess, pct: calcPct(countUnsuccess) },
-                { metric: "Quantity Increase Attempt", count: countQtyAttempt, pct: calcPct(countQtyAttempt) },
-                { metric: "PL Product Pitched", count: countPL, pct: calcPct(countPL) }
-            ];
-
-            var summaryHtml = "";
-            summaryRows.forEach(function(row) {
-                summaryHtml += 
-                    '<tr class="hover:bg-slate-700/30 transition">' +
-                        '<td class="p-2.5 font-medium text-slate-200">' + row.metric + '</td>' +
-                        '<td class="p-2.5 text-center font-bold text-blue-400">' + row.count + '</td>' +
-                        '<td class="p-2.5 text-center font-extrabold text-emerald-400">' + row.pct + '</td>' +
-                    '</tr>';
-            });
-            document.getElementById('summaryTableBody').innerHTML = summaryHtml;
-
-            // Render Individual Cards
-            results.forEach(function(item) {
-                if(item.status !== "success") {
-                    container.innerHTML += '<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed to analyze <b>' + item.filename + '</b>: ' + (item.error || 'Error') + '</div>';
-                    return;
-                }
-
-                var data = item.data || {};
-                var evalData = data.evaluation || {};
-                var pharma = evalData.pharma_upsell_metrics || {};
-                var metrics = data.metrics || {};
-                var transcript = data.transcript || [];
-                
-                var card = document.createElement('div');
-                card.className = "bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
-                
-                var transcriptHtml = "";
-                transcript.forEach(function(t) {
-                    var colorClass = t.speaker === 'Agent' ? 'text-blue-400' : 'text-emerald-400';
-                    transcriptHtml += '<div class="mb-1"><b class="' + colorClass + '">' + t.speaker + ':</b> ' + t.text + '</div>';
-                });
-
-                var strengthsHtml = "";
-                (evalData.strengths || []).forEach(function(s) {
-                    strengthsHtml += '<li>' + s + '</li>';
-                });
-
-                var improvementsHtml = "";
-                (evalData.improvements || []).forEach(function(i) {
-                    improvementsHtml += '<li>' + i + '</li>';
-                });
-
-                var fmtBool = function(val) {
-                    return val ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
-                };
-
-                card.innerHTML = 
-                    '<div class="flex justify-between items-center border-b border-slate-700 pb-3">' +
-                        '<h3 class="font-bold text-blue-400 text-sm">📁 ' + item.filename + '</h3>' +
-                        '<span class="text-emerald-400 font-extrabold text-lg">' + (evalData.overall_score || 0) + '/100</span>' +
-                    '</div>' +
-                    
-                    '<!-- Call Audio Metrics -->' +
-                    '<div class="grid grid-cols-3 gap-2 text-center text-xs">' +
-                        '<div class="bg-slate-900/50 p-2 rounded-lg">' +
-                            '<span class="text-slate-500 block text-[10px]">PACE</span>' +
-                            '<span class="font-bold text-blue-400">' + (metrics.wpm || 0) + ' WPM</span>' +
-                        '</div>' +
-                        '<div class="bg-slate-900/50 p-2 rounded-lg">' +
-                            '<span class="text-slate-500 block text-[10px]">DURATION</span>' +
-                            '<span class="font-bold text-indigo-400">' + Math.round(metrics.duration || 0) + 's</span>' +
-                        '</div>' +
-                        '<div class="bg-slate-900/50 p-2 rounded-lg">' +
-                            '<span class="text-slate-500 block text-[10px]">WORDS</span>' +
-                            '<span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span>' +
-                        '</div>' +
-                    '</div>' +
-
-                    '<!-- Pharma Upsell Audit Grid -->' +
-                    '<div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 space-y-2">' +
-                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Pharma Upsell Metrics</div>' +
-                        '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' +
-                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Upsell Opp. Available: ' + fmtBool(pharma.upsell_opportunity_available) + '</div>' +
-                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Upsell Pitch Done: ' + fmtBool(pharma.upsell_pitch_done) + '</div>' +
-                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Pitch Ineffective: ' + fmtBool(pharma.upsell_pitch_ineffective) + '</div>' +
-                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Successful Upsell: ' + fmtBool(pharma.successful_upsell) + '</div>' +
-                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Quantity Increase Attempt: ' + fmtBool(pharma.quantity_increase_attempt) + '</div>' +
-                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">PL Product Pitched: ' + fmtBool(pharma.pl_product_pitched) + '</div>' +
-                        '</div>' +
-                    '</div>' +
-
-                    '<div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 space-y-1">' +
-                        '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
-                        '<p class="text-slate-300 leading-relaxed">' + (evalData.summary || "N/A") + '</p>' +
-                    '</div>' +
-                    '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">' +
-                        '<div class="bg-slate-900/40 p-3 rounded-xl border border-slate-700/50">' +
-                            '<h5 class="font-bold text-emerald-400 mb-1">✅ Strengths</h5>' +
-                            '<ul class="list-disc list-inside text-slate-300 space-y-1">' + strengthsHtml + '</ul>' +
-                        '</div>' +
-                        '<div class="bg-slate-900/40 p-3 rounded-xl border border-slate-700/50">' +
-                            '<h5 class="font-bold text-amber-400 mb-1">⚠️ Improvements</h5>' +
-                            '<ul class="list-disc list-inside text-slate-300 space-y-1">' + improvementsHtml + '</ul>' +
-                        '</div>' +
-                    '</div>' +
-                    '<details class="bg-slate-900/40 p-3 rounded-xl border border-slate-700/50 text-xs text-slate-300">' +
-                        '<summary class="font-bold text-slate-400 cursor-pointer">📄 Click to view Full Diarized Transcript</summary>' +
-                        '<div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
-                    '</details>';
-                
-                container.appendChild(card);
-            });
-        }
-
-        async function loadHistory() {
-            try {
-                var res = await fetch("/api/history");
-                var list = await res.json();
-                historyDataList = list || [];
-                var hTable = document.getElementById('historyTable');
-                if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No past audits in Firebase.</td></tr>';
-                    return;
-                }
-                hTable.innerHTML = "";
-                list.forEach(function(item) {
-                    var p = item.pharma_metrics || {};
-                    hTable.innerHTML += 
-                        '<tr class="border-b border-slate-700/50">' +
-                            '<td class="p-2 font-medium text-slate-200">' + item.filename + '</td>' +
-                            '<td class="p-2 text-emerald-400 font-bold">' + item.score + '/100</td>' +
-                            '<td class="p-2">' + (p.upsell_opportunity_available ? '✅' : '❌') + '</td>' +
-                            '<td class="p-2">' + (p.upsell_pitch_done ? '✅' : '❌') + '</td>' +
-                            '<td class="p-2">' + (p.successful_upsell ? '✅' : '❌') + '</td>' +
-                            '<td class="p-2">' + (p.pl_product_pitched ? '✅' : '❌') + '</td>' +
-                            '<td class="p-2 text-slate-500">' + item.created_at + '</td>' +
-                        '</tr>';
-                });
-            } catch(e) {
-                console.error("History load error:", e);
-            }
-        }
-
-        function downloadExcel() {
-            if(!currentBatchResults || currentBatchResults.length === 0) {
-                alert("Koi analysis data nahi hai export karne ke liye!");
-                return;
-            }
-
-            var validResults = currentBatchResults.filter(function(r) { return r.status === "success"; });
             var totalCalls = validResults.length;
 
             var countOpp = 0, countPitchDone = 0, countIneffective = 0, countSuccess = 0, countUnsuccess = 0, countQtyAttempt = 0, countPL = 0;
@@ -424,129 +230,147 @@ HTML_CONTENT = """<!DOCTYPE html>
                 return Math.round((val / totalCalls) * 100) + "%";
             }
 
-            var aggregateRows = [
-                { "Metric": "Total Calls Reviewed", "Count": totalCalls, "%": "100%" },
-                { "Metric": "Upsell Opportunity Available", "Count": countOpp, "%": calcPct(countOpp) },
-                { "Metric": "Upsell Pitch Done", "Count": countPitchDone, "%": calcPct(countPitchDone) },
-                { "Metric": "Upsell Pitch Not Done / Ineffective", "Count": countPitchNotDoneOrIneffective, "%": calcPct(countPitchNotDoneOrIneffective) },
-                { "Metric": "Successful Upsell", "Count": countSuccess, "%": calcPct(countSuccess) },
-                { "Metric": "Unsuccessful Upsell", "Count": countUnsuccess, "%": calcPct(countUnsuccess) },
-                { "Metric": "Quantity Increase Attempt", "Count": countQtyAttempt, "%": calcPct(countQtyAttempt) },
-                { "Metric": "PL Product Pitched", "Count": countPL, "%": calcPct(countPL) }
+            document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
+            document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + new Date().toLocaleString();
+
+            var summaryRows = [
+                { metric: "Total Calls Reviewed", count: totalCalls, pct: "100%" },
+                { metric: "Upsell Opportunity Available", count: countOpp, pct: calcPct(countOpp) },
+                { metric: "Upsell Pitch Done", count: countPitchDone, pct: calcPct(countPitchDone) },
+                { metric: "Upsell Pitch Not Done / Ineffective", count: countPitchNotDoneOrIneffective, pct: calcPct(countPitchNotDoneOrIneffective) },
+                { metric: "Successful Upsell", count: countSuccess, pct: calcPct(countSuccess) },
+                { metric: "Unsuccessful Upsell", count: countUnsuccess, pct: calcPct(countUnsuccess) },
+                { metric: "Quantity Increase Attempt", count: countQtyAttempt, pct: calcPct(countQtyAttempt) },
+                { metric: "PL Product Pitched", count: countPL, pct: calcPct(countPL) }
             ];
 
-            var summaryRows = [];
-            var transcriptRows = [];
-
-            currentBatchResults.forEach(function(item) {
-                if(item.status === "success") {
-                    var data = item.data || {};
-                    var evalData = data.evaluation || {};
-                    var pharma = evalData.pharma_upsell_metrics || {};
-                    var metrics = data.metrics || {};
-                    var transcript = data.transcript || [];
-
-                    summaryRows.push({
-                        "File Name": item.filename,
-                        "QA Score (/100)": evalData.overall_score || 0,
-                        "Pace (WPM)": metrics.wpm || 0,
-                        "Call Duration (Sec)": Math.round(metrics.duration || 0),
-                        "Upsell Opportunity Available": pharma.upsell_opportunity_available ? "Yes" : "No",
-                        "Upsell Pitch Done": pharma.upsell_pitch_done ? "Yes" : "No",
-                        "Upsell Pitch Ineffective": pharma.upsell_pitch_ineffective ? "Yes" : "No",
-                        "Successful Upsell": pharma.successful_upsell ? "Yes" : "No",
-                        "Quantity Increase Attempt": pharma.quantity_increase_attempt ? "Yes" : "No",
-                        "PL Product Pitched": pharma.pl_product_pitched ? "Yes" : "No",
-                        "Complete Call Summary": evalData.summary || "",
-                        "Key Strengths": (evalData.strengths || []).map(function(s, idx) { return (idx+1) + ". " + s; }).join("\n"),
-                        "Areas of Improvement": (evalData.improvements || []).map(function(i, idx) { return (idx+1) + ". " + i; }).join("\n")
-                    });
-
-                    transcript.forEach(function(t) {
-                        transcriptRows.push({
-                            "File Name": item.filename,
-                            "Speaker": t.speaker,
-                            "Dialogue / Statement": t.text
-                        });
-                    });
-                }
+            var summaryHtml = "";
+            summaryRows.forEach(function(row) {
+                summaryHtml += '<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">' + row.metric + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + row.count + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + row.pct + '</td></tr>';
             });
+            document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
-            var workbook = XLSX.utils.book_new();
+            results.forEach(function(item) {
+                if(item.status !== "success") {
+                    container.innerHTML += '<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed to analyze <b>' + item.filename + '</b>: ' + (item.error || 'Error') + '</div>';
+                    return;
+                }
 
-            var aggregateSheet = XLSX.utils.json_to_sheet(aggregateRows);
-            aggregateSheet['!cols'] = [{ wch: 35 }, { wch: 12 }, { wch: 12 }];
-            XLSX.utils.book_append_sheet(workbook, aggregateSheet, "Batch Metric Summary");
+                var data = item.data || {};
+                var evalData = data.evaluation || {};
+                var pharma = evalData.pharma_upsell_metrics || {};
+                var metrics = data.metrics || {};
+                var transcript = data.transcript || [];
+                
+                var card = document.createElement('div');
+                card.className = "bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
+                
+                var transcriptHtml = "";
+                transcript.forEach(function(t) {
+                    var colorClass = t.speaker === 'Agent' ? 'text-blue-400' : 'text-emerald-400';
+                    transcriptHtml += '<div class="mb-1"><b class="' + colorClass + '">' + t.speaker + ':</b> ' + t.text + '</div>';
+                });
 
-            var summarySheet = XLSX.utils.json_to_sheet(summaryRows);
-            summarySheet['!cols'] = [
-                { wch: 25 }, { wch: 15 }, { wch: 12 }, { wch: 18 },
-                { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 18 },
-                { wch: 22 }, { wch: 18 }, { wch: 50 }, { wch: 35 }, { wch: 35 }
-            ];
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Per Call QA Details");
+                var fmtBool = function(val) {
+                    return val ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
+                };
 
-            if(transcriptRows.length > 0) {
-                var transcriptSheet = XLSX.utils.json_to_sheet(transcriptRows);
-                transcriptSheet['!cols'] = [
-                    { wch: 25 }, { wch: 15 }, { wch: 85 }
-                ];
-                XLSX.utils.book_append_sheet(workbook, transcriptSheet, "Full Transcripts");
+                card.innerHTML = 
+                    '<div class="flex justify-between items-center border-b border-slate-700 pb-3">' +
+                        '<h3 class="font-bold text-blue-400 text-sm">📁 ' + item.filename + '</h3>' +
+                        '<span class="text-emerald-400 font-extrabold text-lg">' + (evalData.overall_score || 0) + '/100</span>' +
+                    '</div>' +
+                    '<div class="grid grid-cols-3 gap-2 text-center text-xs">' +
+                        '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">PACE</span><span class="font-bold text-blue-400">' + (metrics.wpm || 0) + ' WPM</span></div>' +
+                        '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">DURATION</span><span class="font-bold text-indigo-400">' + Math.round(metrics.duration || 0) + 's</span></div>' +
+                        '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">WORDS</span><span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span></div>' +
+                    '</div>' +
+                    '<div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 space-y-2">' +
+                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Pharma Upsell Metrics</div>' +
+                        '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Upsell Opp. Available: ' + fmtBool(pharma.upsell_opportunity_available) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Upsell Pitch Done: ' + fmtBool(pharma.upsell_pitch_done) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Pitch Ineffective: ' + fmtBool(pharma.upsell_pitch_ineffective) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Successful Upsell: ' + fmtBool(pharma.successful_upsell) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">Quantity Increase Attempt: ' + fmtBool(pharma.quantity_increase_attempt) + '</div>' +
+                            '<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">PL Product Pitched: ' + fmtBool(pharma.pl_product_pitched) + '</div>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 space-y-1">' +
+                        '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
+                        '<p class="text-slate-300 leading-relaxed">' + (evalData.summary || "N/A") + '</p>' +
+                    '</div>' +
+                    '<details class="bg-slate-900/40 p-3 rounded-xl border border-slate-700/50 text-xs text-slate-300">' +
+                        '<summary class="font-bold text-slate-400 cursor-pointer">📄 Click to view Full Diarized Transcript</summary>' +
+                        '<div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
+                    '</details>';
+                
+                container.appendChild(card);
+            });
+        }
+
+        async function loadHistory() {
+            var hTable = document.getElementById('historyTable');
+            try {
+                var res = await fetch("/api/history");
+                var list = await res.json();
+                historyDataList = list || [];
+                
+                if(!list || list.length === 0) {
+                    hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                    return;
+                }
+                hTable.innerHTML = "";
+                list.forEach(function(item) {
+                    var p = item.pharma_metrics || {};
+                    hTable.innerHTML += 
+                        '<tr class="border-b border-slate-700/50">' +
+                            '<td class="p-2 font-medium text-slate-200">' + (item.filename || 'N/A') + '</td>' +
+                            '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
+                            '<td class="p-2">' + (p.upsell_opportunity_available ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.upsell_pitch_done ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.successful_upsell ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2">' + (p.pl_product_pitched ? '✅' : '❌') + '</td>' +
+                            '<td class="p-2 text-slate-500">' + (item.created_at || 'N/A') + '</td>' +
+                        '</tr>';
+                });
+            } catch(e) {
+                console.error("History load error:", e);
+                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
+        }
 
-            var dateStr = new Date().toISOString().slice(0, 10);
-            XLSX.writeFile(workbook, "Pharma_Call_Audit_Report_" + dateStr + ".xlsx");
+        function downloadExcel() {
+            if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
+            var workbook = XLSX.utils.book_new();
+            var summarySheet = XLSX.utils.json_to_sheet(currentBatchResults.map(i => ({
+                "File Name": i.filename,
+                "QA Score": i.data?.evaluation?.overall_score || 0,
+                "Summary": i.data?.evaluation?.summary || ""
+            })));
+            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
+            XLSX.writeFile(workbook, "Pharma_Call_Audit_Report.xlsx");
         }
 
         function exportHistoryExcel() {
-            if(!historyDataList || historyDataList.length === 0) {
-                alert("History empty hai!");
-                return;
-            }
-
-            var exportRows = historyDataList.map(function(item) {
-                var p = item.pharma_metrics || {};
-                return {
-                    "File Name": item.filename,
-                    "QA Score": item.score,
-                    "Pace (WPM)": item.wpm,
-                    "Upsell Opp.": p.upsell_opportunity_available ? "Yes" : "No",
-                    "Upsell Pitched": p.upsell_pitch_done ? "Yes" : "No",
-                    "Successful Upsell": p.successful_upsell ? "Yes" : "No",
-                    "PL Pitched": p.pl_product_pitched ? "Yes" : "No",
-                    "Detailed Call Summary": item.summary || "",
-                    "Audit Date & Time": item.created_at
-                };
-            });
-
-            var worksheet = XLSX.utils.json_to_sheet(exportRows);
-            worksheet['!cols'] = [
-                { wch: 25 }, { wch: 12 }, { wch: 12 }, { wch: 12 },
-                { wch: 15 }, { wch: 15 }, { wch: 12 }, { wch: 50 }, { wch: 20 }
-            ];
-
+            if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
             var workbook = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(workbook, worksheet, "Cloud Audit History");
-
-            var dateStr = new Date().toISOString().slice(0, 10);
-            XLSX.writeFile(workbook, "Cloud_Audit_History_" + dateStr + ".xlsx");
+            var sheet = XLSX.utils.json_to_sheet(historyDataList.map(item => ({
+                "File Name": item.filename,
+                "QA Score": item.score,
+                "WPM": item.wpm,
+                "Created At": item.created_at
+            })));
+            XLSX.utils.book_append_sheet(workbook, sheet, "History");
+            XLSX.writeFile(workbook, "Cloud_Audit_History.xlsx");
         }
 
         function downloadPDF() {
             var element = document.getElementById('batchResultsContainer');
-            var opt = {
-                margin:       0.3,
-                filename:     "Batch_Pharma_Call_Audit_Report_" + new Date().toISOString().slice(0,10) + ".pdf",
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, backgroundColor: '#0f172a' },
-                jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' }
-            };
-            html2pdf().set(opt).from(element).save();
+            html2pdf().from(element).save("Batch_Pharma_Call_Audit_Report.pdf");
         }
 
-        window.onload = function() {
-            loadHistory();
-        };
+        window.onload = function() { loadHistory(); };
     </script>
 </body>
 </html>
@@ -557,19 +381,8 @@ async def serve_ui():
     return HTML_CONTENT
 
 def transcribe_bytes(audio_bytes):
-    url = (
-        "https://api.deepgram.com/v1/listen?"
-        "model=nova-2&"
-        "language=hi&"
-        "detect_language=true&"
-        "diarize=true&"
-        "punctuate=true&"
-        "utterances=true"
-    )
-    headers = {
-        "Authorization": "Token " + DEEPGRAM_API_KEY,
-        "Content-Type": "audio/mp3"
-    }
+    url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
+    headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
     response = requests.post(url, headers=headers, data=audio_bytes, timeout=120)
     if response.status_code != 200:
         raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
@@ -592,43 +405,17 @@ def transcribe_bytes(audio_bytes):
             formatted_transcript.append({"speaker": speaker_name, "text": text})
             
     wpm = int((total_words / duration) * 60) if duration > 0 else 0
-    
-    metrics = {
-        "duration": duration,
-        "total_words": total_words,
-        "wpm": wpm
-    }
-    
-    return formatted_transcript, metrics
+    return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
 def evaluate_quality(transcript):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
-    headers = {"Content-Type": "application/json"}
-    
     prompt = f"""
-    Aap ek Senior Pharma Call Center Quality Assurance (QA) Manager hain.
-    Niche diya gaya call transcript poori tarah analyze karke AGENT ka Quality Score (0-100), Pharma Upsell Metrics aur comprehensive audit report tayyar karein.
-    
-    Transcript:
-    {json.dumps(transcript, indent=2)}
-    
-    Pharma Upsell Metrics Evaluation Criteria (Set boolean true/false for each):
-    1. upsell_opportunity_available: Kya customer ke order/inquiry me complementary medicine, health supplement, extra quantity, ya substitute product cross-sell/upsell karne ka mauka tha?
-    2. upsell_pitch_done: Kya agent ne kisi bhi tarah ka upsell product/offer pitch karne ki koshish ki?
-    3. upsell_pitch_ineffective: Kya agent ki pitch kamzor/ineffective thi jisse customer ne mana kar diya ya agent clear explanation nahi de paya?
-    4. successful_upsell: Kya customer ne upsell offer accept karke additional product kharida?
-    5. quantity_increase_attempt: Kya agent ne ordered product ki quantity/pack size badhane ki koshish ki (e.g., 1 strip ki jagah 3 strips ya monthly pack)?
-    6. pl_product_pitched: Kya agent ne Private Label (PL) / Store Brand / Substitute product suggest/pitch kiya?
-
-    Requirements:
-    - 'summary' field me call ka COMPREHENSIVE aur DETAILED SUMMARY (in-depth 4-6 lines) Hindi/Hinglish me likhein.
-    - 'strengths' field me Agent ke strong points add karein.
-    - 'improvements' field me areas of improvement detail me add karein.
-    
-    Output STRICTLY valid JSON format me dein without markdown code block tags:
+    Analyze transcript for Pharma Agent Quality Score (0-100) & Pharma Upsell Metrics.
+    Transcript: {json.dumps(transcript, indent=2)}
+    Return JSON ONLY:
     {{
         "overall_score": 85,
-        "summary": "Detailed call summary covering customer query, agent response, upsell attempt, and overall conversation flow...",
+        "summary": "Detailed call summary...",
         "pharma_upsell_metrics": {{
             "upsell_opportunity_available": true,
             "upsell_pitch_done": true,
@@ -637,16 +424,13 @@ def evaluate_quality(transcript):
             "quantity_increase_attempt": true,
             "pl_product_pitched": false
         }},
-        "strengths": ["Point 1", "Point 2"],
-        "improvements": ["Point 1", "Point 2"]
+        "strengths": ["Strong point"],
+        "improvements": ["Improvement point"]
     }}
     """
-    
-    payload = {"contents": [{"parts": [{"text": prompt}]}]}
-    response = requests.post(url, headers=headers, json=payload, timeout=60)
+    response = requests.post(url, headers={"Content-Type": "application/json"}, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=60)
     if response.status_code != 200:
         raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
-        
     res_data = response.json()
     gemini_raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
     clean_json = re.sub(r'```(?:json)?\n?', '', gemini_raw_text).replace('```', '').strip()
@@ -655,12 +439,11 @@ def evaluate_quality(transcript):
 async def process_single_file(file: UploadFile):
     try:
         audio_bytes = await file.read()
-        
         loop = asyncio.get_event_loop()
         transcript, metrics = await loop.run_in_executor(None, transcribe_bytes, audio_bytes)
         evaluation = await loop.run_in_executor(None, evaluate_quality, transcript)
         
-        created_time = datetime.now().strftime("%Y-%m-%d %H:%M")
+        created_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         if db:
             try:
@@ -669,29 +452,17 @@ async def process_single_file(file: UploadFile):
                     "score": evaluation.get("overall_score", 0),
                     "summary": evaluation.get("summary", ""),
                     "pharma_metrics": evaluation.get("pharma_upsell_metrics", {}),
-                    "wpm": metrics["wpm"],
-                    "created_at": created_time,
-                    "timestamp": firestore.SERVER_TIMESTAMP
+                    "wpm": metrics.get("wpm", 0),
+                    "created_at": created_time
                 }
                 db.collection("audits").add(audit_data)
+                print(f"✅ Document added to Firebase for {file.filename}")
             except Exception as fe:
-                print("Firebase Write Error:", fe)
+                print("❌ Firebase Write Error:", fe)
 
-        return {
-            "status": "success",
-            "filename": file.filename,
-            "data": {
-                "metrics": metrics,
-                "transcript": transcript,
-                "evaluation": evaluation
-            }
-        }
+        return {"status": "success", "filename": file.filename, "data": {"metrics": metrics, "transcript": transcript, "evaluation": evaluation}}
     except Exception as e:
-        return {
-            "status": "error",
-            "filename": file.filename,
-            "error": str(e)
-        }
+        return {"status": "error", "filename": file.filename, "error": str(e)}
 
 async def process_single_file_limited(file: UploadFile):
     async with semaphore:
@@ -706,39 +477,27 @@ async def analyze_audio_batch(files: List[UploadFile] = File(...)):
 @app.get("/api/history")
 async def get_history():
     if not db:
+        print("❌ Firebase DB Object is None in /api/history")
         return []
     try:
-        try:
-            docs = db.collection("audits").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(20).stream()
-            history = []
-            for doc in docs:
-                data = doc.to_dict()
-                history.append({
-                    "filename": data.get("filename", ""),
-                    "score": data.get("score", 0),
-                    "summary": data.get("summary", ""),
-                    "pharma_metrics": data.get("pharma_metrics", {}),
-                    "wpm": data.get("wpm", 0),
-                    "created_at": data.get("created_at", "")
-                })
-            return history
-        except Exception as e1:
-            print("Ordered Query Failed, trying fallback stream:", e1)
-            docs = db.collection("audits").limit(20).stream()
-            history = []
-            for doc in docs:
-                data = doc.to_dict()
-                history.append({
-                    "filename": data.get("filename", ""),
-                    "score": data.get("score", 0),
-                    "summary": data.get("summary", ""),
-                    "pharma_metrics": data.get("pharma_metrics", {}),
-                    "wpm": data.get("wpm", 0),
-                    "created_at": data.get("created_at", "")
-                })
-            return history
+        docs = db.collection("audits").limit(30).stream()
+        history = []
+        for doc in docs:
+            data = doc.to_dict()
+            history.append({
+                "filename": data.get("filename", "Unknown"),
+                "score": data.get("score", 0),
+                "summary": data.get("summary", ""),
+                "pharma_metrics": data.get("pharma_metrics", {}),
+                "wpm": data.get("wpm", 0),
+                "created_at": data.get("created_at", "")
+            })
+        
+        # Sort in memory by creation time
+        history.sort(key=lambda x: x["created_at"], reverse=True)
+        return history
     except Exception as e:
-        print("Firebase Get History Error:", e)
+        print("❌ Firebase Fetch Error:", str(e))
         return []
 
 if __name__ == "__main__":
