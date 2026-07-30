@@ -45,7 +45,6 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 semaphore = asyncio.Semaphore(2)
 
-# Default metrics to seed in Firestore if empty
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there an opportunity to pitch an upsell or add-on product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent attempt an upsell pitch during the call?"},
@@ -56,7 +55,6 @@ DEFAULT_METRICS = [
 ]
 
 def init_default_metrics():
-    """Seed initial metrics if collection is empty"""
     if db:
         try:
             docs = list(db.collection("metrics").limit(1).stream())
@@ -77,9 +75,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <title>AI Call Quality Auditor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
+        tailwind.config = { darkMode: 'class' }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -97,7 +93,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <body class="min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-6xl mx-auto space-y-6">
         
-        <!-- Top Header with Dark/Light Toggle -->
+        <!-- Header -->
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -267,7 +263,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </form>
 
-            <!-- Metrics List -->
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
                 <div id="metricsListContainer" class="space-y-2"></div>
@@ -281,7 +276,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         var historyDataList = [];
         var activeMetrics = [];
         
-        // History Pagination Variables
         var currentPage = 1;
         var itemsPerPage = 10;
 
@@ -318,18 +312,17 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
             var html = '';
             activeMetrics.forEach(function(m) {
-                html += `
-                <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
-                    <div>
-                        <span class="font-bold text-blue-400">${m.label}</span>
-                        <span class="text-sub text-[10px] ml-2">(${m.key})</span>
-                        <p class="text-sub text-[11px] mt-0.5">${m.description}</p>
-                    </div>
-                    <div class="flex gap-2">
-                        <button onclick="editMetric('${m.id}')" class="text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded">Edit</button>
-                        <button onclick="deleteMetric('${m.id}')" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-1 rounded">Delete</button>
-                    </div>
-                </div>`;
+                html += '<div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">' +
+                    '<div>' +
+                        '<span class="font-bold text-blue-400">' + m.label + '</span>' +
+                        '<span class="text-sub text-[10px] ml-2">(' + m.key + ')</span>' +
+                        '<p class="text-sub text-[11px] mt-0.5">' + m.description + '</p>' +
+                    '</div>' +
+                    '<div class="flex gap-2">' +
+                        '<button onclick="editMetric(\'' + m.id + '\')" class="text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded">Edit</button>' +
+                        '<button onclick="deleteMetric(\'' + m.id + '\')" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-1 rounded">Delete</button>' +
+                    '</div>' +
+                '</div>';
             });
             container.innerHTML = html;
         }
@@ -355,7 +348,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function editMetric(id) {
-            var m = activeMetrics.find(x => x.id === id);
+            var m = activeMetrics.find(function(x) { return x.id === id; });
             if (!m) return;
             document.getElementById('metricId').value = m.id;
             document.getElementById('metricKey').value = m.key;
@@ -373,7 +366,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 description: document.getElementById('metricDesc').value.trim()
             };
 
-            var url = id ? `/api/metrics/${id}` : '/api/metrics';
+            var url = id ? "/api/metrics/" + id : '/api/metrics';
             var method = id ? 'PUT' : 'POST';
 
             try {
@@ -396,7 +389,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function deleteMetric(id) {
             if(!confirm("Are you sure you want to delete this metric?")) return;
             try {
-                var res = await fetch(`/api/metrics/${id}`, { method: 'DELETE' });
+                var res = await fetch("/api/metrics/" + id, { method: 'DELETE' });
                 if(!res.ok) throw new Error("Failed to delete metric");
                 await fetchMetrics();
             } catch(err) {
@@ -449,11 +442,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             var totalCalls = validResults.length;
 
             var metricCounts = {};
-            activeMetrics.forEach(m => metricCounts[m.key] = 0);
+            activeMetrics.forEach(function(m) { metricCounts[m.key] = 0; });
 
             validResults.forEach(function(item) {
                 var evalMetrics = item.data?.evaluation?.evaluated_metrics || {};
-                activeMetrics.forEach(m => {
+                activeMetrics.forEach(function(m) {
                     if(evalMetrics[m.key]) {
                         metricCounts[m.key] = (metricCounts[m.key] || 0) + 1;
                     }
@@ -468,11 +461,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
             document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + new Date().toLocaleString();
 
-            var summaryHtml = `<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">${totalCalls}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>`;
+            var summaryHtml = '<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">' + totalCalls + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>';
             
             activeMetrics.forEach(function(m) {
                 var cnt = metricCounts[m.key] || 0;
-                summaryHtml += `<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">${m.label}</td><td class="p-2.5 text-center font-bold text-blue-400">${cnt}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">${calcPct(cnt)}</td></tr>`;
+                summaryHtml += '<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">' + m.label + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + cnt + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + calcPct(cnt) + '</td></tr>';
             });
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
@@ -501,7 +494,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 activeMetrics.forEach(function(m) {
                     var isTrue = evalMetrics[m.key] === true;
                     var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
-                    dynamicCardsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}:${fmt}</div>`;
+                    dynamicCardsHtml += '<div class="inner-bg p-2 rounded border border-slate-700/40">' + m.label + ': ' + fmt + '</div>';
                 });
 
                 card.innerHTML = 
@@ -578,7 +571,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     '</tr>';
             });
 
-            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} Items)`;
+            document.getElementById('pageInfoText').innerText = "Page " + currentPage + " of " + totalPages + " (" + historyDataList.length + " Items)";
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
         }
@@ -589,7 +582,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function openViewHistoryModal(id) {
-            var item = historyDataList.find(x => x.id === id);
+            var item = historyDataList.find(function(x) { return x.id === id; });
             if (!item) return;
 
             document.getElementById('viewModalFileName').innerText = "📁 " + (item.filename || "Audit Details");
@@ -599,35 +592,23 @@ HTML_CONTENT = """<!DOCTYPE html>
             activeMetrics.forEach(function(m) {
                 var isTrue = evalMetrics[m.key] === true;
                 var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
-                metricsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}: ${fmt}</div>`;
+                metricsHtml += '<div class="inner-bg p-2 rounded border border-slate-700/40">' + m.label + ': ' + fmt + '</div>';
             });
 
-            var contentHtml = `
-                <div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/60">
-                    <div>
-                        <span class="text-sub block text-[10px]">AUDIT DATE</span>
-                        <span class="font-bold text-slate-200">${item.created_at || 'N/A'}</span>
-                    </div>
-                    <div>
-                        <span class="text-sub block text-[10px]">SPEAKING PACE</span>
-                        <span class="font-bold text-blue-400">${item.wpm || 0} WPM</span>
-                    </div>
-                    <div>
-                        <span class="text-sub block text-[10px]">OVERALL QA SCORE</span>
-                        <span class="font-bold text-emerald-400 text-sm">${item.score || 0}/100</span>
-                    </div>
-                </div>
-
-                <div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">
-                    <div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>
-                    <div class="grid grid-cols-2 gap-2 text-xs">${metricsHtml}</div>
-                </div>
-
-                <div class="inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">
-                    <div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>
-                    <p class="text-sub leading-relaxed">${item.summary || "N/A"}</p>
-                </div>
-            `;
+            var contentHtml = 
+                '<div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/60">' +
+                    '<div><span class="text-sub block text-[10px]">AUDIT DATE</span><span class="font-bold text-slate-200">' + (item.created_at || 'N/A') + '</span></div>' +
+                    '<div><span class="text-sub block text-[10px]">SPEAKING PACE</span><span class="font-bold text-blue-400">' + (item.wpm || 0) + ' WPM</span></div>' +
+                    '<div><span class="text-sub block text-[10px]">OVERALL QA SCORE</span><span class="font-bold text-emerald-400 text-sm">' + (item.score || 0) + '/100</span></div>' +
+                '</div>' +
+                '<div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">' +
+                    '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
+                    '<div class="grid grid-cols-2 gap-2 text-xs">' + metricsHtml + '</div>' +
+                '</div>' +
+                '<div class="inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">' +
+                    '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
+                    '<p class="text-sub leading-relaxed">' + (item.summary || "N/A") + '</p>' +
+                '</div>';
 
             document.getElementById('viewModalContent').innerHTML = contentHtml;
             document.getElementById('viewHistoryModal').classList.remove('hidden');
@@ -642,7 +623,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function deleteHistoryRecord(id) {
             if(!confirm("Are you sure you want to delete this call record from Firebase?")) return;
             try {
-                var res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+                var res = await fetch("/api/history/" + id, { method: 'DELETE' });
                 if(!res.ok) throw new Error("Failed to delete record");
                 await loadHistory();
             } catch(err) {
@@ -653,11 +634,13 @@ HTML_CONTENT = """<!DOCTYPE html>
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
             var workbook = XLSX.utils.book_new();
-            var summarySheet = XLSX.utils.json_to_sheet(currentBatchResults.map(i => ({
-                "File Name": i.filename,
-                "QA Score": i.data?.evaluation?.overall_score || 0,
-                "Summary": i.data?.evaluation?.summary || ""
-            })));
+            var summarySheet = XLSX.utils.json_to_sheet(currentBatchResults.map(function(i) {
+                return {
+                    "File Name": i.filename,
+                    "QA Score": i.data?.evaluation?.overall_score || 0,
+                    "Summary": i.data?.evaluation?.summary || ""
+                };
+            }));
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
             XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
         }
@@ -665,12 +648,14 @@ HTML_CONTENT = """<!DOCTYPE html>
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
             var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(historyDataList.map(item => ({
-                "File Name": item.filename,
-                "QA Score": item.score,
-                "WPM": item.wpm,
-                "Created At": item.created_at
-            })));
+            var sheet = XLSX.utils.json_to_sheet(historyDataList.map(function(item) {
+                return {
+                    "File Name": item.filename,
+                    "QA Score": item.score,
+                    "WPM": item.wpm,
+                    "Created At": item.created_at
+                };
+            }));
             XLSX.utils.book_append_sheet(workbook, sheet, "History");
             XLSX.writeFile(workbook, "Cloud_Audit_History.xlsx");
         }
