@@ -485,9 +485,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var metrics = data.metrics || {};
                 var transcript = data.transcript || [];
                 
-                var strengths = (evalData.strengths || []).map(function(s) { return '<li class="text-emerald-400">💪 ' + s + '</li>'; }).join('') || '<li class="text-sub">None noted</li>';
-                var improvements = (evalData.improvements || []).map(function(i) { return '<li class="text-rose-400">⚠️ ' + i + '</li>'; }).join('') || '<li class="text-sub">None noted</li>';
-
                 var card = document.createElement('div');
                 card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
                 
@@ -517,16 +514,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     '<div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">' +
                         '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
                         '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' + dynamicCardsHtml + '</div>' +
-                    '</div>' +
-                    '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">' +
-                        '<div class="inner-bg p-3 rounded-xl border border-emerald-500/20 space-y-1">' +
-                            '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide">Agent Strengths</div>' +
-                            '<ul class="space-y-1 pl-1">' + strengths + '</ul>' +
-                        '</div>' +
-                        '<div class="inner-bg p-3 rounded-xl border border-rose-500/20 space-y-1">' +
-                            '<div class="font-bold text-rose-400 text-[11px] uppercase tracking-wide">Areas of Improvement / Weaknesses</div>' +
-                            '<ul class="space-y-1 pl-1">' + improvements + '</ul>' +
-                        '</div>' +
                     '</div>' +
                     '<div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">' +
                         '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
@@ -583,6 +570,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
                         '<td class="p-2 text-center flex justify-center gap-2">' +
                             '<button onclick="openViewHistoryModal(\'' + item.id + '\')" title="View Record" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition">👁️ View</button>' +
+                            '<button onclick="deleteHistoryRecord(\'' + item.id + '\')" title="Delete Record" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition">🗑️ Delete</button>' +
                         '</td>' +
                     '</tr>';
             });
@@ -611,9 +599,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 metricsHtml += '<div class="inner-bg p-2 rounded border border-slate-700/40">' + m.label + ': ' + fmt + '</div>';
             });
 
-            var strengths = (item.strengths || []).map(function(s) { return '<li class="text-emerald-400">💪 ' + s + '</li>'; }).join('') || '<li class="text-sub">None</li>';
-            var improvements = (item.improvements || []).map(function(i) { return '<li class="text-rose-400">⚠️ ' + i + '</li>'; }).join('') || '<li class="text-sub">None</li>';
-
             var contentHtml = 
                 '<div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/60">' +
                     '<div><span class="text-sub block text-[10px]">AUDIT DATE</span><span class="font-bold text-slate-200">' + (item.created_at || 'N/A') + '</span></div>' +
@@ -623,16 +608,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 '<div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">' +
                     '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
                     '<div class="grid grid-cols-2 gap-2 text-xs">' + metricsHtml + '</div>' +
-                '</div>' +
-                '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">' +
-                    '<div class="inner-bg p-3 rounded-xl border border-emerald-500/20 space-y-1">' +
-                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide">Strengths</div>' +
-                        '<ul class="space-y-1 pl-1">' + strengths + '</ul>' +
-                    '</div>' +
-                    '<div class="inner-bg p-3 rounded-xl border border-rose-500/20 space-y-1">' +
-                        '<div class="font-bold text-rose-400 text-[11px] uppercase tracking-wide">Weaknesses / Improvements</div>' +
-                        '<ul class="space-y-1 pl-1">' + improvements + '</ul>' +
-                    '</div>' +
                 '</div>' +
                 '<div class="inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">' +
                     '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
@@ -647,6 +622,17 @@ HTML_CONTENT = """<!DOCTYPE html>
         function closeViewModal() {
             document.getElementById('viewHistoryModal').classList.add('hidden');
             document.getElementById('viewHistoryModal').classList.remove('flex');
+        }
+
+        async function deleteHistoryRecord(id) {
+            if(!confirm("Are you sure you want to delete this call record from Firebase?")) return;
+            try {
+                var res = await fetch("/api/history/" + id, { method: 'DELETE' });
+                if(!res.ok) throw new Error("Failed to delete record");
+                await loadHistory();
+            } catch(err) {
+                alert("Error deleting record: " + err.message);
+            }
         }
 
         function downloadExcel() {
@@ -806,7 +792,7 @@ def evaluate_quality(transcript, metrics_list):
     metrics_guide = "\n".join(metric_instructions)
 
     prompt = f"""
-    Analyze the following audio call transcript and evaluate quality score (0-100), agent strengths, agent weaknesses/improvements, and evaluated metrics.
+    Analyze the following audio call transcript and evaluate quality score (0-100) and evaluated metrics.
     
     Evaluation Rules for Metrics:
     {metrics_guide}
@@ -848,8 +834,6 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
                     "score": evaluation.get("overall_score", 0),
                     "summary": evaluation.get("summary", ""),
                     "evaluated_metrics": evaluation.get("evaluated_metrics", {}),
-                    "strengths": evaluation.get("strengths", []),
-                    "improvements": evaluation.get("improvements", []),
                     "wpm": metrics.get("wpm", 0),
                     "created_at": created_time
                 }
@@ -889,8 +873,6 @@ async def get_history():
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
                 "evaluated_metrics": data.get("evaluated_metrics", {}),
-                "strengths": data.get("strengths", []),
-                "improvements": data.get("improvements", []),
                 "wpm": data.get("wpm", 0),
                 "created_at": data.get("created_at", "")
             })
@@ -900,6 +882,16 @@ async def get_history():
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
+
+@app.delete("/api/history/{record_id}")
+async def delete_history(record_id: str):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        db.collection("audits").document(record_id).delete()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
