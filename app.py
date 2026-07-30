@@ -92,6 +92,29 @@ HTML_CONTENT = """<!DOCTYPE html>
         .light .inner-bg { background-color: #f1f5f9; color: #1e293b; }
         .text-sub { color: #94a3b8; }
         .light .text-sub { color: #64748b; }
+        
+        /* PDF Print-specific styling overrides */
+        .pdf-export {
+            background-color: #ffffff !important;
+            color: #0f172a !important;
+            padding: 20px !important;
+        }
+        .pdf-export .card-bg, .pdf-export .inner-bg {
+            background-color: #f8fafc !important;
+            border: 1px solid #cbd5e1 !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+        }
+        .pdf-export details {
+            display: block !important;
+        }
+        .pdf-export details summary {
+            display: none !important;
+        }
+        .pdf-export details div {
+            max-height: none !important;
+            overflow: visible !important;
+        }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
@@ -142,10 +165,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
                     <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
-                        📊 Export Detailed Excel (.xlsx)
+                        📊 Export Complete Excel (.xlsx)
                     </button>
                     <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">
-                        📥 Export PDF Report
+                        📥 Export Full Page PDF
                     </button>
                 </div>
             </div>
@@ -243,7 +266,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
                 <div id="metricsListContainer" class="space-y-2">
-                    <!-- Populated via JS -->
                 </div>
             </div>
         </div>
@@ -492,8 +514,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
                         '<p class="text-sub leading-relaxed">' + (evalData.summary || "N/A") + '</p>' +
                     '</div>' +
-                    '<details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">' +
-                        '<summary class="font-bold text-sub cursor-pointer">📄 Click to view Full Diarized Transcript</summary>' +
+                    '<details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs" open>' +
+                        '<summary class="font-bold text-sub cursor-pointer">📄 Full Diarized Transcript</summary>' +
                         '<div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
                     '</details>';
                 
@@ -528,34 +550,117 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
+        // ================= FULL PAGE EXPORT FUNCTIONS =================
+
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
+
+            var validResults = currentBatchResults.filter(r => r.status === "success");
             var workbook = XLSX.utils.book_new();
-            var summarySheet = XLSX.utils.json_to_sheet(currentBatchResults.map(i => ({
-                "File Name": i.filename,
-                "QA Score": i.data?.evaluation?.overall_score || 0,
-                "Summary": i.data?.evaluation?.summary || ""
-            })));
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
-            XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
+
+            // 1. Sheet 1: Aggregate Summary Overview
+            var summaryData = [];
+            var totalCalls = validResults.length;
+            summaryData.push({ "Metric": "Total Calls Reviewed", "Count": totalCalls, "Percentage": "100%" });
+
+            activeMetrics.forEach(function(m) {
+                var count = 0;
+                validResults.forEach(r => {
+                    if (r.data?.evaluation?.evaluated_metrics?.[m.key]) count++;
+                });
+                var pct = totalCalls > 0 ? Math.round((count / totalCalls) * 100) + "%" : "0%";
+                summaryData.push({ "Metric": m.label, "Count": count, "Percentage": pct });
+            });
+
+            var summarySheet = XLSX.utils.json_to_sheet(summaryData);
+            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Overview");
+
+            // 2. Sheet 2: Detailed Call Audits
+            var detailedData = validResults.map(function(item) {
+                var data = item.data || {};
+                var evalData = data.evaluation || {};
+                var evalMetrics = evalData.evaluated_metrics || {};
+                var metrics = data.metrics || {};
+                
+                var row = {
+                    "File Name": item.filename,
+                    "QA Score (/100)": evalData.overall_score || 0,
+                    "Pace (WPM)": metrics.wpm || 0,
+                    "Duration (sec)": Math.round(metrics.duration || 0),
+                    "Total Words": metrics.total_words || 0
+                };
+
+                // Add active dynamic metrics as columns
+                activeMetrics.forEach(function(m) {
+                    row[m.label] = evalMetrics[m.key] ? "YES" : "NO";
+                });
+
+                row["Strengths"] = (evalData.strengths || []).join(" | ");
+                row["Weaknesses"] = (evalData.improvements || []).join(" | ");
+                row["Call Summary"] = evalData.summary || "";
+                
+                // Add full transcript as text
+                var fullTranscript = (data.transcript || []).map(t => `${t.speaker}: ${t.text}`).join("\n");
+                row["Full Transcript"] = fullTranscript;
+
+                return row;
+            });
+
+            var detailedSheet = XLSX.utils.json_to_sheet(detailedData);
+            XLSX.utils.book_append_sheet(workbook, detailedSheet, "Call Audits Detail");
+
+            XLSX.writeFile(workbook, `Batch_Call_Audit_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
             var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(historyDataList.map(item => ({
-                "File Name": item.filename,
-                "QA Score": item.score,
-                "WPM": item.wpm,
-                "Created At": item.created_at
-            })));
-            XLSX.utils.book_append_sheet(workbook, sheet, "History");
-            XLSX.writeFile(workbook, "Cloud_Audit_History.xlsx");
+
+            var detailedData = historyDataList.map(function(item) {
+                var evalMetrics = item.evaluated_metrics || {};
+                var row = {
+                    "File Name": item.filename,
+                    "QA Score": item.score,
+                    "WPM": item.wpm,
+                    "Created At": item.created_at
+                };
+
+                activeMetrics.forEach(function(m) {
+                    row[m.label] = evalMetrics[m.key] ? "YES" : "NO";
+                });
+
+                row["Call Summary"] = item.summary || "";
+                return row;
+            });
+
+            var sheet = XLSX.utils.json_to_sheet(detailedData);
+            XLSX.utils.book_append_sheet(workbook, sheet, "Cloud History");
+            XLSX.writeFile(workbook, `Cloud_Audit_History_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
         function downloadPDF() {
             var element = document.getElementById('batchResultsContainer');
-            html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
+            if (!element || element.classList.contains('hidden')) {
+                return alert("No audit report to export!");
+            }
+
+            element.classList.add('pdf-export');
+
+            var opt = {
+                margin:       [0.4, 0.4, 0.4, 0.4],
+                filename:     `Call_Quality_Batch_Audit_Report_${new Date().toISOString().slice(0,10)}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+
+            html2pdf().set(opt).from(element).save().then(function() {
+                element.classList.remove('pdf-export');
+            }).catch(function(err) {
+                console.error("PDF Export error:", err);
+                element.classList.remove('pdf-export');
+            });
         }
 
         window.onload = function() {
