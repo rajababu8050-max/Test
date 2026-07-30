@@ -97,7 +97,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <body class="min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-6xl mx-auto space-y-6">
         
-        <!-- Top Header with Dark/Light Toggle -->
+        <!-- Top Header with Dark/Light Toggle & Links -->
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -105,7 +105,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </h1>
                 <p class="text-sub text-sm">Pharma Metrics Evaluation & Batch Quality Auditing</p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 flex-wrap">
+                <!-- AI Quality Score Page Button Link -->
+                <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm shadow-lg shadow-purple-500/30 flex items-center gap-2 transform hover:-translate-y-0.5 transition duration-200 border border-purple-400/30">
+                    ✨ AI Quality Score
+                </a>
                 <button onclick="toggleTheme()" class="card-bg border border-slate-600 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow">
                     <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
                 </button>
@@ -612,6 +616,28 @@ HTML_CONTENT = """<!DOCTYPE html>
 @app.get("/", response_class=HTMLResponse)
 async def serve_ui():
     return HTML_CONTENT
+
+# ================= AI HTML Route =================
+
+@app.get("/ai.html", response_class=HTMLResponse)
+async def serve_ai_page():
+    # Agar aapke paas local ai.html file padi hui hai:
+    if os.path.exists("ai.html"):
+        with open("ai.html", "r", encoding="utf-8") as f:
+            return f.read()
+    else:
+        # Fallback agar file missing ho
+        return """
+        <!DOCTYPE html>
+        <html>
+        <head><title>AI Quality Score</title></head>
+        <body style="background:#0f172a; color:white; font-family:sans-serif; text-align:center; padding:50px;">
+            <h1>✨ AI Quality Score Page</h1>
+            <p>Apni <b>ai.html</b> file ko same folder me rakhein!</p>
+            <a href="/" style="color:#38bdf8;">← Back to Home</a>
+        </body>
+        </html>
+        """
 
 # ================= Dynamic Metrics CRUD APIs =================
 
