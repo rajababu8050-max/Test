@@ -92,9 +92,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         .light .inner-bg { background-color: #f1f5f9; color: #1e293b; }
         .text-sub { color: #94a3b8; }
         .light .text-sub { color: #64748b; }
-
-        /* PDF Full Width Fix */
-        .pdf-fit-page { width: 100% !important; max-width: 100% !important; margin: 0 !important; box-sizing: border-box !important; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
@@ -140,7 +137,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
 
         <!-- Multi-Results Container -->
-        <div id="batchResultsContainer" class="hidden space-y-6 w-full">
+        <div id="batchResultsContainer" class="hidden space-y-6">
             <div class="flex justify-between items-center font-semibold border-b border-slate-700/60 pb-2 flex-wrap gap-2">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
@@ -154,7 +151,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
 
             <!-- Aggregate Pharma Upsell Table Box -->
-            <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4 pdf-fit-page">
+            <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
                         <h3 class="text-base font-bold text-blue-400">💊 Aggregate Metrics Summary</h3>
@@ -162,7 +159,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </div>
                     <span id="totalCallsBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-3 py-1 rounded-full border border-blue-500/30">Total Calls: 0</span>
                 </div>
-                <div class="overflow-x-auto w-full">
+                <div class="overflow-x-auto">
                     <table class="w-full text-left text-sm border-collapse">
                         <thead>
                             <tr class="inner-bg uppercase text-xs border-b border-slate-700">
@@ -178,11 +175,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
 
             <h3 class="text-md font-bold pt-2 border-b border-slate-700/60 pb-2">📁 Individual Call Breakdowns</h3>
-            <div id="resultsList" class="space-y-4 w-full"></div>
+            <div id="resultsList" class="space-y-4"></div>
         </div>
 
         <!-- History Table Section -->
-        <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg w-full">
+        <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
                 <div class="flex gap-2">
@@ -478,7 +475,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var transcript = data.transcript || [];
                 
                 var card = document.createElement('div');
-                card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4 pdf-fit-page";
+                card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
                 
                 var transcriptHtml = "";
                 transcript.forEach(function(t) {
@@ -573,41 +570,18 @@ HTML_CONTENT = """<!DOCTYPE html>
             renderHistoryTable();
         }
 
-        /* Full Page Excel Export */
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
             var workbook = XLSX.utils.book_new();
-
-            var exportRows = currentBatchResults.map(i => {
-                var row = {
-                    "File Name": i.filename,
-                    "QA Score": i.data?.evaluation?.overall_score || 0,
-                    "WPM": i.data?.metrics?.wpm || 0,
-                    "Duration (s)": Math.round(i.data?.metrics?.duration || 0),
-                    "Total Words": i.data?.metrics?.total_words || 0,
-                    "Summary": i.data?.evaluation?.summary || ""
-                };
-                
-                var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
-                activeMetrics.forEach(m => {
-                    row[m.label] = evalMetrics[m.key] ? "YES" : "NO";
-                });
-
-                return row;
-            });
-
-            var summarySheet = XLSX.utils.json_to_sheet(exportRows);
-
-            // Column width adjustment for full sheet visibility
-            var cols = [{ wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 60 }];
-            activeMetrics.forEach(() => cols.push({ wch: 20 }));
-            summarySheet['!cols'] = cols;
-
+            var summarySheet = XLSX.utils.json_to_sheet(currentBatchResults.map(i => ({
+                "File Name": i.filename,
+                "QA Score": i.data?.evaluation?.overall_score || 0,
+                "Summary": i.data?.evaluation?.summary || ""
+            })));
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
             XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
         }
 
-        /* Full Page History Excel Export */
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
             var workbook = XLSX.utils.book_new();
@@ -615,33 +589,15 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "File Name": item.filename,
                 "QA Score": item.score,
                 "WPM": item.wpm,
-                "Created At": item.created_at,
-                "Summary": item.summary
+                "Created At": item.created_at
             })));
-
-            sheet['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 22 }, { wch: 60 }];
-
             XLSX.utils.book_append_sheet(workbook, sheet, "History");
             XLSX.writeFile(workbook, "Cloud_Audit_History.xlsx");
         }
 
-        /* Full Page PDF Export */
         function downloadPDF() {
             var element = document.getElementById('batchResultsContainer');
-            if(!element || element.classList.contains('hidden')) {
-                return alert("No audit batch data available to download!");
-            }
-
-            var opt = {
-                margin:       [0.2, 0.2, 0.2, 0.2],
-                filename:     'Batch_Call_Audit_Report.pdf',
-                image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true },
-                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
-                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-            };
-
-            html2pdf().set(opt).from(element).save();
+            html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
         }
 
         window.onload = function() {
