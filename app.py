@@ -92,13 +92,21 @@ HTML_CONTENT = """<!DOCTYPE html>
         .light .inner-bg { background-color: #f1f5f9; color: #1e293b; }
         .text-sub { color: #94a3b8; }
         .light .text-sub { color: #64748b; }
+
+        /* Full Page PDF Print Formatting Fix */
+        @media print {
+            body { background-color: #ffffff !important; color: #000000 !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            .card-bg, .inner-bg { background-color: #ffffff !important; color: #000000 !important; border-color: #ccc !important; }
+            .no-print { display: none !important; }
+            .pdf-page-fit { width: 100% !important; max-width: 100% !important; margin: 0 !important; page-break-inside: avoid; }
+        }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-6xl mx-auto space-y-6">
         
         <!-- Top Header with Dark/Light Toggle -->
-        <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
+        <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3 no-print">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
                     AI Call Quality Auditor Pro
@@ -116,7 +124,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
 
         <!-- Upload Card -->
-        <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg">
+        <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg no-print">
             <div class="space-y-3">
                 <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎙️</div>
                 <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav)</p>
@@ -137,21 +145,21 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
 
         <!-- Multi-Results Container -->
-        <div id="batchResultsContainer" class="hidden space-y-6">
-            <div class="flex justify-between items-center font-semibold border-b border-slate-700/60 pb-2 flex-wrap gap-2">
+        <div id="batchResultsContainer" class="hidden space-y-6 w-full">
+            <div class="flex justify-between items-center font-semibold border-b border-slate-700/60 pb-2 flex-wrap gap-2 no-print">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
                     <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
                         📊 Export Detailed Excel (.xlsx)
                     </button>
                     <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">
-                        📥 Export PDF Report
+                        📥 Export PDF Report (Full Page)
                     </button>
                 </div>
             </div>
 
             <!-- Aggregate Pharma Upsell Table Box -->
-            <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+            <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4 w-full pdf-page-fit">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
                         <h3 class="text-base font-bold text-blue-400">💊 Aggregate Metrics Summary</h3>
@@ -159,7 +167,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </div>
                     <span id="totalCallsBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-3 py-1 rounded-full border border-blue-500/30">Total Calls: 0</span>
                 </div>
-                <div class="overflow-x-auto">
+                <div class="overflow-x-auto w-full">
                     <table class="w-full text-left text-sm border-collapse">
                         <thead>
                             <tr class="inner-bg uppercase text-xs border-b border-slate-700">
@@ -174,12 +182,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <h3 class="text-md font-bold pt-2 border-b border-slate-700/60 pb-2">📁 Individual Call Breakdowns</h3>
-            <div id="resultsList" class="space-y-4"></div>
+            <h3 class="text-md font-bold pt-2 border-b border-slate-700/60 pb-2 no-print">📁 Individual Call Breakdowns</h3>
+            <div id="resultsList" class="space-y-4 w-full"></div>
         </div>
 
         <!-- History Table Section -->
-        <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
+        <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg w-full no-print">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
                 <div class="flex gap-2">
@@ -197,11 +205,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date</th>
-                            <th class="p-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -222,22 +229,8 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     </div>
 
-    <!-- VIEW HISTORY AUDIT MODAL -->
-    <div id="viewHistoryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 id="viewModalFileName" class="text-md font-bold text-blue-400">👁️ Audit Details</h3>
-                <button onclick="closeViewModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
-            </div>
-            <div id="viewModalContent" class="space-y-4 text-xs"></div>
-            <div class="flex justify-end pt-2">
-                <button type="button" onclick="closeViewModal()" class="bg-slate-700 text-slate-300 text-xs px-4 py-1.5 rounded-lg font-bold">Close</button>
-            </div>
-        </div>
-    </div>
-
     <!-- METRICS MANAGEMENT MODAL -->
-    <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-lg font-bold">⚙️ Configure Dynamic Metrics</h3>
@@ -267,9 +260,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </form>
 
+            <!-- Metrics List -->
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
-                <div id="metricsListContainer" class="space-y-2"></div>
+                <div id="metricsListContainer" class="space-y-2">
+                </div>
             </div>
         </div>
     </div>
@@ -280,6 +275,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         var historyDataList = [];
         var activeMetrics = [];
         
+        // History Pagination Variables
         var currentPage = 1;
         var itemsPerPage = 10;
 
@@ -316,17 +312,18 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
             var html = '';
             activeMetrics.forEach(function(m) {
-                html += '<div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">' +
-                    '<div>' +
-                        '<span class="font-bold text-blue-400">' + m.label + '</span>' +
-                        '<span class="text-sub text-[10px] ml-2">(' + m.key + ')</span>' +
-                        '<p class="text-sub text-[11px] mt-0.5">' + m.description + '</p>' +
-                    '</div>' +
-                    '<div class="flex gap-2">' +
-                        '<button onclick="editMetric(\'' + m.id + '\')" class="text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded">Edit</button>' +
-                        '<button onclick="deleteMetric(\'' + m.id + '\')" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-1 rounded">Delete</button>' +
-                    '</div>' +
-                '</div>';
+                html += `
+                <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                    <div>
+                        <span class="font-bold text-blue-400">${m.label}</span>
+                        <span class="text-sub text-[10px] ml-2">(${m.key})</span>
+                        <p class="text-sub text-[11px] mt-0.5">${m.description}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="editMetric('${m.id}')" class="text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded">Edit</button>
+                        <button onclick="deleteMetric('${m.id}')" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-1 rounded">Delete</button>
+                    </div>
+                </div>`;
             });
             container.innerHTML = html;
         }
@@ -352,7 +349,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function editMetric(id) {
-            var m = activeMetrics.find(function(x) { return x.id === id; });
+            var m = activeMetrics.find(x => x.id === id);
             if (!m) return;
             document.getElementById('metricId').value = m.id;
             document.getElementById('metricKey').value = m.key;
@@ -370,7 +367,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 description: document.getElementById('metricDesc').value.trim()
             };
 
-            var url = id ? "/api/metrics/" + id : '/api/metrics';
+            var url = id ? `/api/metrics/${id}` : '/api/metrics';
             var method = id ? 'PUT' : 'POST';
 
             try {
@@ -393,7 +390,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function deleteMetric(id) {
             if(!confirm("Are you sure you want to delete this metric?")) return;
             try {
-                var res = await fetch("/api/metrics/" + id, { method: 'DELETE' });
+                var res = await fetch(`/api/metrics/${id}`, { method: 'DELETE' });
                 if(!res.ok) throw new Error("Failed to delete metric");
                 await fetchMetrics();
             } catch(err) {
@@ -433,7 +430,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 setTimeout(loadHistory, 1000);
             } catch(err) {
                 alert("Error: " + err.message);
-            } finally {
+            } font-medium {
                 document.getElementById('loader').classList.add('hidden');
             }
         }
@@ -446,11 +443,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             var totalCalls = validResults.length;
 
             var metricCounts = {};
-            activeMetrics.forEach(function(m) { metricCounts[m.key] = 0; });
+            activeMetrics.forEach(m => metricCounts[m.key] = 0);
 
             validResults.forEach(function(item) {
                 var evalMetrics = item.data?.evaluation?.evaluated_metrics || {};
-                activeMetrics.forEach(function(m) {
+                activeMetrics.forEach(m => {
                     if(evalMetrics[m.key]) {
                         metricCounts[m.key] = (metricCounts[m.key] || 0) + 1;
                     }
@@ -465,11 +462,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
             document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + new Date().toLocaleString();
 
-            var summaryHtml = '<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">' + totalCalls + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>';
+            var summaryHtml = `<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">${totalCalls}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>`;
             
             activeMetrics.forEach(function(m) {
                 var cnt = metricCounts[m.key] || 0;
-                summaryHtml += '<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">' + m.label + '</td><td class="p-2.5 text-center font-bold text-blue-400">' + cnt + '</td><td class="p-2.5 text-center font-extrabold text-emerald-400">' + calcPct(cnt) + '</td></tr>';
+                summaryHtml += `<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">${m.label}</td><td class="p-2.5 text-center font-bold text-blue-400">${cnt}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">${calcPct(cnt)}</td></tr>`;
             });
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
@@ -486,7 +483,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var transcript = data.transcript || [];
                 
                 var card = document.createElement('div');
-                card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
+                card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4 pdf-page-fit";
                 
                 var transcriptHtml = "";
                 transcript.forEach(function(t) {
@@ -498,7 +495,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 activeMetrics.forEach(function(m) {
                     var isTrue = evalMetrics[m.key] === true;
                     var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
-                    dynamicCardsHtml += '<div class="inner-bg p-2 rounded border border-slate-700/40">' + m.label + ': ' + fmt + '</div>';
+                    dynamicCardsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}:${fmt}</div>`;
                 });
 
                 card.innerHTML = 
@@ -519,9 +516,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
                         '<p class="text-sub leading-relaxed">' + (evalData.summary || "N/A") + '</p>' +
                     '</div>' +
-                    '<details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">' +
-                        '<summary class="font-bold text-sub cursor-pointer">📄 Click to view Full Diarized Transcript</summary>' +
-                        '<div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
+                    '<details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs" open>' +
+                        '<summary class="font-bold text-sub cursor-pointer">📄 Diarized Transcript Summary</summary>' +
+                        '<div class="mt-3 space-y-2 max-h-60 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
                     '</details>';
                 
                 container.appendChild(card);
@@ -538,14 +535,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                 renderHistoryTable();
             } catch(e) {
                 console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
                 document.getElementById('pageInfoText').innerText = "Page 0 of 0";
                 document.getElementById('prevPageBtn').disabled = true;
                 document.getElementById('nextPageBtn').disabled = true;
@@ -564,18 +561,14 @@ HTML_CONTENT = """<!DOCTYPE html>
             pageItems.forEach(function(item) {
                 hTable.innerHTML += 
                     '<tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">' +
-                        '<td class="p-2 font-medium text-slate-200">' + (item.filename || 'N/A') + '</td>' +
+                        '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
                         '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
                         '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
                         '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
-                        '<td class="p-2 text-center flex justify-center gap-2">' +
-                            '<button onclick="openViewHistoryModal(\'' + item.id + '\')" title="View Record" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition">👁️ View</button>' +
-                            '<button onclick="deleteHistoryRecord(\'' + item.id + '\')" title="Delete Record" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition">🗑️ Delete</button>' +
-                        '</td>' +
                     '</tr>';
             });
 
-            document.getElementById('pageInfoText').innerText = "Page " + currentPage + " of " + totalPages + " (" + historyDataList.length + " Items)";
+            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} Items)`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
         }
@@ -585,88 +578,76 @@ HTML_CONTENT = """<!DOCTYPE html>
             renderHistoryTable();
         }
 
-        function openViewHistoryModal(id) {
-            var item = historyDataList.find(function(x) { return x.id === id; });
-            if (!item) return;
-
-            document.getElementById('viewModalFileName').innerText = "📁 " + (item.filename || "Audit Details");
-            var evalMetrics = item.evaluated_metrics || {};
-
-            var metricsHtml = '';
-            activeMetrics.forEach(function(m) {
-                var isTrue = evalMetrics[m.key] === true;
-                var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
-                metricsHtml += '<div class="inner-bg p-2 rounded border border-slate-700/40">' + m.label + ': ' + fmt + '</div>';
-            });
-
-            var contentHtml = 
-                '<div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/60">' +
-                    '<div><span class="text-sub block text-[10px]">AUDIT DATE</span><span class="font-bold text-slate-200">' + (item.created_at || 'N/A') + '</span></div>' +
-                    '<div><span class="text-sub block text-[10px]">SPEAKING PACE</span><span class="font-bold text-blue-400">' + (item.wpm || 0) + ' WPM</span></div>' +
-                    '<div><span class="text-sub block text-[10px]">OVERALL QA SCORE</span><span class="font-bold text-emerald-400 text-sm">' + (item.score || 0) + '/100</span></div>' +
-                '</div>' +
-                '<div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">' +
-                    '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
-                    '<div class="grid grid-cols-2 gap-2 text-xs">' + metricsHtml + '</div>' +
-                '</div>' +
-                '<div class="inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">' +
-                    '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
-                    '<p class="text-sub leading-relaxed">' + (item.summary || "N/A") + '</p>' +
-                '</div>';
-
-            document.getElementById('viewModalContent').innerHTML = contentHtml;
-            document.getElementById('viewHistoryModal').classList.remove('hidden');
-            document.getElementById('viewHistoryModal').classList.add('flex');
-        }
-
-        function closeViewModal() {
-            document.getElementById('viewHistoryModal').classList.add('hidden');
-            document.getElementById('viewHistoryModal').classList.remove('flex');
-        }
-
-        async function deleteHistoryRecord(id) {
-            if(!confirm("Are you sure you want to delete this call record from Firebase?")) return;
-            try {
-                var res = await fetch("/api/history/" + id, { method: 'DELETE' });
-                if(!res.ok) throw new Error("Failed to delete record");
-                await loadHistory();
-            } catch(err) {
-                alert("Error deleting record: " + err.message);
-            }
-        }
-
+        /* Full Page Excel Export */
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
             var workbook = XLSX.utils.book_new();
-            var summarySheet = XLSX.utils.json_to_sheet(currentBatchResults.map(function(i) {
-                return {
+
+            var structuredData = currentBatchResults.map(i => {
+                var row = {
                     "File Name": i.filename,
                     "QA Score": i.data?.evaluation?.overall_score || 0,
+                    "WPM": i.data?.metrics?.wpm || 0,
+                    "Duration (s)": Math.round(i.data?.metrics?.duration || 0),
+                    "Total Words": i.data?.metrics?.total_words || 0,
                     "Summary": i.data?.evaluation?.summary || ""
                 };
-            }));
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
+                
+                // Unfold active metrics as separate full columns
+                var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
+                activeMetrics.forEach(m => {
+                    row[m.label] = evalMetrics[m.key] ? "YES" : "NO";
+                });
+
+                return row;
+            });
+
+            var summarySheet = XLSX.utils.json_to_sheet(structuredData);
+
+            // Set dynamic full page column width
+            var colWidths = [
+                { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 60 }
+            ];
+            activeMetrics.forEach(() => colWidths.push({ wch: 20 }));
+            summarySheet['!cols'] = colWidths;
+
+            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Audit Summary");
             XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
         }
 
+        /* Full Page Excel Export for History */
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
             var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(historyDataList.map(function(item) {
-                return {
-                    "File Name": item.filename,
-                    "QA Score": item.score,
-                    "WPM": item.wpm,
-                    "Created At": item.created_at
-                };
-            }));
-            XLSX.utils.book_append_sheet(workbook, sheet, "History");
+            var sheet = XLSX.utils.json_to_sheet(historyDataList.map(item => ({
+                "File Name": item.filename,
+                "QA Score": item.score,
+                "WPM": item.wpm,
+                "Created At": item.created_at,
+                "Summary": item.summary
+            })));
+
+            sheet['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 22 }, { wch: 60 }];
+
+            XLSX.utils.book_append_sheet(workbook, sheet, "Audit History");
             XLSX.writeFile(workbook, "Cloud_Audit_History.xlsx");
         }
 
+        /* Full Page PDF Export Settings */
         function downloadPDF() {
             var element = document.getElementById('batchResultsContainer');
-            html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
+            if(!element) return alert("No report available to download!");
+
+            var opt = {
+                margin:       [0.3, 0.3, 0.3, 0.3], // Small margins for max full page area
+                filename:     'Batch_Call_Audit_Report.pdf',
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
+                pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+            };
+
+            html2pdf().set(opt).from(element).save();
         }
 
         window.onload = function() {
@@ -863,12 +844,11 @@ async def get_history():
         print("❌ Firebase DB Object is None in /api/history")
         return []
     try:
-        docs = db.collection("audits").limit(100).stream()
+        docs = db.collection("audits").limit(50).stream()
         history = []
         for doc in docs:
             data = doc.to_dict()
             history.append({
-                "id": doc.id,
                 "filename": data.get("filename", "Unknown"),
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
@@ -882,16 +862,6 @@ async def get_history():
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
-
-@app.delete("/api/history/{record_id}")
-async def delete_history(record_id: str):
-    if not db:
-        raise HTTPException(status_code=500, detail="Database not configured")
-    try:
-        db.collection("audits").document(record_id).delete()
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
