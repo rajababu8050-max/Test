@@ -45,6 +45,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 semaphore = asyncio.Semaphore(2)
 
+# Default metrics to seed in Firestore if empty
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there an opportunity to pitch an upsell or add-on product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent attempt an upsell pitch during the call?"},
@@ -55,6 +56,7 @@ DEFAULT_METRICS = [
 ]
 
 def init_default_metrics():
+    """Seed initial metrics if collection is empty"""
     if db:
         try:
             docs = list(db.collection("metrics").limit(1).stream())
@@ -75,7 +77,9 @@ HTML_CONTENT = """<!DOCTYPE html>
     <title>AI Call Quality Auditor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = { darkMode: 'class' }
+        tailwind.config = {
+            darkMode: 'class',
+        }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -93,7 +97,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <body class="min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-6xl mx-auto space-y-6">
         
-        <!-- Header -->
+        <!-- Top Header with Dark/Light Toggle -->
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -263,6 +267,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </form>
 
+            <!-- Metrics List -->
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
                 <div id="metricsListContainer" class="space-y-2"></div>
