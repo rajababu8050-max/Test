@@ -45,7 +45,6 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 semaphore = asyncio.Semaphore(2)
 
-# Default metrics to seed in Firestore if empty
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there an opportunity to pitch an upsell or add-on product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent attempt an upsell pitch during the call?"},
@@ -56,7 +55,6 @@ DEFAULT_METRICS = [
 ]
 
 def init_default_metrics():
-    """Seed initial metrics if collection is empty"""
     if db:
         try:
             docs = list(db.collection("metrics").limit(1).stream())
@@ -77,9 +75,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <title>AI Call Quality Auditor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
+        tailwind.config = { darkMode: 'class' }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -97,7 +93,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <body class="min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-6xl mx-auto space-y-6">
         
-        <!-- Top Header with Dark/Light Toggle -->
+        <!-- Header -->
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -267,7 +263,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </form>
 
-            <!-- Metrics List -->
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
                 <div id="metricsListContainer" class="space-y-2"></div>
@@ -571,7 +566,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
                         '<td class="p-2 text-center flex justify-center gap-2">' +
                             '<button onclick="openViewHistoryModal(\'' + item.id + '\')" title="View Record" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition">👁️ View</button>' +
-                            '<button onclick="deleteHistoryRecord(\'' + item.id + '\')" title="Delete Record" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition">🗑️ Delete</button>' +
                         '</td>' +
                     '</tr>';
             });
@@ -623,17 +617,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         function closeViewModal() {
             document.getElementById('viewHistoryModal').classList.add('hidden');
             document.getElementById('viewHistoryModal').classList.remove('flex');
-        }
-
-        async function deleteHistoryRecord(id) {
-            if(!confirm("Are you sure you want to delete this call record from Firebase?")) return;
-            try {
-                var res = await fetch("/api/history/" + id, { method: 'DELETE' });
-                if(!res.ok) throw new Error("Failed to delete record");
-                await loadHistory();
-            } catch(err) {
-                alert("Error deleting record: " + err.message);
-            }
         }
 
         function downloadExcel() {
@@ -883,16 +866,6 @@ async def get_history():
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
-
-@app.delete("/api/history/{record_id}")
-async def delete_history(record_id: str):
-    if not db:
-        raise HTTPException(status_code=500, detail="Database not configured")
-    try:
-        db.collection("audits").document(record_id).delete()
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
