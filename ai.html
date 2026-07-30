@@ -214,8 +214,7 @@
             </div>
 
             <div class="form-group">
-              <label>Select Audio File (MP3 / WAV / M4A / AWB / AMR / AAC / OGG / FLAC / WEBM / WMA)</label>
-              <!-- All Audio Formats Supported including .awb -->
+              <label>Select Any Audio File (MP3, WAV, M4A, AWB, AMR, AAC, OGG, FLAC, WEBM, WMA)</label>
               <input type="file" id="audioFileInput" class="form-control" accept="audio/*, .mp3, .wav, .m4a, .awb, .amr, .aac, .ogg, .flac, .webm, .wma, .opus, .m4r, .mp4, .3gp" required>
             </div>
 
@@ -461,28 +460,34 @@
       document.getElementById('processBtn').disabled = true;
 
       try {
-        let audioFile = fileInput.files[0];
+        let rawFile = fileInput.files[0];
         
         // --- STEP 1: GROQ WHISPER SPEECH-TO-TEXT ---
         loaderText.innerText = "Step 1/2: Groq Whisper AI audio ko transcribe kar raha hai...";
 
-        // GROQ STRICT EXTENSION VALIDATION FIX:
-        // Groq API only allows [flac, mp3, mp4, mpeg, mpga, m4a, ogg, opus, wav, webm]
-        let originalName = audioFile.name;
-        let fileNameToUpload = originalName;
+        // GROQ STRICT EXTENSION & MIME FIX:
+        // Raw file ko arrayBuffer me convert karke naya File object banaya ja raha hai
+        // jisse MIME Type 'audio/mp3' force ho jaaye aur Groq API error na de.
+        const arrayBuffer = await rawFile.arrayBuffer();
+        
+        // File extension and format alias
+        const allowedExts = ['flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'opus', 'wav', 'webm'];
+        let origName = rawFile.name;
+        let ext = origName.includes('.') ? origName.split('.').pop().toLowerCase() : '';
+        
+        let finalFileName = origName;
+        let finalMimeType = rawFile.type || 'audio/mp3';
 
-        const allowedExtensions = ['flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'opus', 'wav', 'webm'];
-        const fileExt = originalName.includes('.') ? originalName.split('.').pop().toLowerCase() : '';
-
-        if (!allowedExtensions.includes(fileExt)) {
-          // Bypass for .awb, .amr, .aac, .wma, etc. by appending .mp3 extension alias
-          const lastIndex = originalName.lastIndexOf('.');
-          const baseName = lastIndex !== -1 ? originalName.substring(0, lastIndex) : originalName;
-          fileNameToUpload = baseName + '.mp3';
+        if (!allowedExts.includes(ext)) {
+            const baseName = origName.substring(0, origName.lastIndexOf('.')) || origName;
+            finalFileName = baseName + '.mp3';
+            finalMimeType = 'audio/mp3';
         }
 
+        const safeAudioFile = new File([arrayBuffer], finalFileName, { type: finalMimeType });
+
         const formData = new FormData();
-        formData.append("file", audioFile, fileNameToUpload);
+        formData.append("file", safeAudioFile);
         formData.append("model", "whisper-large-v3");
         formData.append("language", "hi"); // Hindi & Hinglish support
         formData.append("temperature", "0");
