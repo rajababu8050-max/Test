@@ -70,39 +70,60 @@ def init_default_metrics():
 init_default_metrics()
 
 HTML_CONTENT = """<!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Call Quality Auditor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+        }
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        .dark body { background-color: #0f172a; color: #f8fafc; }
+        body { background-color: #f8fafc; color: #0f172a; transition: background-color 0.3s, color 0.3s; }
+        .card-bg { background-color: #1e293b; }
+        .light .card-bg { background-color: #ffffff; border-color: #e2e8f0; color: #1e293b; }
+        .inner-bg { background-color: #0f172a; }
+        .light .inner-bg { background-color: #f1f5f9; color: #1e293b; }
+        .text-sub { color: #94a3b8; }
+        .light .text-sub { color: #64748b; }
+    </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen p-4 md:p-8 font-sans">
+<body class="min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-6xl mx-auto space-y-6">
         
-        <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+        <!-- Header -->
+        <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
                     AI Call Quality Auditor Pro
                 </h1>
-                <p class="text-slate-400 text-sm">Pharma Metrics Evaluation & Batch Quality Auditing</p>
+                <p class="text-sub text-sm">Pharma Metrics Evaluation & Batch Quality Auditing</p>
             </div>
-            <button onclick="openMetricModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
-                ⚙️ Manage Metrics
-            </button>
+            <div class="flex items-center gap-3">
+                <button onclick="toggleTheme()" class="card-bg border border-slate-600 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow">
+                    <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
+                </button>
+                <button onclick="openMetricModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
+                    ⚙️ Manage Metrics
+                </button>
+            </div>
         </div>
 
         <!-- Upload Card -->
-        <div class="bg-slate-800 border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center">
+        <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg">
             <div class="space-y-3">
                 <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎙️</div>
-                <p id="fileName" class="text-sm font-medium text-slate-200">Select Audio File(s) (.mp3, .wav)</p>
+                <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav)</p>
                 <input type="file" id="audioInput" accept="audio/*" multiple class="hidden" onchange="fileSelected(event)">
                 
                 <div class="flex justify-center gap-3">
-                    <button type="button" onclick="document.getElementById('audioInput').click()" class="bg-slate-700 hover:bg-slate-600 text-white font-medium px-4 py-2 rounded-xl text-sm">
+                    <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-600 font-medium px-4 py-2 rounded-xl text-sm">
                         Browse Files
                     </button>
                     <button type="button" onclick="uploadAudioBatch()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2 rounded-xl text-sm shadow-lg shadow-blue-500/20">
@@ -111,37 +132,37 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
             <div id="loader" class="hidden mt-4 text-xs text-blue-400 animate-pulse font-medium">
-                ⏳ Auditing speech, analyzing metrics & generating summary... Please wait...
+                ⏳ Auditing speech, evaluating metrics & agent strengths/weaknesses... Please wait...
             </div>
         </div>
 
         <!-- Multi-Results Container -->
         <div id="batchResultsContainer" class="hidden space-y-6">
-            <div class="flex justify-between items-center text-slate-300 font-semibold border-b border-slate-800 pb-2 flex-wrap gap-2">
+            <div class="flex justify-between items-center font-semibold border-b border-slate-700/60 pb-2 flex-wrap gap-2">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
                     <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
                         📊 Export Detailed Excel (.xlsx)
                     </button>
                     <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">
-                        📥 Export PDF Report
+                        📥 Export Full Page PDF
                     </button>
                 </div>
             </div>
 
-            <!-- Aggregate Pharma Upsell Table Box -->
-            <div id="summaryTableContainer" class="bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
+            <!-- Aggregate Summary Table Box -->
+            <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
                         <h3 class="text-base font-bold text-blue-400">💊 Aggregate Metrics Summary</h3>
-                        <p class="text-xs text-slate-400" id="summaryTimeSlot">Batch Analytics</p>
+                        <p class="text-xs text-sub" id="summaryTimeSlot">Batch Analytics</p>
                     </div>
-                    <span id="totalCallsBadge" class="bg-blue-500/20 text-blue-300 text-xs font-bold px-3 py-1 rounded-full border border-blue-500/30">Total Calls: 0</span>
+                    <span id="totalCallsBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-3 py-1 rounded-full border border-blue-500/30">Total Calls: 0</span>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm text-slate-300 border-collapse">
+                    <table class="w-full text-left text-sm border-collapse">
                         <thead>
-                            <tr class="bg-slate-900/80 text-slate-200 uppercase text-xs border-b border-slate-700">
+                            <tr class="inner-bg uppercase text-xs border-b border-slate-700">
                                 <th class="p-3">Metric</th>
                                 <th class="p-3 text-center">Count</th>
                                 <th class="p-3 text-center">%</th>
@@ -153,64 +174,85 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <h3 class="text-md font-bold text-slate-300 pt-2 border-b border-slate-800 pb-2">📁 Individual Call Breakdowns</h3>
+            <h3 class="text-md font-bold pt-2 border-b border-slate-700/60 pb-2">📁 Individual Call Breakdowns</h3>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
         <!-- History Table Section -->
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-sm font-semibold text-slate-300">🔥 Firebase Cloud Audits History</h3>
+        <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
+                <h3 class="text-sm font-semibold text-slate-300 dark:text-slate-200">🔥 Firebase Cloud Audits History</h3>
                 <div class="flex gap-2">
                     <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1">
-                        📊 Export History to Excel
+                        📊 Export History Excel
                     </button>
                     <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">Refresh</button>
                 </div>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-slate-400">
-                    <thead class="bg-slate-700/50 text-slate-300 uppercase font-semibold">
+                <table class="w-full text-left text-xs text-sub">
+                    <thead class="inner-bg uppercase font-semibold">
                         <tr>
                             <th class="p-2">File</th>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date</th>
+                            <th class="p-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- History Pagination -->
+            <div class="flex justify-between items-center pt-2 text-xs border-t border-slate-700/60">
+                <span id="pageInfo" class="text-sub">Page 1 of 1</span>
+                <div class="flex gap-2">
+                    <button id="prevPageBtn" onclick="changeHistoryPage(-1)" class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub disabled:opacity-50">← Prev</button>
+                    <button id="nextPageBtn" onclick="changeHistoryPage(1)" class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub disabled:opacity-50">Next →</button>
+                </div>
             </div>
         </div>
 
     </div>
 
+    <!-- VIEW AUDIT DETAILS MODAL -->
+    <div id="viewAuditModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-3xl p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h3 id="viewModalTitle" class="text-lg font-bold text-blue-400">📁 Audit Details</h3>
+                <button onclick="closeViewModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
+            </div>
+            <div id="viewModalBody" class="space-y-4"></div>
+        </div>
+    </div>
+
     <!-- METRICS MANAGEMENT MODAL -->
     <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-lg font-bold text-white">⚙️ Configure Dynamic Metrics</h3>
-                <button onclick="closeMetricModal()" class="text-slate-400 hover:text-white font-bold text-lg">&times;</button>
+                <h3 class="text-lg font-bold">⚙️ Configure Dynamic Metrics</h3>
+                <button onclick="closeMetricModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
             </div>
 
             <!-- Create/Edit Form -->
-            <form id="metricForm" onsubmit="saveMetric(event)" class="bg-slate-900/60 p-4 rounded-xl border border-slate-700 space-y-3">
+            <form id="metricForm" onsubmit="saveMetric(event)" class="inner-bg p-4 rounded-xl border border-slate-700 space-y-3">
                 <input type="hidden" id="metricId" value="">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1">Metric Key (Unique slug)</label>
-                        <input type="text" id="metricKey" required placeholder="e.g. discount_offered" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <label class="block text-xs font-semibold text-sub mb-1">Metric Key (Unique slug)</label>
+                        <input type="text" id="metricKey" required placeholder="e.g. discount_offered" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-400 mb-1">Display Label</label>
-                        <input type="text" id="metricLabel" required placeholder="e.g. Discount Offered" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                        <label class="block text-xs font-semibold text-sub mb-1">Display Label</label>
+                        <input type="text" id="metricLabel" required placeholder="e.g. Discount Offered" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1">Description (Guides AI Evaluation)</label>
-                    <input type="text" id="metricDesc" required placeholder="e.g. Did agent offer any promotional discount?" class="w-full bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+                    <label class="block text-xs font-semibold text-sub mb-1">Description (Guides AI Evaluation)</label>
+                    <input type="text" id="metricDesc" required placeholder="e.g. Did agent offer any promotional discount?" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="resetMetricForm()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-3 py-1.5 rounded-lg">Clear</button>
@@ -220,10 +262,8 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             <!-- Metrics List -->
             <div class="space-y-3">
-                <h4 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Active Evaluated Metrics</h4>
-                <div id="metricsListContainer" class="space-y-2">
-                    <!-- Populated via JS -->
-                </div>
+                <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
+                <div id="metricsListContainer" class="space-y-2"></div>
             </div>
         </div>
     </div>
@@ -233,6 +273,25 @@ HTML_CONTENT = """<!DOCTYPE html>
         var currentBatchResults = [];
         var historyDataList = [];
         var activeMetrics = [];
+        
+        // History Pagination State
+        var currentHistoryPage = 1;
+        var historyItemsPerPage = 10;
+
+        function toggleTheme() {
+            var html = document.documentElement;
+            if(html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                html.classList.add('light');
+                document.getElementById('themeIcon').innerText = "☀️";
+                document.getElementById('themeText').innerText = "Light Mode";
+            } else {
+                html.classList.remove('light');
+                html.classList.add('dark');
+                document.getElementById('themeIcon').innerText = "🌙";
+                document.getElementById('themeText').innerText = "Dark Mode";
+            }
+        }
 
         async function fetchMetrics() {
             try {
@@ -247,17 +306,17 @@ HTML_CONTENT = """<!DOCTYPE html>
         function renderMetricsList() {
             var container = document.getElementById('metricsListContainer');
             if (!activeMetrics || activeMetrics.length === 0) {
-                container.innerHTML = '<div class="text-xs text-slate-500 text-center py-2">No metrics defined. Add one above.</div>';
+                container.innerHTML = '<div class="text-xs text-sub text-center py-2">No metrics defined. Add one above.</div>';
                 return;
             }
             var html = '';
             activeMetrics.forEach(function(m) {
                 html += `
-                <div class="bg-slate-900/40 p-3 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
                     <div>
                         <span class="font-bold text-blue-400">${m.label}</span>
-                        <span class="text-slate-500 text-[10px] ml-2">(${m.key})</span>
-                        <p class="text-slate-400 text-[11px] mt-0.5">${m.description}</p>
+                        <span class="text-sub text-[10px] ml-2">(${m.key})</span>
+                        <p class="text-sub text-[11px] mt-0.5">${m.description}</p>
                     </div>
                     <div class="flex gap-2">
                         <button onclick="editMetric('${m.id}')" class="text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded">Edit</button>
@@ -382,7 +441,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             var validResults = results.filter(function(r) { return r.status === "success"; });
             var totalCalls = validResults.length;
 
-            // Map metrics dynamic tallies
             var metricCounts = {};
             activeMetrics.forEach(m => metricCounts[m.key] = 0);
 
@@ -403,11 +461,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
             document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + new Date().toLocaleString();
 
-            var summaryHtml = `<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">${totalCalls}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>`;
+            var summaryHtml = `<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">${totalCalls}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>`;
             
             activeMetrics.forEach(function(m) {
                 var cnt = metricCounts[m.key] || 0;
-                summaryHtml += `<tr class="hover:bg-slate-700/30 transition"><td class="p-2.5 font-medium text-slate-200">${m.label}</td><td class="p-2.5 text-center font-bold text-blue-400">${cnt}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">${calcPct(cnt)}</td></tr>`;
+                summaryHtml += `<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">${m.label}</td><td class="p-2.5 text-center font-bold text-blue-400">${cnt}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">${calcPct(cnt)}</td></tr>`;
             });
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
@@ -423,8 +481,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var metrics = data.metrics || {};
                 var transcript = data.transcript || [];
                 
+                var strengthsHtml = (evalData.strengths || []).map(s => `<li class="text-emerald-400">💪 ${s}</li>`).join('') || '<li class="text-sub">None noted</li>';
+                var improvementsHtml = (evalData.improvements || []).map(i => `<li class="text-rose-400">⚠️ ${i}</li>`).join('') || '<li class="text-sub">None noted</li>';
+
                 var card = document.createElement('div');
-                card.className = "bg-slate-800 border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
+                card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
                 
                 var transcriptHtml = "";
                 transcript.forEach(function(t) {
@@ -436,7 +497,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 activeMetrics.forEach(function(m) {
                     var isTrue = evalMetrics[m.key] === true;
                     var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
-                    dynamicCardsHtml += `<div class="bg-slate-800/80 p-2 rounded border border-slate-700/40">${m.label}:${fmt}</div>`;
+                    dynamicCardsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}: ${fmt}</div>`;
                 });
 
                 card.innerHTML = 
@@ -445,20 +506,30 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<span class="text-emerald-400 font-extrabold text-lg">' + (evalData.overall_score || 0) + '/100</span>' +
                     '</div>' +
                     '<div class="grid grid-cols-3 gap-2 text-center text-xs">' +
-                        '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">PACE</span><span class="font-bold text-blue-400">' + (metrics.wpm || 0) + ' WPM</span></div>' +
-                        '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">DURATION</span><span class="font-bold text-indigo-400">' + Math.round(metrics.duration || 0) + 's</span></div>' +
-                        '<div class="bg-slate-900/50 p-2 rounded-lg"><span class="text-slate-500 block text-[10px]">WORDS</span><span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span></div>' +
+                        '<div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">PACE</span><span class="font-bold text-blue-400">' + (metrics.wpm || 0) + ' WPM</span></div>' +
+                        '<div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">DURATION</span><span class="font-bold text-indigo-400">' + Math.round(metrics.duration || 0) + 's</span></div>' +
+                        '<div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">WORDS</span><span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span></div>' +
                     '</div>' +
-                    '<div class="bg-slate-900/70 p-3 rounded-xl border border-slate-700/60 space-y-2">' +
-                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
+                    '<div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">' +
+                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Call Metrics Evaluation</div>' +
                         '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' + dynamicCardsHtml + '</div>' +
                     '</div>' +
-                    '<div class="text-xs text-slate-300 bg-slate-900/60 p-3 rounded-xl border border-slate-700/50 space-y-1">' +
-                        '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
-                        '<p class="text-slate-300 leading-relaxed">' + (evalData.summary || "N/A") + '</p>' +
+                    '<div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">' +
+                        '<div class="inner-bg p-3 rounded-xl border border-emerald-500/20 space-y-1">' +
+                            '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide">Agent Strengths</div>' +
+                            '<ul class="space-y-1 pl-1">' + strengthsHtml + '</ul>' +
+                        '</div>' +
+                        '<div class="inner-bg p-3 rounded-xl border border-rose-500/20 space-y-1">' +
+                            '<div class="font-bold text-rose-400 text-[11px] uppercase tracking-wide">Areas of Improvement / Weaknesses</div>' +
+                            '<ul class="space-y-1 pl-1">' + improvementsHtml + '</ul>' +
+                        '</div>' +
                     '</div>' +
-                    '<details class="bg-slate-900/40 p-3 rounded-xl border border-slate-700/50 text-xs text-slate-300">' +
-                        '<summary class="font-bold text-slate-400 cursor-pointer">📄 Click to view Full Diarized Transcript</summary>' +
+                    '<div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">' +
+                        '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
+                        '<p class="leading-relaxed text-sub">' + (evalData.summary || "N/A") + '</p>' +
+                    '</div>' +
+                    '<details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">' +
+                        '<summary class="font-bold text-sub cursor-pointer">📄 Click to view Full Diarized Transcript</summary>' +
                         '<div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
                     '</details>';
                 
@@ -472,24 +543,114 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetch("/api/history");
                 var list = await res.json();
                 historyDataList = list || [];
-                
-                if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
-                    return;
-                }
-                hTable.innerHTML = "";
-                list.forEach(function(item) {
-                    hTable.innerHTML += 
-                        '<tr class="border-b border-slate-700/50">' +
-                            '<td class="p-2 font-medium text-slate-200">' + (item.filename || 'N/A') + '</td>' +
-                            '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
-                            '<td class="p-2 text-slate-400 max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
-                            '<td class="p-2 text-slate-500">' + (item.created_at || 'N/A') + '</td>' +
-                        '</tr>';
-                });
+                renderHistoryPage();
             } catch(e) {
                 console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+            }
+        }
+
+        function renderHistoryPage() {
+            var hTable = document.getElementById('historyTable');
+            if(!historyDataList || historyDataList.length === 0) {
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-sub">No past audits found in Firebase.</td></tr>';
+                document.getElementById('pageInfo').innerText = "Page 0 of 0";
+                return;
+            }
+
+            var totalPages = Math.ceil(historyDataList.length / historyItemsPerPage);
+            if(currentHistoryPage > totalPages) currentHistoryPage = totalPages;
+            if(currentHistoryPage < 1) currentHistoryPage = 1;
+
+            var startIndex = (currentHistoryPage - 1) * historyItemsPerPage;
+            var endIndex = startIndex + historyItemsPerPage;
+            var pageItems = historyDataList.slice(startIndex, endIndex);
+
+            hTable.innerHTML = "";
+            pageItems.forEach(function(item) {
+                hTable.innerHTML += 
+                    '<tr class="border-b border-slate-700/50 hover:bg-slate-700/20">' +
+                        '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
+                        '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
+                        '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
+                        '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
+                        '<td class="p-2 text-center flex justify-center gap-2">' +
+                            '<button onclick="viewHistoryItem(\'' + item.id + '\')" class="bg-blue-500/20 text-blue-400 hover:bg-blue-500/30 px-2 py-1 rounded text-[11px] font-bold">👁️ View</button>' +
+                            '<button onclick="deleteHistoryItem(\'' + item.id + '\')" class="bg-rose-500/20 text-rose-400 hover:bg-rose-500/30 px-2 py-1 rounded text-[11px] font-bold">🗑️ Delete</button>' +
+                        '</td>' +
+                    '</tr>';
+            });
+
+            document.getElementById('pageInfo').innerText = `Page ${currentHistoryPage} of ${totalPages} (${historyDataList.length} total)`;
+            document.getElementById('prevPageBtn').disabled = currentHistoryPage === 1;
+            document.getElementById('nextPageBtn').disabled = currentHistoryPage === totalPages;
+        }
+
+        function changeHistoryPage(direction) {
+            currentHistoryPage += direction;
+            renderHistoryPage();
+        }
+
+        function viewHistoryItem(id) {
+            var item = historyDataList.find(x => x.id === id);
+            if(!item) return;
+
+            document.getElementById('viewModalTitle').innerText = "📁 " + (item.filename || "Audit Details");
+            
+            var strengths = (item.strengths || []).map(s => `<li class="text-emerald-400">💪 ${s}</li>`).join('') || '<li class="text-sub">None</li>';
+            var improvements = (item.improvements || []).map(i => `<li class="text-rose-400">⚠️ ${i}</li>`).join('') || '<li class="text-sub">None</li>';
+
+            var metricsHtml = '';
+            var evalMetrics = item.evaluated_metrics || {};
+            for(var key in evalMetrics) {
+                var isTrue = evalMetrics[key] === true;
+                var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
+                metricsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${key}: ${fmt}</div>`;
+            }
+
+            var bodyHtml = `
+                <div class="flex justify-between items-center text-sm border-b border-slate-700 pb-2">
+                    <span class="text-sub">Date: ${item.created_at || 'N/A'}</span>
+                    <span class="text-emerald-400 font-bold text-lg">Score: ${item.score || 0}/100</span>
+                </div>
+                <div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">
+                    <div class="font-bold text-emerald-400 text-xs uppercase">Evaluated Metrics</div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">${metricsHtml || '<div class="text-sub">No metrics saved</div>'}</div>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div class="inner-bg p-3 rounded-xl border border-emerald-500/20">
+                        <div class="font-bold text-emerald-400 text-xs uppercase mb-1">Strengths</div>
+                        <ul class="space-y-1">${strengths}</ul>
+                    </div>
+                    <div class="inner-bg p-3 rounded-xl border border-rose-500/20">
+                        <div class="font-bold text-rose-400 text-xs uppercase mb-1">Weaknesses / Improvements</div>
+                        <ul class="space-y-1">${improvements}</ul>
+                    </div>
+                </div>
+                <div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">
+                    <div class="font-bold text-blue-300 text-xs uppercase">Summary</div>
+                    <p class="text-sub leading-relaxed">${item.summary || "N/A"}</p>
+                </div>
+            `;
+
+            document.getElementById('viewModalBody').innerHTML = bodyHtml;
+            document.getElementById('viewAuditModal').classList.remove('hidden');
+            document.getElementById('viewAuditModal').classList.add('flex');
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewAuditModal').classList.add('hidden');
+            document.getElementById('viewAuditModal').classList.remove('flex');
+        }
+
+        async function deleteHistoryItem(id) {
+            if(!confirm("Are you sure you want to delete this audit history item from Firebase?")) return;
+            try {
+                var res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+                if(!res.ok) throw new Error("Failed to delete record");
+                await loadHistory();
+            } catch(e) {
+                alert("Error deleting record: " + e.message);
             }
         }
 
@@ -499,10 +660,13 @@ HTML_CONTENT = """<!DOCTYPE html>
             var summarySheet = XLSX.utils.json_to_sheet(currentBatchResults.map(i => ({
                 "File Name": i.filename,
                 "QA Score": i.data?.evaluation?.overall_score || 0,
+                "WPM": i.data?.metrics?.wpm || 0,
+                "Strengths": (i.data?.evaluation?.strengths || []).join(" | "),
+                "Weaknesses": (i.data?.evaluation?.improvements || []).join(" | "),
                 "Summary": i.data?.evaluation?.summary || ""
             })));
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
-            XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
+            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Report");
+            XLSX.writeFile(workbook, "Call_Audit_Full_Report.xlsx");
         }
 
         function exportHistoryExcel() {
@@ -512,7 +676,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "File Name": item.filename,
                 "QA Score": item.score,
                 "WPM": item.wpm,
-                "Created At": item.created_at
+                "Strengths": (item.strengths || []).join(" | "),
+                "Weaknesses": (item.improvements || []).join(" | "),
+                "Created At": item.created_at,
+                "Summary": item.summary
             })));
             XLSX.utils.book_append_sheet(workbook, sheet, "History");
             XLSX.writeFile(workbook, "Cloud_Audit_History.xlsx");
@@ -520,7 +687,14 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         function downloadPDF() {
             var element = document.getElementById('batchResultsContainer');
-            html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
+            var opt = {
+              margin:       0.3,
+              filename:     'Call_Quality_Audit_Report.pdf',
+              image:        { type: 'jpeg', quality: 0.98 },
+              html2canvas:  { scale: 2 },
+              jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+            html2pdf().set(opt).from(element).save();
         }
 
         window.onload = function() {
@@ -565,7 +739,6 @@ async def create_metric(payload: Dict[str, str] = Body(...)):
     if not key or not label or not description:
         raise HTTPException(status_code=400, detail="All fields (key, label, description) are required.")
 
-    # Check key duplicate
     existing = db.collection("metrics").where("key", "==", key).get()
     if len(existing) > 0:
         raise HTTPException(status_code=400, detail=f"Metric key '{key}' already exists.")
@@ -635,7 +808,6 @@ def transcribe_bytes(audio_bytes):
 def evaluate_quality(transcript, metrics_list):
     url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
     
-    # Build dynamic JSON structure template for prompt
     evaluated_metrics_json = {}
     metric_instructions = []
 
@@ -648,7 +820,7 @@ def evaluate_quality(transcript, metrics_list):
     metrics_guide = "\n".join(metric_instructions)
 
     prompt = f"""
-    Analyze the following audio call transcript and evaluate quality score (0-100) and evaluated metrics.
+    Analyze the following audio call transcript and evaluate quality score (0-100), agent strengths, agent weaknesses/improvements, and evaluated metrics.
     
     Evaluation Rules for Metrics:
     {metrics_guide}
@@ -661,8 +833,8 @@ def evaluate_quality(transcript, metrics_list):
         "overall_score": 85,
         "summary": "Detailed call summary...",
         "evaluated_metrics": {json.dumps(evaluated_metrics_json)},
-        "strengths": ["Strong point"],
-        "improvements": ["Improvement point"]
+        "strengths": ["Clear communication", "Good pitch timing"],
+        "improvements": ["Missed asking about monthly refill", "High speaking pace"]
     }}
     """
 
@@ -690,6 +862,8 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
                     "score": evaluation.get("overall_score", 0),
                     "summary": evaluation.get("summary", ""),
                     "evaluated_metrics": evaluation.get("evaluated_metrics", {}),
+                    "strengths": evaluation.get("strengths", []),
+                    "improvements": evaluation.get("improvements", []),
                     "wpm": metrics.get("wpm", 0),
                     "created_at": created_time
                 }
@@ -708,7 +882,6 @@ async def process_single_file_limited(file: UploadFile, active_metrics: List[Dic
 
 @app.post("/api/analyze-batch")
 async def analyze_audio_batch(files: List[UploadFile] = File(...)):
-    # Fetch active metrics to evaluate dynamically
     active_metrics = await get_metrics()
     tasks = [process_single_file_limited(file, active_metrics) for file in files]
     results = await asyncio.gather(*tasks)
@@ -720,15 +893,18 @@ async def get_history():
         print("❌ Firebase DB Object is None in /api/history")
         return []
     try:
-        docs = db.collection("audits").limit(30).stream()
+        docs = db.collection("audits").stream()
         history = []
         for doc in docs:
             data = doc.to_dict()
             history.append({
+                "id": doc.id,
                 "filename": data.get("filename", "Unknown"),
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
                 "evaluated_metrics": data.get("evaluated_metrics", {}),
+                "strengths": data.get("strengths", []),
+                "improvements": data.get("improvements", []),
                 "wpm": data.get("wpm", 0),
                 "created_at": data.get("created_at", "")
             })
@@ -738,6 +914,16 @@ async def get_history():
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
+
+@app.delete("/api/history/{record_id}")
+async def delete_history(record_id: str):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        db.collection("audits").document(record_id).delete()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
