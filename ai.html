@@ -466,10 +466,19 @@
         // --- STEP 1: GROQ WHISPER SPEECH-TO-TEXT ---
         loaderText.innerText = "Step 1/2: Groq Whisper AI audio ko transcribe kar raha hai...";
 
-        // AWB extension handle karne ke liye File Blob re-alias (Groq Whisper API support fix)
-        let fileNameToUpload = audioFile.name;
-        if (fileNameToUpload.toLowerCase().endsWith('.awb')) {
-          fileNameToUpload = fileNameToUpload.replace(/\.awb$/i, '.amr');
+        // GROQ STRICT EXTENSION VALIDATION FIX:
+        // Groq API only allows [flac, mp3, mp4, mpeg, mpga, m4a, ogg, opus, wav, webm]
+        let originalName = audioFile.name;
+        let fileNameToUpload = originalName;
+
+        const allowedExtensions = ['flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'opus', 'wav', 'webm'];
+        const fileExt = originalName.includes('.') ? originalName.split('.').pop().toLowerCase() : '';
+
+        if (!allowedExtensions.includes(fileExt)) {
+          // Bypass for .awb, .amr, .aac, .wma, etc. by appending .mp3 extension alias
+          const lastIndex = originalName.lastIndexOf('.');
+          const baseName = lastIndex !== -1 ? originalName.substring(0, lastIndex) : originalName;
+          fileNameToUpload = baseName + '.mp3';
         }
 
         const formData = new FormData();
