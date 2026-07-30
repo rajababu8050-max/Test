@@ -93,20 +93,15 @@ HTML_CONTENT = """<!DOCTYPE html>
         .text-sub { color: #94a3b8; }
         .light .text-sub { color: #64748b; }
 
-        /* Full Page PDF Print Formatting Fix */
-        @media print {
-            body { background-color: #ffffff !important; color: #000000 !important; width: 100% !important; margin: 0 !important; padding: 0 !important; }
-            .card-bg, .inner-bg { background-color: #ffffff !important; color: #000000 !important; border-color: #ccc !important; }
-            .no-print { display: none !important; }
-            .pdf-page-fit { width: 100% !important; max-width: 100% !important; margin: 0 !important; page-break-inside: avoid; }
-        }
+        /* PDF Full Width Fix */
+        .pdf-fit-page { width: 100% !important; max-width: 100% !important; margin: 0 !important; box-sizing: border-box !important; }
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
     <div class="max-w-6xl mx-auto space-y-6">
         
         <!-- Top Header with Dark/Light Toggle -->
-        <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3 no-print">
+        <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
                     AI Call Quality Auditor Pro
@@ -124,7 +119,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
 
         <!-- Upload Card -->
-        <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg no-print">
+        <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg">
             <div class="space-y-3">
                 <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎙️</div>
                 <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav)</p>
@@ -146,20 +141,20 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         <!-- Multi-Results Container -->
         <div id="batchResultsContainer" class="hidden space-y-6 w-full">
-            <div class="flex justify-between items-center font-semibold border-b border-slate-700/60 pb-2 flex-wrap gap-2 no-print">
+            <div class="flex justify-between items-center font-semibold border-b border-slate-700/60 pb-2 flex-wrap gap-2">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
                     <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
                         📊 Export Detailed Excel (.xlsx)
                     </button>
                     <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">
-                        📥 Export PDF Report (Full Page)
+                        📥 Export PDF Report
                     </button>
                 </div>
             </div>
 
             <!-- Aggregate Pharma Upsell Table Box -->
-            <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4 w-full pdf-page-fit">
+            <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4 pdf-fit-page">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
                         <h3 class="text-base font-bold text-blue-400">💊 Aggregate Metrics Summary</h3>
@@ -182,12 +177,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <h3 class="text-md font-bold pt-2 border-b border-slate-700/60 pb-2 no-print">📁 Individual Call Breakdowns</h3>
+            <h3 class="text-md font-bold pt-2 border-b border-slate-700/60 pb-2">📁 Individual Call Breakdowns</h3>
             <div id="resultsList" class="space-y-4 w-full"></div>
         </div>
 
         <!-- History Table Section -->
-        <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg w-full no-print">
+        <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg w-full">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
                 <div class="flex gap-2">
@@ -230,7 +225,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <!-- METRICS MANAGEMENT MODAL -->
-    <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
+    <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-lg font-bold">⚙️ Configure Dynamic Metrics</h3>
@@ -430,7 +425,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 setTimeout(loadHistory, 1000);
             } catch(err) {
                 alert("Error: " + err.message);
-            } font-medium {
+            } finally {
                 document.getElementById('loader').classList.add('hidden');
             }
         }
@@ -483,7 +478,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var transcript = data.transcript || [];
                 
                 var card = document.createElement('div');
-                card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4 pdf-page-fit";
+                card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4 pdf-fit-page";
                 
                 var transcriptHtml = "";
                 transcript.forEach(function(t) {
@@ -516,9 +511,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
                         '<p class="text-sub leading-relaxed">' + (evalData.summary || "N/A") + '</p>' +
                     '</div>' +
-                    '<details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs" open>' +
-                        '<summary class="font-bold text-sub cursor-pointer">📄 Diarized Transcript Summary</summary>' +
-                        '<div class="mt-3 space-y-2 max-h-60 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
+                    '<details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">' +
+                        '<summary class="font-bold text-sub cursor-pointer">📄 Click to view Full Diarized Transcript</summary>' +
+                        '<div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
                     '</details>';
                 
                 container.appendChild(card);
@@ -583,7 +578,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
             var workbook = XLSX.utils.book_new();
 
-            var structuredData = currentBatchResults.map(i => {
+            var exportRows = currentBatchResults.map(i => {
                 var row = {
                     "File Name": i.filename,
                     "QA Score": i.data?.evaluation?.overall_score || 0,
@@ -593,7 +588,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Summary": i.data?.evaluation?.summary || ""
                 };
                 
-                // Unfold active metrics as separate full columns
                 var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
                 activeMetrics.forEach(m => {
                     row[m.label] = evalMetrics[m.key] ? "YES" : "NO";
@@ -602,20 +596,18 @@ HTML_CONTENT = """<!DOCTYPE html>
                 return row;
             });
 
-            var summarySheet = XLSX.utils.json_to_sheet(structuredData);
+            var summarySheet = XLSX.utils.json_to_sheet(exportRows);
 
-            // Set dynamic full page column width
-            var colWidths = [
-                { wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 60 }
-            ];
-            activeMetrics.forEach(() => colWidths.push({ wch: 20 }));
-            summarySheet['!cols'] = colWidths;
+            // Column width adjustment for full sheet visibility
+            var cols = [{ wch: 30 }, { wch: 10 }, { wch: 10 }, { wch: 12 }, { wch: 12 }, { wch: 60 }];
+            activeMetrics.forEach(() => cols.push({ wch: 20 }));
+            summarySheet['!cols'] = cols;
 
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Audit Summary");
+            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
             XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
         }
 
-        /* Full Page Excel Export for History */
+        /* Full Page History Excel Export */
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
             var workbook = XLSX.utils.book_new();
@@ -629,20 +621,22 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             sheet['!cols'] = [{ wch: 30 }, { wch: 12 }, { wch: 10 }, { wch: 22 }, { wch: 60 }];
 
-            XLSX.utils.book_append_sheet(workbook, sheet, "Audit History");
+            XLSX.utils.book_append_sheet(workbook, sheet, "History");
             XLSX.writeFile(workbook, "Cloud_Audit_History.xlsx");
         }
 
-        /* Full Page PDF Export Settings */
+        /* Full Page PDF Export */
         function downloadPDF() {
             var element = document.getElementById('batchResultsContainer');
-            if(!element) return alert("No report available to download!");
+            if(!element || element.classList.contains('hidden')) {
+                return alert("No audit batch data available to download!");
+            }
 
             var opt = {
-                margin:       [0.3, 0.3, 0.3, 0.3], // Small margins for max full page area
+                margin:       [0.2, 0.2, 0.2, 0.2],
                 filename:     'Batch_Call_Audit_Report.pdf',
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2, useCORS: true, logging: false },
+                html2canvas:  { scale: 2, useCORS: true },
                 jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' },
                 pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
             };
