@@ -93,7 +93,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         .text-sub { color: #94a3b8; }
         .light .text-sub { color: #64748b; }
         
-        /* PDF Print-specific styling overrides */
         .pdf-export {
             background-color: #ffffff !important;
             color: #0f172a !important;
@@ -104,16 +103,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             border: 1px solid #cbd5e1 !important;
             color: #0f172a !important;
             box-shadow: none !important;
-        }
-        .pdf-export details {
-            display: block !important;
-        }
-        .pdf-export details summary {
-            display: none !important;
-        }
-        .pdf-export details div {
-            max-height: none !important;
-            overflow: visible !important;
         }
     </style>
 </head>
@@ -220,15 +209,32 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date</th>
+                            <th class="p-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
         </div>
 
+    </div>
+
+    <!-- VIEW HISTORY AUDIT MODAL -->
+    <div id="viewHistoryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h3 id="viewModalFileName" class="text-md font-bold text-blue-400">👁️ Audit Details</h3>
+                <button onclick="closeViewModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
+            </div>
+            <div id="viewModalContent" class="space-y-4 text-xs">
+                <!-- Dynamic Content -->
+            </div>
+            <div class="flex justify-end pt-2">
+                <button type="button" onclick="closeViewModal()" class="bg-slate-700 text-slate-300 text-xs px-4 py-1.5 rounded-lg font-bold">Close</button>
+            </div>
+        </div>
     </div>
 
     <!-- METRICS MANAGEMENT MODAL -->
@@ -270,6 +276,9 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
     </div>
+
+    <!-- HIDDEN CONTAINER FOR SINGLE PDF PRINTING -->
+    <div id="singlePdfContainer" class="hidden"></div>
 
     <script>
         var selectedFiles = [];
@@ -531,26 +540,169 @@ HTML_CONTENT = """<!DOCTYPE html>
                 historyDataList = list || [];
                 
                 if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                    hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
                     return;
                 }
                 hTable.innerHTML = "";
                 list.forEach(function(item) {
                     hTable.innerHTML += 
-                        '<tr class="border-b border-slate-700/50">' +
-                            '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
+                        '<tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">' +
+                            '<td class="p-2 font-medium text-slate-200">' + (item.filename || 'N/A') + '</td>' +
                             '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
                             '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
                             '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
+                            '<td class="p-2 text-center flex justify-center gap-1.5">' +
+                                '<button onclick="openViewHistoryModal(\'' + item.id + '\')" title="View Record" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2 py-1 rounded text-[11px] font-bold">👁️ View</button>' +
+                                '<button onclick="deleteHistoryRecord(\'' + item.id + '\')" title="Delete Record" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 px-2 py-1 rounded text-[11px] font-bold">🗑️ Delete</button>' +
+                                '<button onclick="exportSingleHistoryExcel(\'' + item.id + '\')" title="Export Single Excel" class="bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-400 px-2 py-1 rounded text-[11px] font-bold">📊 Excel</button>' +
+                                '<button onclick="exportSingleHistoryPDF(\'' + item.id + '\')" title="Export Single PDF" class="bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-400 px-2 py-1 rounded text-[11px] font-bold">📥 PDF</button>' +
+                            '</td>' +
                         '</tr>';
                 });
             } catch(e) {
                 console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
         }
 
-        // ================= FULL PAGE EXPORT FUNCTIONS =================
+        // ================= VIEW & DELETE ACTIONS =================
+
+        function openViewHistoryModal(id) {
+            var item = historyDataList.find(x => x.id === id);
+            if (!item) return;
+
+            document.getElementById('viewModalFileName').innerText = "📁 " + (item.filename || "Audit Details");
+            var evalMetrics = item.evaluated_metrics || {};
+
+            var metricsHtml = '';
+            activeMetrics.forEach(function(m) {
+                var isTrue = evalMetrics[m.key] === true;
+                var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
+                metricsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}: ${fmt}</div>`;
+            });
+
+            var contentHtml = `
+                <div class="flex justify-between items-center bg-slate-900/50 p-3 rounded-xl border border-slate-700/60">
+                    <div>
+                        <span class="text-sub block text-[10px]">AUDIT DATE</span>
+                        <span class="font-bold text-slate-200">${item.created_at || 'N/A'}</span>
+                    </div>
+                    <div>
+                        <span class="text-sub block text-[10px]">SPEAKING PACE</span>
+                        <span class="font-bold text-blue-400">${item.wpm || 0} WPM</span>
+                    </div>
+                    <div>
+                        <span class="text-sub block text-[10px]">OVERALL QA SCORE</span>
+                        <span class="font-bold text-emerald-400 text-sm">${item.score || 0}/100</span>
+                    </div>
+                </div>
+
+                <div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">
+                    <div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">${metricsHtml}</div>
+                </div>
+
+                <div class="inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">
+                    <div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>
+                    <p class="text-sub leading-relaxed">${item.summary || "N/A"}</p>
+                </div>
+            `;
+
+            document.getElementById('viewModalContent').innerHTML = contentHtml;
+            document.getElementById('viewHistoryModal').classList.remove('hidden');
+            document.getElementById('viewHistoryModal').classList.add('flex');
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewHistoryModal').classList.add('hidden');
+            document.getElementById('viewHistoryModal').classList.remove('flex');
+        }
+
+        async function deleteHistoryRecord(id) {
+            if(!confirm("Are you sure you want to delete this call record from Firebase?")) return;
+            try {
+                var res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
+                if(!res.ok) throw new Error("Failed to delete record");
+                await loadHistory();
+            } catch(err) {
+                alert("Error deleting record: " + err.message);
+            }
+        }
+
+        // ================= SINGLE ITEM EXPORTS =================
+
+        function exportSingleHistoryExcel(id) {
+            var item = historyDataList.find(x => x.id === id);
+            if (!item) return alert("Record not found!");
+
+            var workbook = XLSX.utils.book_new();
+            var evalMetrics = item.evaluated_metrics || {};
+
+            var row = {
+                "File Name": item.filename,
+                "QA Score (/100)": item.score || 0,
+                "WPM": item.wpm || 0,
+                "Created At": item.created_at || ""
+            };
+
+            activeMetrics.forEach(function(m) {
+                row[m.label] = evalMetrics[m.key] ? "YES" : "NO";
+            });
+
+            row["Call Summary"] = item.summary || "";
+
+            var sheet = XLSX.utils.json_to_sheet([row]);
+            XLSX.utils.book_append_sheet(workbook, sheet, "Call Audit");
+            
+            var safeName = (item.filename || "Audit").replace(/[^a-z0-9]/gi, '_');
+            XLSX.writeFile(workbook, `${safeName}_Audit.xlsx`);
+        }
+
+        function exportSingleHistoryPDF(id) {
+            var item = historyDataList.find(x => x.id === id);
+            if (!item) return alert("Record not found!");
+
+            var container = document.getElementById('singlePdfContainer');
+            var evalMetrics = item.evaluated_metrics || {};
+
+            var dynamicCardsHtml = '';
+            activeMetrics.forEach(function(m) {
+                var isTrue = evalMetrics[m.key] === true;
+                var fmt = isTrue ? '<b style="color:#059669;">YES</b>' : '<b style="color:#e11d48;">NO</b>';
+                dynamicCardsHtml += `<div style="background:#f1f5f9; padding:8px; border-radius:6px; font-size:12px;">${m.label}: ${fmt}</div>`;
+            });
+
+            container.innerHTML = `
+                <div style="font-family:sans-serif; padding:20px; color:#0f172a; background:#ffffff;">
+                    <div style="border-bottom:2px solid #2563eb; padding-bottom:10px; margin-bottom:15px; display:flex; justify-content:space-between;">
+                        <h2 style="font-size:18px; font-weight:bold; color:#2563eb; margin:0;">📁 ${item.filename}</h2>
+                        <span style="font-size:18px; font-weight:bold; color:#059669;">QA Score: ${item.score}/100</span>
+                    </div>
+                    <p style="font-size:12px; color:#64748b; margin-bottom:15px;">Audit Date: ${item.created_at || 'N/A'} | Pace: ${item.wpm || 0} WPM</p>
+                    <div style="margin-bottom:15px;">
+                        <h3 style="font-size:14px; font-weight:bold; color:#059669; margin-bottom:8px;">💊 Call Metrics Evaluation</h3>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">${dynamicCardsHtml}</div>
+                    </div>
+                    <div>
+                        <h3 style="font-size:14px; font-weight:bold; color:#2563eb; margin-bottom:8px;">Detailed Call Summary</h3>
+                        <p style="font-size:12px; line-height:1.5; background:#f8fafc; padding:12px; border-radius:8px; border:1px solid #cbd5e1;">${item.summary || 'N/A'}</p>
+                    </div>
+                </div>
+            `;
+
+            var safeName = (item.filename || "Audit").replace(/[^a-z0-9]/gi, '_');
+            var opt = {
+                margin:       0.4,
+                filename:     `${safeName}_Report.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true },
+                jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opt).from(container).save();
+        }
+
+        // ================= FULL BATCH EXPORT FUNCTIONS =================
 
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
@@ -558,7 +710,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             var validResults = currentBatchResults.filter(r => r.status === "success");
             var workbook = XLSX.utils.book_new();
 
-            // 1. Sheet 1: Aggregate Summary Overview
             var summaryData = [];
             var totalCalls = validResults.length;
             summaryData.push({ "Metric": "Total Calls Reviewed", "Count": totalCalls, "Percentage": "100%" });
@@ -575,7 +726,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             var summarySheet = XLSX.utils.json_to_sheet(summaryData);
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Overview");
 
-            // 2. Sheet 2: Detailed Call Audits
             var detailedData = validResults.map(function(item) {
                 var data = item.data || {};
                 var evalData = data.evaluation || {};
@@ -590,7 +740,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Total Words": metrics.total_words || 0
                 };
 
-                // Add active dynamic metrics as columns
                 activeMetrics.forEach(function(m) {
                     row[m.label] = evalMetrics[m.key] ? "YES" : "NO";
                 });
@@ -599,7 +748,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 row["Weaknesses"] = (evalData.improvements || []).join(" | ");
                 row["Call Summary"] = evalData.summary || "";
                 
-                // Add full transcript as text
                 var fullTranscript = (data.transcript || []).map(t => `${t.speaker}: ${t.text}`).join("\n");
                 row["Full Transcript"] = fullTranscript;
 
@@ -862,6 +1010,7 @@ async def get_history():
         for doc in docs:
             data = doc.to_dict()
             history.append({
+                "id": doc.id,
                 "filename": data.get("filename", "Unknown"),
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
@@ -875,6 +1024,16 @@ async def get_history():
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
+
+@app.delete("/api/history/{record_id}")
+async def delete_history(record_id: str):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        db.collection("audits").document(record_id).delete()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
