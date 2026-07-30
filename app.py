@@ -197,11 +197,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date</th>
-                            <th class="p-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -220,51 +219,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
 
-    </div>
-
-    <!-- VIEW AUDIT DETAILS MODAL -->
-    <div id="viewAuditModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-3xl p-6 space-y-4 shadow-2xl max-h-[90vh] overflow-y-auto" id="auditModalContent">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-lg font-bold text-blue-400" id="modalFileName">📁 Audit Details</h3>
-                <button onclick="closeViewModal()" class="text-sub hover:text-white font-bold text-xl">&times;</button>
-            </div>
-            
-            <div class="flex justify-between items-center inner-bg p-3 rounded-xl border border-slate-700">
-                <span class="text-xs text-sub">Overall QA Score</span>
-                <span class="text-2xl font-extrabold text-emerald-400" id="modalScore">0/100</span>
-            </div>
-
-            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-center text-xs">
-                <div class="inner-bg p-2.5 rounded-lg border border-slate-700/60">
-                    <span class="text-sub block text-[10px]">PACE</span>
-                    <span class="font-bold text-blue-400" id="modalWpm">0 WPM</span>
-                </div>
-                <div class="inner-bg p-2.5 rounded-lg border border-slate-700/60">
-                    <span class="text-sub block text-[10px]">DURATION</span>
-                    <span class="font-bold text-indigo-400" id="modalDuration">0s</span>
-                </div>
-                <div class="inner-bg p-2.5 rounded-lg border border-slate-700/60">
-                    <span class="text-sub block text-[10px]">TOTAL WORDS</span>
-                    <span class="font-bold text-amber-400" id="modalWords">0</span>
-                </div>
-            </div>
-
-            <div class="inner-bg p-3.5 rounded-xl border border-slate-700/60 space-y-2">
-                <div class="font-bold text-emerald-400 text-xs uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>
-                <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs" id="modalEvaluatedMetrics"></div>
-            </div>
-
-            <div class="text-xs inner-bg p-3.5 rounded-xl border border-slate-700/50 space-y-1">
-                <div class="font-bold text-blue-300 text-xs uppercase tracking-wide">Call Summary</div>
-                <p class="text-sub leading-relaxed" id="modalSummary">N/A</p>
-            </div>
-
-            <details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs" open>
-                <summary class="font-bold text-sub cursor-pointer">📄 Diarized Transcript</summary>
-                <div class="mt-3 space-y-2 max-h-56 overflow-y-auto pr-2 pt-2 border-t border-slate-800" id="modalTranscript"></div>
-            </details>
-        </div>
     </div>
 
     <!-- METRICS MANAGEMENT MODAL -->
@@ -573,14 +527,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                 renderHistoryTable();
             } catch(e) {
                 console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
                 document.getElementById('pageInfoText').innerText = "Page 0 of 0";
                 document.getElementById('prevPageBtn').disabled = true;
                 document.getElementById('nextPageBtn').disabled = true;
@@ -597,128 +551,18 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             hTable.innerHTML = "";
             pageItems.forEach(function(item) {
-                var id = item.id || '';
                 hTable.innerHTML += 
                     '<tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">' +
-                        '<td class="p-2 font-medium max-w-[150px] truncate">' + (item.filename || 'N/A') + '</td>' +
+                        '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
                         '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
                         '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
-                        '<td class="p-2 text-sub whitespace-nowrap">' + (item.created_at || 'N/A') + '</td>' +
-                        '<td class="p-2 text-center whitespace-nowrap">' +
-                            '<div class="flex items-center justify-center gap-1.5">' +
-                                '<button onclick="viewHistoryAudit(\'' + id + '\')" title="View Call Audit" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white px-2 py-1 rounded text-xs font-semibold transition">👁️ View</button>' +
-                                '<button onclick="exportSingleHistoryExcel(\'' + id + '\')" title="Export Excel" class="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white px-2 py-1 rounded text-xs font-semibold transition">📊 Excel</button>' +
-                                '<button onclick="exportSingleHistoryPDF(\'' + id + '\')" title="Export PDF" class="bg-slate-700/60 text-slate-300 hover:bg-slate-600 hover:text-white px-2 py-1 rounded text-xs font-semibold transition">📄 PDF</button>' +
-                                '<button onclick="deleteHistoryAudit(\'' + id + '\')" title="Delete Audit" class="bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white px-2 py-1 rounded text-xs font-semibold transition">🗑️</button>' +
-                            '</div>' +
-                        '</td>' +
+                        '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
                     '</tr>';
             });
 
             document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} Items)`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
-        }
-
-        // ================= ACTION BUTTON FUNCTIONS =================
-        
-        function viewHistoryAudit(id) {
-            var audit = historyDataList.find(x => x.id === id);
-            if(!audit) return alert("Audit data not found!");
-
-            document.getElementById('modalFileName').innerText = "📁 " + (audit.filename || "Audit Details");
-            document.getElementById('modalScore').innerText = (audit.score || 0) + "/100";
-            document.getElementById('modalWpm').innerText = (audit.wpm || 0) + " WPM";
-            document.getElementById('modalDuration').innerText = Math.round(audit.duration || 0) + "s";
-            document.getElementById('modalWords').innerText = audit.total_words || 0;
-            document.getElementById('modalSummary').innerText = audit.summary || "No summary available.";
-
-            // Dynamic Metrics
-            var metricsContainer = document.getElementById('modalEvaluatedMetrics');
-            metricsContainer.innerHTML = "";
-            var evalMetrics = audit.evaluated_metrics || {};
-            
-            activeMetrics.forEach(function(m) {
-                var isTrue = evalMetrics[m.key] === true;
-                var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
-                metricsContainer.innerHTML += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}: ${fmt}</div>`;
-            });
-
-            // Transcript
-            var transcriptContainer = document.getElementById('modalTranscript');
-            transcriptContainer.innerHTML = "";
-            var transcript = audit.transcript || [];
-            if(transcript.length === 0) {
-                transcriptContainer.innerHTML = '<span class="text-sub">No transcript available for this audit.</span>';
-            } else {
-                transcript.forEach(function(t) {
-                    var colorClass = t.speaker === 'Agent' ? 'text-blue-400' : 'text-emerald-400';
-                    transcriptContainer.innerHTML += '<div class="mb-1"><b class="' + colorClass + '">' + t.speaker + ':</b> ' + t.text + '</div>';
-                });
-            }
-
-            document.getElementById('viewAuditModal').classList.remove('hidden');
-            document.getElementById('viewAuditModal').classList.add('flex');
-        }
-
-        function closeViewModal() {
-            document.getElementById('viewAuditModal').classList.add('hidden');
-            document.getElementById('viewAuditModal').classList.remove('flex');
-        }
-
-        async function deleteHistoryAudit(id) {
-            if(!id) return alert("Invalid audit ID!");
-            if(!confirm("Are you sure you want to delete this call audit from Firebase?")) return;
-
-            try {
-                var res = await fetch(`/api/history/${id}`, { method: 'DELETE' });
-                if(!res.ok) {
-                    var err = await res.json();
-                    throw new Error(err.detail || "Failed to delete audit");
-                }
-                historyDataList = historyDataList.filter(x => x.id !== id);
-                renderHistoryTable();
-            } catch(e) {
-                alert("Error deleting item: " + e.message);
-            }
-        }
-
-        function exportSingleHistoryExcel(id) {
-            var item = historyDataList.find(x => x.id === id);
-            if(!item) return alert("Audit data missing!");
-
-            var rowData = {
-                "File Name": item.filename,
-                "QA Score": item.score,
-                "WPM": item.wpm,
-                "Duration (s)": item.duration || 0,
-                "Total Words": item.total_words || 0,
-                "Summary": item.summary,
-                "Created At": item.created_at
-            };
-
-            // Include metrics
-            var evalMetrics = item.evaluated_metrics || {};
-            activeMetrics.forEach(m => {
-                rowData[m.label] = evalMetrics[m.key] ? "YES" : "NO";
-            });
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet([rowData]);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Call Audit");
-            XLSX.writeFile(workbook, (item.filename || "Audit") + "_Report.xlsx");
-        }
-
-        function exportSingleHistoryPDF(id) {
-            var item = historyDataList.find(x => x.id === id);
-            if(!item) return alert("Audit data missing!");
-
-            // Open view modal first and print PDF of modal content
-            viewHistoryAudit(id);
-            setTimeout(() => {
-                var element = document.getElementById('auditModalContent');
-                html2pdf().from(element).save((item.filename || "Audit") + "_Report.pdf");
-            }, 300);
         }
 
         function changePage(direction) {
@@ -922,9 +766,6 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
                     "summary": evaluation.get("summary", ""),
                     "evaluated_metrics": evaluation.get("evaluated_metrics", {}),
                     "wpm": metrics.get("wpm", 0),
-                    "duration": metrics.get("duration", 0),
-                    "total_words": metrics.get("total_words", 0),
-                    "transcript": transcript,
                     "created_at": created_time
                 }
                 db.collection("audits").add(audit_data)
@@ -957,17 +798,12 @@ async def get_history():
         history = []
         for doc in docs:
             data = doc.to_dict()
-            data["id"] = doc.id
             history.append({
-                "id": doc.id,
                 "filename": data.get("filename", "Unknown"),
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
                 "evaluated_metrics": data.get("evaluated_metrics", {}),
                 "wpm": data.get("wpm", 0),
-                "duration": data.get("duration", 0),
-                "total_words": data.get("total_words", 0),
-                "transcript": data.get("transcript", []),
                 "created_at": data.get("created_at", "")
             })
         
@@ -976,16 +812,6 @@ async def get_history():
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
-
-@app.delete("/api/history/{audit_id}")
-async def delete_history_audit(audit_id: str):
-    if not db:
-        raise HTTPException(status_code=500, detail="Database not configured")
-    try:
-        db.collection("audits").document(audit_id).delete()
-        return {"status": "success", "message": f"Audit {audit_id} deleted successfully."}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
