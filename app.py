@@ -204,6 +204,19 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </tbody>
                 </table>
             </div>
+
+            <!-- Pagination Controls -->
+            <div class="flex justify-between items-center pt-2 text-xs border-t border-slate-700/60">
+                <span id="pageInfoText" class="text-sub font-medium">Page 1 of 1</span>
+                <div class="flex gap-2">
+                    <button id="prevPageBtn" onclick="changePage(-1)" disabled class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">
+                        ← Prev
+                    </button>
+                    <button id="nextPageBtn" onclick="changePage(1)" disabled class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">
+                        Next →
+                    </button>
+                </div>
+            </div>
         </div>
 
     </div>
@@ -243,7 +256,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
                 <div id="metricsListContainer" class="space-y-2">
-                    <!-- Populated via JS -->
                 </div>
             </div>
         </div>
@@ -254,6 +266,10 @@ HTML_CONTENT = """<!DOCTYPE html>
         var currentBatchResults = [];
         var historyDataList = [];
         var activeMetrics = [];
+        
+        // History Pagination Variables
+        var currentPage = 1;
+        var itemsPerPage = 10;
 
         function toggleTheme() {
             var html = document.documentElement;
@@ -507,25 +523,51 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetch("/api/history");
                 var list = await res.json();
                 historyDataList = list || [];
-                
-                if(!list || list.length === 0) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
-                    return;
-                }
-                hTable.innerHTML = "";
-                list.forEach(function(item) {
-                    hTable.innerHTML += 
-                        '<tr class="border-b border-slate-700/50">' +
-                            '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
-                            '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
-                            '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
-                            '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
-                        '</tr>';
-                });
+                currentPage = 1;
+                renderHistoryTable();
             } catch(e) {
                 console.error("History load error:", e);
                 hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
+        }
+
+        function renderHistoryTable() {
+            var hTable = document.getElementById('historyTable');
+            if(!historyDataList || historyDataList.length === 0) {
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                document.getElementById('pageInfoText').innerText = "Page 0 of 0";
+                document.getElementById('prevPageBtn').disabled = true;
+                document.getElementById('nextPageBtn').disabled = true;
+                return;
+            }
+
+            var totalPages = Math.ceil(historyDataList.length / itemsPerPage);
+            if(currentPage > totalPages) currentPage = totalPages;
+            if(currentPage < 1) currentPage = 1;
+
+            var startIndex = (currentPage - 1) * itemsPerPage;
+            var endIndex = startIndex + itemsPerPage;
+            var pageItems = historyDataList.slice(startIndex, endIndex);
+
+            hTable.innerHTML = "";
+            pageItems.forEach(function(item) {
+                hTable.innerHTML += 
+                    '<tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">' +
+                        '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
+                        '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
+                        '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
+                        '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
+                    '</tr>';
+            });
+
+            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} Items)`;
+            document.getElementById('prevPageBtn').disabled = currentPage === 1;
+            document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
+        }
+
+        function changePage(direction) {
+            currentPage += direction;
+            renderHistoryTable();
         }
 
         function downloadExcel() {
@@ -752,7 +794,7 @@ async def get_history():
         print("❌ Firebase DB Object is None in /api/history")
         return []
     try:
-        docs = db.collection("audits").limit(30).stream()
+        docs = db.collection("audits").limit(50).stream()
         history = []
         for doc in docs:
             data = doc.to_dict()
