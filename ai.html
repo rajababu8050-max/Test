@@ -198,7 +198,7 @@
         <div class="card">
           <h3>Upload Call Recording File</h3>
           <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 20px;">
-            Call recording upload karein. Groq Whisper transcript me se Agent aur Customer ki aawaz alag karke scoring karega.
+            Call recording upload karein. LLM Whisper transcript me se Agent aur Customer ki aawaz alag karke scoring karega.
           </p>
 
           <form id="fileUploadForm">
@@ -214,15 +214,15 @@
             </div>
 
             <div class="form-group">
-              <label>Select Any Audio File (MP3, WAV, M4A, AWB, AMR, AAC, OGG, FLAC, WEBM, WMA)</label>
-              <input type="file" id="audioFileInput" class="form-control" accept="audio/*, .mp3, .wav, .m4a, .awb, .amr, .aac, .ogg, .flac, .webm, .wma, .opus, .m4r, .mp4, .3gp" required>
+              <label>Select Audio File (MP3 / WAV / M4A)</label>
+              <input type="file" id="audioFileInput" class="form-control" accept="audio/*" required>
             </div>
 
             <button type="submit" id="processBtn" class="btn btn-primary" style="margin-top: 8px;">
               🚀 Transcribe, Separate Speakers & Evaluate Agent Score
             </button>
             <div id="loaderStatus" class="hidden" style="margin-top: 12px; color: var(--primary);">
-              <span class="loader"></span> <span id="loaderText">Groq Whisper AI audio transcribe kar raha hai...</span>
+              <span class="loader"></span> <span id="loaderText">Whisper AI audio transcribe kar raha hai...</span>
             </div>
           </form>
 
@@ -447,7 +447,7 @@
       `).join('');
     }
 
-    // 2-STEP AUDIO & GROQ LLM DIARIZATION PIPELINE
+    // 2-STEP AUDIO & LLM DIARIZATION PIPELINE (FULL AUDIO CONVERSION)
     document.getElementById('fileUploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -460,37 +460,16 @@
       document.getElementById('processBtn').disabled = true;
 
       try {
-        let rawFile = fileInput.files[0];
+        const audioFile = fileInput.files[0];
         
-        // --- STEP 1: GROQ WHISPER SPEECH-TO-TEXT ---
-        loaderText.innerText = "Step 1/2: Groq Whisper AI audio ko transcribe kar raha hai...";
-
-        // GROQ STRICT EXTENSION & MIME FIX:
-        // Raw file ko arrayBuffer me convert karke naya File object banaya ja raha hai
-        // jisse MIME Type 'audio/mp3' force ho jaaye aur Groq API error na de.
-        const arrayBuffer = await rawFile.arrayBuffer();
-        
-        // File extension and format alias
-        const allowedExts = ['flac', 'mp3', 'mp4', 'mpeg', 'mpga', 'm4a', 'ogg', 'opus', 'wav', 'webm'];
-        let origName = rawFile.name;
-        let ext = origName.includes('.') ? origName.split('.').pop().toLowerCase() : '';
-        
-        let finalFileName = origName;
-        let finalMimeType = rawFile.type || 'audio/mp3';
-
-        if (!allowedExts.includes(ext)) {
-            const baseName = origName.substring(0, origName.lastIndexOf('.')) || origName;
-            finalFileName = baseName + '.mp3';
-            finalMimeType = 'audio/mp3';
-        }
-
-        const safeAudioFile = new File([arrayBuffer], finalFileName, { type: finalMimeType });
+        // --- STEP 1: FULL WHISPER SPEECH-TO-TEXT (Start to End) ---
+        loaderText.innerText = "Step 1/2: Whisper AI audio ko shuru se aakhir tak transcribe kar raha hai...";
 
         const formData = new FormData();
-        formData.append("file", safeAudioFile);
+        formData.append("file", audioFile);
         formData.append("model", "whisper-large-v3");
         formData.append("language", "hi"); // Hindi & Hinglish support
-        formData.append("temperature", "0");
+        formData.append("temperature", "0"); // Low temperature accurate full transcription ke liye
         formData.append("response_format", "json");
         formData.append("prompt", "यह एक कॉल सेंटर सपोर्ट कॉल है। Agent aur Customer ke shuruat se ant tak ki saari baat ko bina kisi shabd ko chhode poora transcribe karein.");
 
@@ -501,7 +480,7 @@
         });
 
         const whisperData = await whisperRes.json();
-        if (!whisperRes.ok || !whisperData.text) throw new Error(whisperData.error?.message || "Groq Whisper STT failed");
+        if (!whisperRes.ok || !whisperData.text) throw new Error(whisperData.error?.message || "Whisper STT failed");
 
         const rawTranscript = whisperData.text.trim();
 
