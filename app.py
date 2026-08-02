@@ -69,16 +69,16 @@ def init_default_metrics():
 
 init_default_metrics()
 
-# Dependency for Admin Verification
+# Middleware / Dependency to verify Firebase Auth Token for protected APIs
 async def verify_admin(authorization: Optional[str] = Header(None)):
     if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Unauthorized: Admin access required.")
+        raise HTTPException(status_code=401, detail="Unauthorized: Access Denied. Token missing.")
     token = authorization.split("Bearer ")[1]
     try:
         decoded_token = auth.verify_id_token(token)
         return decoded_token
     except Exception as e:
-        raise HTTPException(status_code=403, detail="Forbidden: Invalid or expired admin token.")
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid or expired Firebase Token.")
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -93,7 +93,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- Firebase Auth Modular SDKs -->
+    <!-- Firebase Auth SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     
@@ -108,10 +108,42 @@ HTML_CONTENT = """<!DOCTYPE html>
         .light .text-sub { color: #64748b; }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-8 font-sans">
-    <div class="max-w-6xl mx-auto space-y-6">
+<body class="min-h-screen font-sans flex flex-col justify-center items-center p-4 md:p-8">
+
+    <!-- 1. FULL PAGE LOGIN SECTION (Shown when NOT logged in) -->
+    <div id="loginSection" class="w-full max-w-md card-bg border border-slate-700 rounded-2xl p-8 space-y-6 shadow-2xl">
+        <div class="text-center space-y-2">
+            <div class="w-14 h-14 bg-gradient-to-tr from-blue-500 to-emerald-400 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg shadow-blue-500/30">
+                🔐
+            </div>
+            <h2 class="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                Admin Authentication
+            </h2>
+            <p class="text-sub text-xs">Aapko is dashboard ko access karne ke liye login karna hoga.</p>
+        </div>
+
+        <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
+            <div>
+                <label class="block text-xs font-semibold text-sub mb-1">Email Address</label>
+                <input type="email" id="loginEmail" required placeholder="admin@example.com" class="w-full inner-bg border border-slate-600 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-blue-500 transition">
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-sub mb-1">Password</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full inner-bg border border-slate-600 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-blue-500 transition">
+            </div>
+
+            <div id="loginError" class="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs p-3 rounded-xl hidden"></div>
+
+            <button type="submit" id="loginSubmitBtn" class="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white text-xs font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 transition transform hover:-translate-y-0.5">
+                Login to Dashboard
+            </button>
+        </form>
+    </div>
+
+    <!-- 2. MAIN DASHBOARD SECTION (Shown ONLY when logged in) -->
+    <div id="dashboardSection" class="w-full max-w-6xl space-y-6 hidden">
         
-        <!-- Top Header with Dark/Light Toggle & Links -->
+        <!-- Top Header with Dark/Light Toggle, User Info & Logout -->
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -126,13 +158,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <button onclick="toggleTheme()" class="card-bg border border-slate-600 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow">
                     <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
                 </button>
-                <div id="adminAuthControl">
-                    <button id="adminLoginBtn" onclick="openLoginModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-emerald-500/20 flex items-center gap-2">
-                        🔐 Admin Login
-                    </button>
-                </div>
-                <button id="manageMetricsBtn" onclick="openMetricModal()" class="hidden bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
+                <button onclick="openMetricModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
                     ⚙️ Manage Metrics
+                </button>
+                <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-rose-500/20 flex items-center gap-2">
+                    🚪 Logout
                 </button>
             </div>
         </div>
@@ -219,7 +249,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date</th>
-                            <th id="adminActionHeader" class="p-2 hidden">Action</th>
+                            <th class="p-2 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
@@ -244,35 +274,11 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     </div>
 
-    <!-- ADMIN LOGIN MODAL -->
-    <div id="loginModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-lg font-bold">🔐 Admin Authentication</h3>
-                <button onclick="closeLoginModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
-            </div>
-            <form id="adminLoginForm" onsubmit="handleAdminLogin(event)" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-semibold text-sub mb-1">Admin Email</label>
-                    <input type="email" id="adminEmail" required placeholder="admin@domain.com" class="w-full inner-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-sub mb-1">Password</label>
-                    <input type="password" id="adminPassword" required placeholder="••••••••" class="w-full inner-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
-                </div>
-                <div id="loginError" class="text-xs text-rose-400 hidden"></div>
-                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 rounded-lg font-bold shadow-lg shadow-emerald-600/20">
-                    Sign In as Administrator
-                </button>
-            </form>
-        </div>
-    </div>
-
     <!-- METRICS MANAGEMENT MODAL -->
     <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-lg font-bold">⚙️ Admin Panel: Dynamic Metrics</h3>
+                <h3 class="text-lg font-bold">⚙️ Configure Dynamic Metrics</h3>
                 <button onclick="closeMetricModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
             </div>
 
@@ -308,7 +314,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <script>
-        // CLIENT FIREBASE CONFIGURATION (Firebase Console Project Settings se replace karein)
+        // ⚠️ REPLACE THIS WITH YOUR FIREBASE WEB CONFIG FROM FIREBASE CONSOLE
         const firebaseConfig = {
             apiKey: "YOUR_FIREBASE_API_KEY",
             authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
@@ -317,11 +323,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             messagingSenderId: "YOUR_SENDER_ID",
             appId: "YOUR_APP_ID"
         };
-        
+
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
 
-        var currentAdminToken = null;
+        var currentUserToken = null;
         var selectedFiles = [];
         var currentBatchResults = [];
         var historyDataList = [];
@@ -330,57 +336,44 @@ HTML_CONTENT = """<!DOCTYPE html>
         var currentPage = 1;
         var itemsPerPage = 10;
 
-        // Firebase Auth State Observer
+        // Firebase Auth Listener
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                currentAdminToken = await user.getIdToken();
-                document.getElementById('adminAuthControl').innerHTML = `
-                    <button onclick="handleAdminLogout()" class="bg-rose-600 hover:bg-rose-500 text-white font-medium px-3 py-2 rounded-xl text-xs flex items-center gap-1">
-                        🔴 Logout (${user.email.split('@')[0]})
-                    </button>
-                `;
-                document.getElementById('manageMetricsBtn').classList.remove('hidden');
-                document.getElementById('adminActionHeader').classList.remove('hidden');
+                currentUserToken = await user.getIdToken();
+                document.getElementById('loginSection').classList.add('hidden');
+                document.getElementById('dashboardSection').classList.remove('hidden');
+                fetchMetrics();
+                loadHistory();
             } else {
-                currentAdminToken = null;
-                document.getElementById('adminAuthControl').innerHTML = `
-                    <button onclick="openLoginModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-emerald-500/20 flex items-center gap-2">
-                        🔐 Admin Login
-                    </button>
-                `;
-                document.getElementById('manageMetricsBtn').classList.add('hidden');
-                document.getElementById('adminActionHeader').classList.add('hidden');
+                currentUserToken = null;
+                document.getElementById('loginSection').classList.remove('hidden');
+                document.getElementById('dashboardSection').classList.add('hidden');
             }
-            renderHistoryTable();
         });
 
-        function openLoginModal() {
-            document.getElementById('loginModal').classList.remove('hidden');
-            document.getElementById('loginModal').classList.add('flex');
-        }
-
-        function closeLoginModal() {
-            document.getElementById('loginModal').classList.add('hidden');
-            document.getElementById('loginModal').classList.remove('flex');
-            document.getElementById('loginError').classList.add('hidden');
-        }
-
-        async function handleAdminLogin(e) {
+        async function handleLogin(e) {
             e.preventDefault();
-            const email = document.getElementById('adminEmail').value;
-            const password = document.getElementById('adminPassword').value;
+            const email = document.getElementById('loginEmail').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
             const errDiv = document.getElementById('loginError');
+            const submitBtn = document.getElementById('loginSubmitBtn');
+
+            errDiv.classList.add('hidden');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Authenticating...";
 
             try {
                 await auth.signInWithEmailAndPassword(email, password);
-                closeLoginModal();
-            } catch (error) {
-                errDiv.innerText = error.message;
+            } catch (err) {
+                errDiv.innerText = err.message || "Invalid Email or Password!";
                 errDiv.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Login to Dashboard";
             }
         }
 
-        function handleAdminLogout() {
+        function handleLogout() {
             auth.signOut();
         }
 
@@ -399,9 +392,17 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
+        function getAuthHeaders() {
+            return {
+                'Authorization': 'Bearer ' + currentUserToken,
+                'Content-Type': 'application/json'
+            };
+        }
+
         async function fetchMetrics() {
             try {
-                var res = await fetch("/api/metrics");
+                var res = await fetch("/api/metrics", { headers: getAuthHeaders() });
+                if(res.status === 401 || res.status === 403) return handleLogout();
                 activeMetrics = await res.json();
                 renderMetricsList();
             } catch(e) {
@@ -434,7 +435,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function openMetricModal() {
-            if(!currentAdminToken) return alert("Admin Login required!");
             document.getElementById('metricsModal').classList.remove('hidden');
             document.getElementById('metricsModal').classList.add('flex');
             fetchMetrics();
@@ -466,8 +466,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function saveMetric(e) {
             e.preventDefault();
-            if(!currentAdminToken) return alert("Unauthorized!");
-            
             var id = document.getElementById('metricId').value;
             var payload = {
                 key: document.getElementById('metricKey').value.trim(),
@@ -481,10 +479,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 var res = await fetch(url, {
                     method: method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + currentAdminToken
-                    },
+                    headers: getAuthHeaders(),
                     body: JSON.stringify(payload)
                 });
                 if(!res.ok) {
@@ -499,13 +494,9 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         async function deleteMetric(id) {
-            if(!currentAdminToken) return alert("Unauthorized!");
             if(!confirm("Are you sure you want to delete this metric?")) return;
             try {
-                var res = await fetch(`/api/metrics/${id}`, { 
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + currentAdminToken }
-                });
+                var res = await fetch(`/api/metrics/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
                 if(!res.ok) throw new Error("Failed to delete metric");
                 await fetchMetrics();
             } catch(err) {
@@ -535,7 +526,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
 
             try {
-                var res = await fetch("/api/analyze-batch", { method: "POST", body: formData });
+                var res = await fetch("/api/analyze-batch", { 
+                    method: "POST", 
+                    headers: { 'Authorization': 'Bearer ' + currentUserToken },
+                    body: formData 
+                });
                 var batchData = await res.json();
                 if(!res.ok) throw new Error(batchData.detail || "Server error");
 
@@ -643,7 +638,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
             try {
-                var res = await fetch("/api/history");
+                var res = await fetch("/api/history", { headers: getAuthHeaders() });
                 var list = await res.json();
                 historyDataList = list || [];
                 currentPage = 1;
@@ -674,17 +669,13 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             hTable.innerHTML = "";
             pageItems.forEach(function(item) {
-                var adminCell = currentAdminToken 
-                    ? `<td class="p-2"><button onclick="deleteAuditRecord('${item.id}')" class="text-rose-400 hover:text-rose-300 font-bold">Delete</button></td>`
-                    : '';
-
                 hTable.innerHTML += 
                     '<tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">' +
                         '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
                         '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
                         '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
                         '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
-                        adminCell +
+                        '<td class="p-2 text-right"><button onclick="deleteHistoryDoc(\'' + item.id + '\')" class="text-rose-400 hover:text-rose-300 font-bold">Delete</button></td>' +
                     '</tr>';
             });
 
@@ -693,18 +684,14 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
         }
 
-        async function deleteAuditRecord(docId) {
-            if(!currentAdminToken) return alert("Unauthorized!");
-            if(!confirm("Are you sure you want to delete this cloud audit record?")) return;
+        async function deleteHistoryDoc(id) {
+            if(!confirm("Are you sure you want to delete this audit record?")) return;
             try {
-                var res = await fetch(`/api/admin/audits/${docId}`, {
-                    method: 'DELETE',
-                    headers: { 'Authorization': 'Bearer ' + currentAdminToken }
-                });
+                var res = await fetch(`/api/history/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
                 if(!res.ok) throw new Error("Delete failed");
-                loadHistory();
-            } catch(e) {
-                alert("Error: " + e.message);
+                await loadHistory();
+            } catch(err) {
+                alert("Error: " + err.message);
             }
         }
 
@@ -742,11 +729,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             var element = document.getElementById('batchResultsContainer');
             html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
         }
-
-        window.onload = function() {
-            fetchMetrics();
-            loadHistory();
-        };
     </script>
 </body>
 </html>
@@ -774,10 +756,10 @@ async def serve_ai_page():
         </html>
         """
 
-# ================= Dynamic Metrics Public & Admin APIs =================
+# ================= Dynamic Metrics CRUD APIs (Protected) =================
 
 @app.get("/api/metrics")
-async def get_metrics():
+async def get_metrics(admin: dict = Depends(verify_admin)):
     if not db:
         return DEFAULT_METRICS
     try:
@@ -839,13 +821,6 @@ async def delete_metric(metric_id: str, admin: dict = Depends(verify_admin)):
     db.collection("metrics").document(metric_id).delete()
     return {"status": "success"}
 
-# Admin Delete Cloud Audit Record
-@app.delete("/api/admin/audits/{doc_id}")
-async def delete_audit_record(doc_id: str, admin: dict = Depends(verify_admin)):
-    if not db:
-        raise HTTPException(status_code=500, detail="Database not configured")
-    db.collection("audits").document(doc_id).delete()
-    return {"status": "success"}
 
 # ================= Transcribe & Analyze =================
 
@@ -950,14 +925,14 @@ async def process_single_file_limited(file: UploadFile, active_metrics: List[Dic
         return await process_single_file(file, active_metrics)
 
 @app.post("/api/analyze-batch")
-async def analyze_audio_batch(files: List[UploadFile] = File(...)):
-    active_metrics = await get_metrics()
+async def analyze_audio_batch(files: List[UploadFile] = File(...), admin: dict = Depends(verify_admin)):
+    active_metrics = await get_metrics(admin)
     tasks = [process_single_file_limited(file, active_metrics) for file in files]
     results = await asyncio.gather(*tasks)
     return {"results": results}
 
 @app.get("/api/history")
-async def get_history():
+async def get_history(admin: dict = Depends(verify_admin)):
     if not db:
         return []
     try:
@@ -975,11 +950,21 @@ async def get_history():
                 "created_at": data.get("created_at", "")
             })
         
-        history.sort(key=key_fn if (key_fn := lambda x: x["created_at"]) else None, reverse=True)
+        history.sort(key=lambda x: x["created_at"], reverse=True)
         return history
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
+
+@app.delete("/api/history/{doc_id}")
+async def delete_history(doc_id: str, admin: dict = Depends(verify_admin)):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        db.collection("audits").document(doc_id).delete()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
