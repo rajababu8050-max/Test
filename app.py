@@ -6,13 +6,13 @@ import requests
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Depends, Header
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth
 
 app = FastAPI()
 
@@ -69,20 +69,34 @@ def init_default_metrics():
 
 init_default_metrics()
 
+# Dependency for Admin Verification
+async def verify_admin(authorization: Optional[str] = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Unauthorized: Admin access required.")
+    token = authorization.split("Bearer ")[1]
+    try:
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token
+    except Exception as e:
+        raise HTTPException(status_code=403, detail="Forbidden: Invalid or expired admin token.")
+
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro</title>
+    <title>AI Call Quality Auditor Pro - Admin Portal</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
+        tailwind.config = { darkMode: 'class' }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Firebase Auth Modular SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    
     <style>
         .dark body { background-color: #0f172a; color: #f8fafc; }
         body { background-color: #f8fafc; color: #0f172a; transition: background-color 0.3s, color 0.3s; }
@@ -106,14 +120,18 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <p class="text-sub text-sm">Pharma Metrics Evaluation & Batch Quality Auditing</p>
             </div>
             <div class="flex items-center gap-3 flex-wrap">
-                <!-- AI Quality Score Page Button Link -->
                 <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm shadow-lg shadow-purple-500/30 flex items-center gap-2 transform hover:-translate-y-0.5 transition duration-200 border border-purple-400/30">
                     ✨ AI Quality Score
                 </a>
                 <button onclick="toggleTheme()" class="card-bg border border-slate-600 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow">
                     <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
                 </button>
-                <button onclick="openMetricModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
+                <div id="adminAuthControl">
+                    <button id="adminLoginBtn" onclick="openLoginModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+                        🔐 Admin Login
+                    </button>
+                </div>
+                <button id="manageMetricsBtn" onclick="openMetricModal()" class="hidden bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
                     ⚙️ Manage Metrics
                 </button>
             </div>
@@ -201,10 +219,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date</th>
+                            <th id="adminActionHeader" class="p-2 hidden">Action</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -225,11 +244,35 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     </div>
 
+    <!-- ADMIN LOGIN MODAL -->
+    <div id="loginModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h3 class="text-lg font-bold">🔐 Admin Authentication</h3>
+                <button onclick="closeLoginModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
+            </div>
+            <form id="adminLoginForm" onsubmit="handleAdminLogin(event)" class="space-y-3">
+                <div>
+                    <label class="block text-xs font-semibold text-sub mb-1">Admin Email</label>
+                    <input type="email" id="adminEmail" required placeholder="admin@domain.com" class="w-full inner-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-sub mb-1">Password</label>
+                    <input type="password" id="adminPassword" required placeholder="••••••••" class="w-full inner-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                </div>
+                <div id="loginError" class="text-xs text-rose-400 hidden"></div>
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs py-2 rounded-lg font-bold shadow-lg shadow-emerald-600/20">
+                    Sign In as Administrator
+                </button>
+            </form>
+        </div>
+    </div>
+
     <!-- METRICS MANAGEMENT MODAL -->
     <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-lg font-bold">⚙️ Configure Dynamic Metrics</h3>
+                <h3 class="text-lg font-bold">⚙️ Admin Panel: Dynamic Metrics</h3>
                 <button onclick="closeMetricModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
             </div>
 
@@ -259,21 +302,87 @@ HTML_CONTENT = """<!DOCTYPE html>
             <!-- Metrics List -->
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
-                <div id="metricsListContainer" class="space-y-2">
-                </div>
+                <div id="metricsListContainer" class="space-y-2"></div>
             </div>
         </div>
     </div>
 
     <script>
+        // CLIENT FIREBASE CONFIGURATION (Firebase Console Project Settings se replace karein)
+        const firebaseConfig = {
+            apiKey: "YOUR_FIREBASE_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        var currentAdminToken = null;
         var selectedFiles = [];
         var currentBatchResults = [];
         var historyDataList = [];
         var activeMetrics = [];
         
-        // History Pagination Variables
         var currentPage = 1;
         var itemsPerPage = 10;
+
+        // Firebase Auth State Observer
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentAdminToken = await user.getIdToken();
+                document.getElementById('adminAuthControl').innerHTML = `
+                    <button onclick="handleAdminLogout()" class="bg-rose-600 hover:bg-rose-500 text-white font-medium px-3 py-2 rounded-xl text-xs flex items-center gap-1">
+                        🔴 Logout (${user.email.split('@')[0]})
+                    </button>
+                `;
+                document.getElementById('manageMetricsBtn').classList.remove('hidden');
+                document.getElementById('adminActionHeader').classList.remove('hidden');
+            } else {
+                currentAdminToken = null;
+                document.getElementById('adminAuthControl').innerHTML = `
+                    <button onclick="openLoginModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-emerald-500/20 flex items-center gap-2">
+                        🔐 Admin Login
+                    </button>
+                `;
+                document.getElementById('manageMetricsBtn').classList.add('hidden');
+                document.getElementById('adminActionHeader').classList.add('hidden');
+            }
+            renderHistoryTable();
+        });
+
+        function openLoginModal() {
+            document.getElementById('loginModal').classList.remove('hidden');
+            document.getElementById('loginModal').classList.add('flex');
+        }
+
+        function closeLoginModal() {
+            document.getElementById('loginModal').classList.add('hidden');
+            document.getElementById('loginModal').classList.remove('flex');
+            document.getElementById('loginError').classList.add('hidden');
+        }
+
+        async function handleAdminLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('adminEmail').value;
+            const password = document.getElementById('adminPassword').value;
+            const errDiv = document.getElementById('loginError');
+
+            try {
+                await auth.signInWithEmailAndPassword(email, password);
+                closeLoginModal();
+            } catch (error) {
+                errDiv.innerText = error.message;
+                errDiv.classList.remove('hidden');
+            }
+        }
+
+        function handleAdminLogout() {
+            auth.signOut();
+        }
 
         function toggleTheme() {
             var html = document.documentElement;
@@ -325,6 +434,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function openMetricModal() {
+            if(!currentAdminToken) return alert("Admin Login required!");
             document.getElementById('metricsModal').classList.remove('hidden');
             document.getElementById('metricsModal').classList.add('flex');
             fetchMetrics();
@@ -356,6 +466,8 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function saveMetric(e) {
             e.preventDefault();
+            if(!currentAdminToken) return alert("Unauthorized!");
+            
             var id = document.getElementById('metricId').value;
             var payload = {
                 key: document.getElementById('metricKey').value.trim(),
@@ -369,7 +481,10 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 var res = await fetch(url, {
                     method: method,
-                    headers: {'Content-Type': 'application/json'},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + currentAdminToken
+                    },
                     body: JSON.stringify(payload)
                 });
                 if(!res.ok) {
@@ -384,9 +499,13 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         async function deleteMetric(id) {
+            if(!currentAdminToken) return alert("Unauthorized!");
             if(!confirm("Are you sure you want to delete this metric?")) return;
             try {
-                var res = await fetch(`/api/metrics/${id}`, { method: 'DELETE' });
+                var res = await fetch(`/api/metrics/${id}`, { 
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + currentAdminToken }
+                });
                 if(!res.ok) throw new Error("Failed to delete metric");
                 await fetchMetrics();
             } catch(err) {
@@ -531,14 +650,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                 renderHistoryTable();
             } catch(e) {
                 console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
                 document.getElementById('pageInfoText').innerText = "Page 0 of 0";
                 document.getElementById('prevPageBtn').disabled = true;
                 document.getElementById('nextPageBtn').disabled = true;
@@ -555,18 +674,38 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             hTable.innerHTML = "";
             pageItems.forEach(function(item) {
+                var adminCell = currentAdminToken 
+                    ? `<td class="p-2"><button onclick="deleteAuditRecord('${item.id}')" class="text-rose-400 hover:text-rose-300 font-bold">Delete</button></td>`
+                    : '';
+
                 hTable.innerHTML += 
                     '<tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">' +
                         '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
                         '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
                         '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
                         '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
+                        adminCell +
                     '</tr>';
             });
 
             document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} Items)`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
+        }
+
+        async function deleteAuditRecord(docId) {
+            if(!currentAdminToken) return alert("Unauthorized!");
+            if(!confirm("Are you sure you want to delete this cloud audit record?")) return;
+            try {
+                var res = await fetch(`/api/admin/audits/${docId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': 'Bearer ' + currentAdminToken }
+                });
+                if(!res.ok) throw new Error("Delete failed");
+                loadHistory();
+            } catch(e) {
+                alert("Error: " + e.message);
+            }
         }
 
         function changePage(direction) {
@@ -617,16 +756,12 @@ HTML_CONTENT = """<!DOCTYPE html>
 async def serve_ui():
     return HTML_CONTENT
 
-# ================= AI HTML Route =================
-
 @app.get("/ai.html", response_class=HTMLResponse)
 async def serve_ai_page():
-    # Agar aapke paas local ai.html file padi hui hai:
     if os.path.exists("ai.html"):
         with open("ai.html", "r", encoding="utf-8") as f:
             return f.read()
     else:
-        # Fallback agar file missing ho
         return """
         <!DOCTYPE html>
         <html>
@@ -639,7 +774,7 @@ async def serve_ai_page():
         </html>
         """
 
-# ================= Dynamic Metrics CRUD APIs =================
+# ================= Dynamic Metrics Public & Admin APIs =================
 
 @app.get("/api/metrics")
 async def get_metrics():
@@ -657,7 +792,7 @@ async def get_metrics():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/metrics")
-async def create_metric(payload: Dict[str, str] = Body(...)):
+async def create_metric(payload: Dict[str, str] = Body(...), admin: dict = Depends(verify_admin)):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
@@ -680,7 +815,7 @@ async def create_metric(payload: Dict[str, str] = Body(...)):
     return {"status": "success", "id": doc_ref[1].id}
 
 @app.put("/api/metrics/{metric_id}")
-async def update_metric(metric_id: str, payload: Dict[str, str] = Body(...)):
+async def update_metric(metric_id: str, payload: Dict[str, str] = Body(...), admin: dict = Depends(verify_admin)):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
@@ -697,13 +832,20 @@ async def update_metric(metric_id: str, payload: Dict[str, str] = Body(...)):
     return {"status": "success"}
 
 @app.delete("/api/metrics/{metric_id}")
-async def delete_metric(metric_id: str):
+async def delete_metric(metric_id: str, admin: dict = Depends(verify_admin)):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
     db.collection("metrics").document(metric_id).delete()
     return {"status": "success"}
 
+# Admin Delete Cloud Audit Record
+@app.delete("/api/admin/audits/{doc_id}")
+async def delete_audit_record(doc_id: str, admin: dict = Depends(verify_admin)):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    db.collection("audits").document(doc_id).delete()
+    return {"status": "success"}
 
 # ================= Transcribe & Analyze =================
 
@@ -817,7 +959,6 @@ async def analyze_audio_batch(files: List[UploadFile] = File(...)):
 @app.get("/api/history")
 async def get_history():
     if not db:
-        print("❌ Firebase DB Object is None in /api/history")
         return []
     try:
         docs = db.collection("audits").limit(50).stream()
@@ -825,6 +966,7 @@ async def get_history():
         for doc in docs:
             data = doc.to_dict()
             history.append({
+                "id": doc.id,
                 "filename": data.get("filename", "Unknown"),
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
@@ -833,7 +975,7 @@ async def get_history():
                 "created_at": data.get("created_at", "")
             })
         
-        history.sort(key=lambda x: x["created_at"], reverse=True)
+        history.sort(key=key_fn if (key_fn := lambda x: x["created_at"]) else None, reverse=True)
         return history
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
