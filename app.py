@@ -842,7 +842,3 @@ async def get_history():
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-
-Es code me mujhe firebase authentic admin pannel chahiye
