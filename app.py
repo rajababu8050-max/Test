@@ -325,7 +325,6 @@ HTML_CONTENT = """<!DOCTYPE html>
   appId: "1:788716678382:web:778853207b4fa11e0517ff",
   measurementId: "G-R4R06JN2SK"
 };
-
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
 
