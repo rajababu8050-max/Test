@@ -1,4 +1,4 @@
-import os
+Import os
 import json
 import re
 import asyncio
@@ -6,13 +6,13 @@ import requests
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Depends, Header
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 import firebase_admin
-from firebase_admin import credentials, firestore, auth
+from firebase_admin import credentials, firestore
 
 app = FastAPI()
 
@@ -69,34 +69,20 @@ def init_default_metrics():
 
 init_default_metrics()
 
-# Middleware / Dependency to verify Firebase Auth Token for protected APIs
-async def verify_admin(authorization: Optional[str] = Header(None)):
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Unauthorized: Access Denied. Token missing.")
-    token = authorization.split("Bearer ")[1]
-    try:
-        decoded_token = auth.verify_id_token(token)
-        return decoded_token
-    except Exception as e:
-        raise HTTPException(status_code=403, detail="Forbidden: Invalid or expired Firebase Token.")
-
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro - Admin Portal</title>
+    <title>AI Call Quality Auditor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = { darkMode: 'class' }
+        tailwind.config = {
+            darkMode: 'class',
+        }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
-    <!-- Firebase Auth SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    
     <style>
         .dark body { background-color: #0f172a; color: #f8fafc; }
         body { background-color: #f8fafc; color: #0f172a; transition: background-color 0.3s, color 0.3s; }
@@ -108,42 +94,10 @@ HTML_CONTENT = """<!DOCTYPE html>
         .light .text-sub { color: #64748b; }
     </style>
 </head>
-<body class="min-h-screen font-sans flex flex-col justify-center items-center p-4 md:p-8">
-
-    <!-- 1. FULL PAGE LOGIN SECTION (Shown when NOT logged in) -->
-    <div id="loginSection" class="w-full max-w-md card-bg border border-slate-700 rounded-2xl p-8 space-y-6 shadow-2xl">
-        <div class="text-center space-y-2">
-            <div class="w-14 h-14 bg-gradient-to-tr from-blue-500 to-emerald-400 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg shadow-blue-500/30">
-                🔐
-            </div>
-            <h2 class="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-                Admin Authentication
-            </h2>
-            <p class="text-sub text-xs">Aapko is dashboard ko access karne ke liye login karna hoga.</p>
-        </div>
-
-        <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-4">
-            <div>
-                <label class="block text-xs font-semibold text-sub mb-1">Email Address</label>
-                <input type="email" id="loginEmail" required placeholder="admin@example.com" class="w-full inner-bg border border-slate-600 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-blue-500 transition">
-            </div>
-            <div>
-                <label class="block text-xs font-semibold text-sub mb-1">Password</label>
-                <input type="password" id="loginPassword" required placeholder="••••••••" class="w-full inner-bg border border-slate-600 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-blue-500 transition">
-            </div>
-
-            <div id="loginError" class="bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs p-3 rounded-xl hidden"></div>
-
-            <button type="submit" id="loginSubmitBtn" class="w-full bg-gradient-to-r from-blue-600 to-emerald-600 hover:from-blue-500 hover:to-emerald-500 text-white text-xs font-bold py-3 rounded-xl shadow-lg shadow-blue-500/20 transition transform hover:-translate-y-0.5">
-                Login to Dashboard
-            </button>
-        </form>
-    </div>
-
-    <!-- 2. MAIN DASHBOARD SECTION (Shown ONLY when logged in) -->
-    <div id="dashboardSection" class="w-full max-w-6xl space-y-6 hidden">
+<body class="min-h-screen p-4 md:p-8 font-sans">
+    <div class="max-w-6xl mx-auto space-y-6">
         
-        <!-- Top Header with Dark/Light Toggle, User Info & Logout -->
+        <!-- Top Header with Dark/Light Toggle & Links -->
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -152,6 +106,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <p class="text-sub text-sm">Pharma Metrics Evaluation & Batch Quality Auditing</p>
             </div>
             <div class="flex items-center gap-3 flex-wrap">
+                <!-- AI Quality Score Page Button Link -->
                 <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm shadow-lg shadow-purple-500/30 flex items-center gap-2 transform hover:-translate-y-0.5 transition duration-200 border border-purple-400/30">
                     ✨ AI Quality Score
                 </a>
@@ -160,9 +115,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </button>
                 <button onclick="openMetricModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
                     ⚙️ Manage Metrics
-                </button>
-                <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-rose-500/20 flex items-center gap-2">
-                    🚪 Logout
                 </button>
             </div>
         </div>
@@ -249,11 +201,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date</th>
-                            <th class="p-2 text-right">Action</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -308,75 +259,21 @@ HTML_CONTENT = """<!DOCTYPE html>
             <!-- Metrics List -->
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
-                <div id="metricsListContainer" class="space-y-2"></div>
+                <div id="metricsListContainer" class="space-y-2">
+                </div>
             </div>
         </div>
     </div>
 
     <script>
-        // ⚠️ REPLACE THIS WITH YOUR FIREBASE WEB CONFIG FROM FIREBASE CONSOLE
-        const firebaseConfig = {
-  apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
-  authDomain: "ai-call-quality-auditor-pro.firebaseapp.com",
-  databaseURL: "https://ai-call-quality-auditor-pro-default-rtdb.firebaseio.com",
-  projectId: "ai-call-quality-auditor-pro",
-  storageBucket: "ai-call-quality-auditor-pro.firebasestorage.app",
-  messagingSenderId: "788716678382",
-  appId: "1:788716678382:web:778853207b4fa11e0517ff",
-  measurementId: "G-R4R06JN2SK"
-};
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-
-        var currentUserToken = null;
         var selectedFiles = [];
         var currentBatchResults = [];
         var historyDataList = [];
         var activeMetrics = [];
         
+        // History Pagination Variables
         var currentPage = 1;
         var itemsPerPage = 10;
-
-        // Firebase Auth Listener
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                currentUserToken = await user.getIdToken();
-                document.getElementById('loginSection').classList.add('hidden');
-                document.getElementById('dashboardSection').classList.remove('hidden');
-                fetchMetrics();
-                loadHistory();
-            } else {
-                currentUserToken = null;
-                document.getElementById('loginSection').classList.remove('hidden');
-                document.getElementById('dashboardSection').classList.add('hidden');
-            }
-        });
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const email = document.getElementById('loginEmail').value.trim();
-            const password = document.getElementById('loginPassword').value.trim();
-            const errDiv = document.getElementById('loginError');
-            const submitBtn = document.getElementById('loginSubmitBtn');
-
-            errDiv.classList.add('hidden');
-            submitBtn.disabled = true;
-            submitBtn.innerText = "Authenticating...";
-
-            try {
-                await auth.signInWithEmailAndPassword(email, password);
-            } catch (err) {
-                errDiv.innerText = err.message || "Invalid Email or Password!";
-                errDiv.classList.remove('hidden');
-            } finally {
-                submitBtn.disabled = false;
-                submitBtn.innerText = "Login to Dashboard";
-            }
-        }
-
-        function handleLogout() {
-            auth.signOut();
-        }
 
         function toggleTheme() {
             var html = document.documentElement;
@@ -393,17 +290,9 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        function getAuthHeaders() {
-            return {
-                'Authorization': 'Bearer ' + currentUserToken,
-                'Content-Type': 'application/json'
-            };
-        }
-
         async function fetchMetrics() {
             try {
-                var res = await fetch("/api/metrics", { headers: getAuthHeaders() });
-                if(res.status === 401 || res.status === 403) return handleLogout();
+                var res = await fetch("/api/metrics");
                 activeMetrics = await res.json();
                 renderMetricsList();
             } catch(e) {
@@ -480,7 +369,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 var res = await fetch(url, {
                     method: method,
-                    headers: getAuthHeaders(),
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(payload)
                 });
                 if(!res.ok) {
@@ -497,7 +386,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function deleteMetric(id) {
             if(!confirm("Are you sure you want to delete this metric?")) return;
             try {
-                var res = await fetch(`/api/metrics/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+                var res = await fetch(`/api/metrics/${id}`, { method: 'DELETE' });
                 if(!res.ok) throw new Error("Failed to delete metric");
                 await fetchMetrics();
             } catch(err) {
@@ -527,11 +416,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
 
             try {
-                var res = await fetch("/api/analyze-batch", { 
-                    method: "POST", 
-                    headers: { 'Authorization': 'Bearer ' + currentUserToken },
-                    body: formData 
-                });
+                var res = await fetch("/api/analyze-batch", { method: "POST", body: formData });
                 var batchData = await res.json();
                 if(!res.ok) throw new Error(batchData.detail || "Server error");
 
@@ -639,21 +524,21 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
             try {
-                var res = await fetch("/api/history", { headers: getAuthHeaders() });
+                var res = await fetch("/api/history");
                 var list = await res.json();
                 historyDataList = list || [];
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
                 console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
                 document.getElementById('pageInfoText').innerText = "Page 0 of 0";
                 document.getElementById('prevPageBtn').disabled = true;
                 document.getElementById('nextPageBtn').disabled = true;
@@ -676,24 +561,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
                         '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
                         '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
-                        '<td class="p-2 text-right"><button onclick="deleteHistoryDoc(\'' + item.id + '\')" class="text-rose-400 hover:text-rose-300 font-bold">Delete</button></td>' +
                     '</tr>';
             });
 
             document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} Items)`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
-        }
-
-        async function deleteHistoryDoc(id) {
-            if(!confirm("Are you sure you want to delete this audit record?")) return;
-            try {
-                var res = await fetch(`/api/history/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
-                if(!res.ok) throw new Error("Delete failed");
-                await loadHistory();
-            } catch(err) {
-                alert("Error: " + err.message);
-            }
         }
 
         function changePage(direction) {
@@ -730,6 +603,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             var element = document.getElementById('batchResultsContainer');
             html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
         }
+
+        window.onload = function() {
+            fetchMetrics();
+            loadHistory();
+        };
     </script>
 </body>
 </html>
@@ -739,12 +617,16 @@ HTML_CONTENT = """<!DOCTYPE html>
 async def serve_ui():
     return HTML_CONTENT
 
+# ================= AI HTML Route =================
+
 @app.get("/ai.html", response_class=HTMLResponse)
 async def serve_ai_page():
+    # Agar aapke paas local ai.html file padi hui hai:
     if os.path.exists("ai.html"):
         with open("ai.html", "r", encoding="utf-8") as f:
             return f.read()
     else:
+        # Fallback agar file missing ho
         return """
         <!DOCTYPE html>
         <html>
@@ -757,10 +639,10 @@ async def serve_ai_page():
         </html>
         """
 
-# ================= Dynamic Metrics CRUD APIs (Protected) =================
+# ================= Dynamic Metrics CRUD APIs =================
 
 @app.get("/api/metrics")
-async def get_metrics(admin: dict = Depends(verify_admin)):
+async def get_metrics():
     if not db:
         return DEFAULT_METRICS
     try:
@@ -775,7 +657,7 @@ async def get_metrics(admin: dict = Depends(verify_admin)):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/metrics")
-async def create_metric(payload: Dict[str, str] = Body(...), admin: dict = Depends(verify_admin)):
+async def create_metric(payload: Dict[str, str] = Body(...)):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
@@ -798,7 +680,7 @@ async def create_metric(payload: Dict[str, str] = Body(...), admin: dict = Depen
     return {"status": "success", "id": doc_ref[1].id}
 
 @app.put("/api/metrics/{metric_id}")
-async def update_metric(metric_id: str, payload: Dict[str, str] = Body(...), admin: dict = Depends(verify_admin)):
+async def update_metric(metric_id: str, payload: Dict[str, str] = Body(...)):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
@@ -815,7 +697,7 @@ async def update_metric(metric_id: str, payload: Dict[str, str] = Body(...), adm
     return {"status": "success"}
 
 @app.delete("/api/metrics/{metric_id}")
-async def delete_metric(metric_id: str, admin: dict = Depends(verify_admin)):
+async def delete_metric(metric_id: str):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
@@ -926,15 +808,16 @@ async def process_single_file_limited(file: UploadFile, active_metrics: List[Dic
         return await process_single_file(file, active_metrics)
 
 @app.post("/api/analyze-batch")
-async def analyze_audio_batch(files: List[UploadFile] = File(...), admin: dict = Depends(verify_admin)):
-    active_metrics = await get_metrics(admin)
+async def analyze_audio_batch(files: List[UploadFile] = File(...)):
+    active_metrics = await get_metrics()
     tasks = [process_single_file_limited(file, active_metrics) for file in files]
     results = await asyncio.gather(*tasks)
     return {"results": results}
 
 @app.get("/api/history")
-async def get_history(admin: dict = Depends(verify_admin)):
+async def get_history():
     if not db:
+        print("❌ Firebase DB Object is None in /api/history")
         return []
     try:
         docs = db.collection("audits").limit(50).stream()
@@ -942,7 +825,6 @@ async def get_history(admin: dict = Depends(verify_admin)):
         for doc in docs:
             data = doc.to_dict()
             history.append({
-                "id": doc.id,
                 "filename": data.get("filename", "Unknown"),
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
@@ -957,16 +839,10 @@ async def get_history(admin: dict = Depends(verify_admin)):
         print("❌ Firebase Fetch Error:", str(e))
         return []
 
-@app.delete("/api/history/{doc_id}")
-async def delete_history(doc_id: str, admin: dict = Depends(verify_admin)):
-    if not db:
-        raise HTTPException(status_code=500, detail="Database not configured")
-    try:
-        db.collection("audits").document(doc_id).delete()
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+
+Es code me mujhe firebase authentic admin pannel chahiye
