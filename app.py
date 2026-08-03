@@ -6,13 +6,13 @@ import requests
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Depends, status
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 
 import firebase_admin
-from firebase_admin import credentials, firestore
+from firebase_admin import credentials, firestore, auth
 
 app = FastAPI()
 
@@ -32,7 +32,7 @@ if firebase_json_env:
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred)
         db = firestore.client()
-        print("✅ Firebase Firestore Connected Successfully!")
+        print("✅ Firebase Firestore & Auth Connected Successfully!")
     except Exception as e:
         db = None
         print("❌ Firebase Connection Error:", e)
@@ -69,6 +69,27 @@ def init_default_metrics():
 
 init_default_metrics()
 
+# ================= Authentication Middleware Dependency =================
+
+async def verify_firebase_token(request: Request):
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Unauthorized access. Token missing."
+        )
+    token = auth_header.split("Bearer ")[1]
+    try:
+        decoded_token = auth.verify_id_token(token)
+        return decoded_token
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Unauthorized: Invalid or expired token ({str(e)})"
+        )
+
+# ================= HTML Content with Integrated Admin Auth =================
+
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
@@ -83,6 +104,11 @@ HTML_CONTENT = """<!DOCTYPE html>
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <!-- Firebase Web SDK Integration -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+
     <style>
         .dark body { background-color: #0f172a; color: #f8fafc; }
         body { background-color: #f8fafc; color: #0f172a; transition: background-color 0.3s, color 0.3s; }
@@ -95,7 +121,36 @@ HTML_CONTENT = """<!DOCTYPE html>
     </style>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
-    <div class="max-w-6xl mx-auto space-y-6">
+
+    <!-- ADMIN LOGIN MODAL -->
+    <div id="authModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
+        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl">
+            <div class="text-center space-y-2">
+                <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🔒</div>
+                <h2 class="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                    Admin Portal Access
+                </h2>
+                <p class="text-xs text-sub">Please sign in with your Firebase credentials</p>
+            </div>
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-sub mb-1">Admin Email</label>
+                    <input type="email" id="adminEmail" required placeholder="admin@example.com" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-sub mb-1">Password</label>
+                    <input type="password" id="adminPassword" required placeholder="••••••••" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                </div>
+                <div id="authError" class="text-rose-400 text-xs text-center hidden font-medium"></div>
+                <button type="submit" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-lg shadow-blue-500/20">
+                    Sign In
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN PROTECTED DASHBOARD CONTENT -->
+    <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
         
         <!-- Top Header with Dark/Light Toggle & Links -->
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
@@ -106,7 +161,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <p class="text-sub text-sm">Pharma Metrics Evaluation & Batch Quality Auditing</p>
             </div>
             <div class="flex items-center gap-3 flex-wrap">
-                <!-- AI Quality Score Page Button Link -->
                 <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm shadow-lg shadow-purple-500/30 flex items-center gap-2 transform hover:-translate-y-0.5 transition duration-200 border border-purple-400/30">
                     ✨ AI Quality Score
                 </a>
@@ -115,6 +169,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </button>
                 <button onclick="openMetricModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
                     ⚙️ Manage Metrics
+                </button>
+                <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-lg shadow-rose-600/20">
+                    🚪 Logout
                 </button>
             </div>
         </div>
@@ -233,7 +290,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <button onclick="closeMetricModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
             </div>
 
-            <!-- Create/Edit Form -->
             <form id="metricForm" onsubmit="saveMetric(event)" class="inner-bg p-4 rounded-xl border border-slate-700 space-y-3">
                 <input type="hidden" id="metricId" value="">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -256,24 +312,82 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </form>
 
-            <!-- Metrics List -->
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
-                <div id="metricsListContainer" class="space-y-2">
-                </div>
+                <div id="metricsListContainer" class="space-y-2"></div>
             </div>
         </div>
     </div>
 
     <script>
+        // ⚠️ REPLACE THIS WITH YOUR FIREBASE WEB PROJECT CONFIG ⚠️
+        const firebaseConfig = {
+  apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
+  authDomain: "ai-call-quality-auditor-pro.firebaseapp.com",
+  databaseURL: "https://ai-call-quality-auditor-pro-default-rtdb.firebaseio.com",
+  projectId: "ai-call-quality-auditor-pro",
+  storageBucket: "ai-call-quality-auditor-pro.firebasestorage.app",
+  messagingSenderId: "788716678382",
+  appId: "1:788716678382:web:778853207b4fa11e0517ff",
+  measurementId: "G-R4R06JN2SK"
+};
+
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+
+        var idToken = "";
         var selectedFiles = [];
         var currentBatchResults = [];
         var historyDataList = [];
         var activeMetrics = [];
         
-        // History Pagination Variables
         var currentPage = 1;
         var itemsPerPage = 10;
+
+        // Listen for Authentication State
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                idToken = await user.getIdToken();
+                document.getElementById('authModal').classList.add('hidden');
+                document.getElementById('dashboardContent').classList.remove('hidden');
+                fetchMetrics();
+                loadHistory();
+            } else {
+                idToken = "";
+                document.getElementById('authModal').classList.remove('hidden');
+                document.getElementById('dashboardContent').classList.add('hidden');
+            }
+        });
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('adminEmail').value.trim();
+            const password = document.getElementById('adminPassword').value.trim();
+            const errorDiv = document.getElementById('authError');
+            const loginBtn = document.getElementById('loginBtn');
+            
+            try {
+                errorDiv.classList.add('hidden');
+                loginBtn.innerText = "Signing in...";
+                await auth.signInWithEmailAndPassword(email, password);
+            } catch (error) {
+                errorDiv.innerText = error.message;
+                errorDiv.classList.remove('hidden');
+            } finally {
+                loginBtn.innerText = "Sign In";
+            }
+        }
+
+        function handleLogout() {
+            auth.signOut();
+        }
+
+        // Authenticated Fetch Helper
+        async function fetchAuth(url, options = {}) {
+            if (!options.headers) options.headers = {};
+            options.headers['Authorization'] = 'Bearer ' + idToken;
+            return fetch(url, options);
+        }
 
         function toggleTheme() {
             var html = document.documentElement;
@@ -292,7 +406,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         async function fetchMetrics() {
             try {
-                var res = await fetch("/api/metrics");
+                var res = await fetchAuth("/api/metrics");
                 activeMetrics = await res.json();
                 renderMetricsList();
             } catch(e) {
@@ -367,7 +481,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var method = id ? 'PUT' : 'POST';
 
             try {
-                var res = await fetch(url, {
+                var res = await fetchAuth(url, {
                     method: method,
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(payload)
@@ -386,7 +500,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function deleteMetric(id) {
             if(!confirm("Are you sure you want to delete this metric?")) return;
             try {
-                var res = await fetch(`/api/metrics/${id}`, { method: 'DELETE' });
+                var res = await fetchAuth(`/api/metrics/${id}`, { method: 'DELETE' });
                 if(!res.ok) throw new Error("Failed to delete metric");
                 await fetchMetrics();
             } catch(err) {
@@ -416,7 +530,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
 
             try {
-                var res = await fetch("/api/analyze-batch", { method: "POST", body: formData });
+                var res = await fetchAuth("/api/analyze-batch", { method: "POST", body: formData });
                 var batchData = await res.json();
                 if(!res.ok) throw new Error(batchData.detail || "Server error");
 
@@ -524,7 +638,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
             try {
-                var res = await fetch("/api/history");
+                var res = await fetchAuth("/api/history");
                 var list = await res.json();
                 historyDataList = list || [];
                 currentPage = 1;
@@ -603,11 +717,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             var element = document.getElementById('batchResultsContainer');
             html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
         }
-
-        window.onload = function() {
-            fetchMetrics();
-            loadHistory();
-        };
     </script>
 </body>
 </html>
@@ -621,12 +730,10 @@ async def serve_ui():
 
 @app.get("/ai.html", response_class=HTMLResponse)
 async def serve_ai_page():
-    # Agar aapke paas local ai.html file padi hui hai:
     if os.path.exists("ai.html"):
         with open("ai.html", "r", encoding="utf-8") as f:
             return f.read()
     else:
-        # Fallback agar file missing ho
         return """
         <!DOCTYPE html>
         <html>
@@ -639,10 +746,10 @@ async def serve_ai_page():
         </html>
         """
 
-# ================= Dynamic Metrics CRUD APIs =================
+# ================= Dynamic Metrics CRUD APIs (Protected) =================
 
 @app.get("/api/metrics")
-async def get_metrics():
+async def get_metrics(user: dict = Depends(verify_firebase_token)):
     if not db:
         return DEFAULT_METRICS
     try:
@@ -657,7 +764,10 @@ async def get_metrics():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/metrics")
-async def create_metric(payload: Dict[str, str] = Body(...)):
+async def create_metric(
+    payload: Dict[str, str] = Body(...), 
+    user: dict = Depends(verify_firebase_token)
+):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
@@ -680,7 +790,11 @@ async def create_metric(payload: Dict[str, str] = Body(...)):
     return {"status": "success", "id": doc_ref[1].id}
 
 @app.put("/api/metrics/{metric_id}")
-async def update_metric(metric_id: str, payload: Dict[str, str] = Body(...)):
+async def update_metric(
+    metric_id: str, 
+    payload: Dict[str, str] = Body(...),
+    user: dict = Depends(verify_firebase_token)
+):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
@@ -697,7 +811,10 @@ async def update_metric(metric_id: str, payload: Dict[str, str] = Body(...)):
     return {"status": "success"}
 
 @app.delete("/api/metrics/{metric_id}")
-async def delete_metric(metric_id: str):
+async def delete_metric(
+    metric_id: str,
+    user: dict = Depends(verify_firebase_token)
+):
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
@@ -807,15 +924,26 @@ async def process_single_file_limited(file: UploadFile, active_metrics: List[Dic
     async with semaphore:
         return await process_single_file(file, active_metrics)
 
+# Batch Processing Endpoint (Protected)
 @app.post("/api/analyze-batch")
-async def analyze_audio_batch(files: List[UploadFile] = File(...)):
-    active_metrics = await get_metrics()
+async def analyze_audio_batch(
+    files: List[UploadFile] = File(...),
+    user: dict = Depends(verify_firebase_token)
+):
+    # Fetch metrics internally without requiring authentication context
+    if db:
+        docs = db.collection("metrics").stream()
+        active_metrics = [doc.to_dict() for doc in docs]
+    else:
+        active_metrics = DEFAULT_METRICS
+
     tasks = [process_single_file_limited(file, active_metrics) for file in files]
     results = await asyncio.gather(*tasks)
     return {"results": results}
 
+# History Fetch Endpoint (Protected)
 @app.get("/api/history")
-async def get_history():
+async def get_history(user: dict = Depends(verify_firebase_token)):
     if not db:
         print("❌ Firebase DB Object is None in /api/history")
         return []
