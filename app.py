@@ -359,13 +359,15 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script>
         // ⚠️ REPLACE THIS WITH YOUR FIREBASE WEB PROJECT CONFIG ⚠️
         const firebaseConfig = {
-            apiKey: "YOUR_API_KEY",
-            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-            projectId: "YOUR_PROJECT_ID",
-            storageBucket: "YOUR_PROJECT_ID.appspot.com",
-            messagingSenderId: "SENDER_ID",
-            appId: "APP_ID"
-        };
+  apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
+  authDomain: "ai-call-quality-auditor-pro.firebaseapp.com",
+  databaseURL: "https://ai-call-quality-auditor-pro-default-rtdb.firebaseio.com",
+  projectId: "ai-call-quality-auditor-pro",
+  storageBucket: "ai-call-quality-auditor-pro.firebasestorage.app",
+  messagingSenderId: "788716678382",
+  appId: "1:788716678382:web:778853207b4fa11e0517ff",
+  measurementId: "G-R4R06JN2SK"
+};
 
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
