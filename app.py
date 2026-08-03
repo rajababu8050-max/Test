@@ -88,7 +88,7 @@ async def verify_firebase_token(request: Request):
             detail=f"Unauthorized: Invalid or expired token ({str(e)})"
         )
 
-# ================= HTML Content with Integrated Admin Auth =================
+# ================= HTML Content with History Actions & View Modal =================
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -258,10 +258,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date</th>
+                            <th class="p-2 text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -280,6 +281,42 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
 
+    </div>
+
+    <!-- VIEW AUDIT DETAILS MODAL -->
+    <div id="viewAuditModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                <h3 id="modalFilename" class="text-base font-bold text-blue-400">📁 Audit Details</h3>
+                <button onclick="closeViewModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
+            </div>
+            
+            <div class="flex justify-between items-center bg-slate-800/60 p-3 rounded-xl border border-slate-700">
+                <div>
+                    <span class="text-xs text-sub block">CREATED AT</span>
+                    <span id="modalDate" class="text-xs font-semibold text-slate-300"></span>
+                </div>
+                <div class="text-right">
+                    <span class="text-xs text-sub block">QA SCORE</span>
+                    <span id="modalScore" class="text-lg font-extrabold text-emerald-400"></span>
+                </div>
+            </div>
+
+            <div class="inner-bg p-4 rounded-xl border border-slate-700 space-y-2">
+                <div class="font-bold text-blue-300 text-xs uppercase tracking-wide">Detailed Call Summary</div>
+                <p id="modalSummary" class="text-xs text-sub leading-relaxed"></p>
+            </div>
+
+            <div class="inner-bg p-4 rounded-xl border border-slate-700 space-y-2">
+                <div class="font-bold text-emerald-400 text-xs uppercase tracking-wide border-b border-slate-800 pb-1">Evaluated Dynamic Metrics</div>
+                <div id="modalMetrics" class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs pt-1"></div>
+            </div>
+
+            <details class="inner-bg p-3 rounded-xl border border-slate-700 text-xs">
+                <summary class="font-bold text-sub cursor-pointer">📄 Click to view Diarized Transcript</summary>
+                <div id="modalTranscript" class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800"></div>
+            </details>
+        </div>
     </div>
 
     <!-- METRICS MANAGEMENT MODAL -->
@@ -322,15 +359,13 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script>
         // ⚠️ REPLACE THIS WITH YOUR FIREBASE WEB PROJECT CONFIG ⚠️
         const firebaseConfig = {
-  apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
-  authDomain: "ai-call-quality-auditor-pro.firebaseapp.com",
-  databaseURL: "https://ai-call-quality-auditor-pro-default-rtdb.firebaseio.com",
-  projectId: "ai-call-quality-auditor-pro",
-  storageBucket: "ai-call-quality-auditor-pro.firebasestorage.app",
-  messagingSenderId: "788716678382",
-  appId: "1:788716678382:web:778853207b4fa11e0517ff",
-  measurementId: "G-R4R06JN2SK"
-};
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
+            projectId: "YOUR_PROJECT_ID",
+            storageBucket: "YOUR_PROJECT_ID.appspot.com",
+            messagingSenderId: "SENDER_ID",
+            appId: "APP_ID"
+        };
 
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
@@ -344,7 +379,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         var currentPage = 1;
         var itemsPerPage = 10;
 
-        // Listen for Authentication State
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 idToken = await user.getIdToken();
@@ -382,7 +416,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             auth.signOut();
         }
 
-        // Authenticated Fetch Helper
         async function fetchAuth(url, options = {}) {
             if (!options.headers) options.headers = {};
             options.headers['Authorization'] = 'Bearer ' + idToken;
@@ -645,14 +678,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                 renderHistoryTable();
             } catch(e) {
                 console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
                 document.getElementById('pageInfoText').innerText = "Page 0 of 0";
                 document.getElementById('prevPageBtn').disabled = true;
                 document.getElementById('nextPageBtn').disabled = true;
@@ -675,12 +708,74 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
                         '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
                         '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
+                        '<td class="p-2 text-center flex justify-center gap-2">' +
+                            '<button onclick="viewAudit(\'' + item.id + '\')" class="bg-blue-600/20 hover:bg-blue-600/40 text-blue-400 px-2 py-1 rounded text-[11px] font-bold">👁️ View</button>' +
+                            '<button onclick="deleteAudit(\'' + item.id + '\')" class="bg-rose-600/20 hover:bg-rose-600/40 text-rose-400 px-2 py-1 rounded text-[11px] font-bold">🗑️ Delete</button>' +
+                        '</td>' +
                     '</tr>';
             });
 
             document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} Items)`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
+        }
+
+        function viewAudit(id) {
+            var item = historyDataList.find(x => x.id === id);
+            if (!item) return;
+
+            document.getElementById('modalFilename').innerText = "📁 " + (item.filename || "Audit Details");
+            document.getElementById('modalDate').innerText = item.created_at || "N/A";
+            document.getElementById('modalScore').innerText = (item.score || 0) + "/100";
+            document.getElementById('modalSummary').innerText = item.summary || "No summary available.";
+
+            var metricsHtml = '';
+            var evalMetrics = item.evaluated_metrics || {};
+            
+            if (activeMetrics.length > 0) {
+                activeMetrics.forEach(function(m) {
+                    var isTrue = evalMetrics[m.key] === true;
+                    var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
+                    metricsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}: ${fmt}</div>`;
+                });
+            } else {
+                for (var key in evalMetrics) {
+                    var isTrue = evalMetrics[key] === true;
+                    var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
+                    metricsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${key}: ${fmt}</div>`;
+                }
+            }
+            document.getElementById('modalMetrics').innerHTML = metricsHtml || '<div class="text-sub">No metrics recorded.</div>';
+
+            var transcriptHtml = '';
+            if (item.transcript && item.transcript.length > 0) {
+                item.transcript.forEach(function(t) {
+                    var colorClass = t.speaker === 'Agent' ? 'text-blue-400' : 'text-emerald-400';
+                    transcriptHtml += '<div class="mb-1"><b class="' + colorClass + '">' + t.speaker + ':</b> ' + t.text + '</div>';
+                });
+            } else {
+                transcriptHtml = '<p class="text-sub">Transcript not available for this audit record.</p>';
+            }
+            document.getElementById('modalTranscript').innerHTML = transcriptHtml;
+
+            document.getElementById('viewAuditModal').classList.remove('hidden');
+            document.getElementById('viewAuditModal').classList.add('flex');
+        }
+
+        function closeViewModal() {
+            document.getElementById('viewAuditModal').classList.add('hidden');
+            document.getElementById('viewAuditModal').classList.remove('flex');
+        }
+
+        async function deleteAudit(id) {
+            if(!confirm("Kya aap sach me is audit record ko Firebase se delete karna chahte hain?")) return;
+            try {
+                var res = await fetchAuth(`/api/history/${id}`, { method: 'DELETE' });
+                if(!res.ok) throw new Error("Failed to delete record");
+                await loadHistory();
+            } catch(err) {
+                alert("Error: " + err.message);
+            }
         }
 
         function changePage(direction) {
@@ -908,6 +1003,7 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
                     "score": evaluation.get("overall_score", 0),
                     "summary": evaluation.get("summary", ""),
                     "evaluated_metrics": evaluation.get("evaluated_metrics", {}),
+                    "transcript": transcript,
                     "wpm": metrics.get("wpm", 0),
                     "created_at": created_time
                 }
@@ -930,7 +1026,6 @@ async def analyze_audio_batch(
     files: List[UploadFile] = File(...),
     user: dict = Depends(verify_firebase_token)
 ):
-    # Fetch metrics internally without requiring authentication context
     if db:
         docs = db.collection("metrics").stream()
         active_metrics = [doc.to_dict() for doc in docs]
@@ -953,10 +1048,12 @@ async def get_history(user: dict = Depends(verify_firebase_token)):
         for doc in docs:
             data = doc.to_dict()
             history.append({
+                "id": doc.id,
                 "filename": data.get("filename", "Unknown"),
                 "score": data.get("score", 0),
                 "summary": data.get("summary", ""),
                 "evaluated_metrics": data.get("evaluated_metrics", {}),
+                "transcript": data.get("transcript", []),
                 "wpm": data.get("wpm", 0),
                 "created_at": data.get("created_at", "")
             })
@@ -966,6 +1063,20 @@ async def get_history(user: dict = Depends(verify_firebase_token)):
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
+
+# Delete Audit Record Endpoint (Protected)
+@app.delete("/api/history/{audit_id}")
+async def delete_history_item(
+    audit_id: str,
+    user: dict = Depends(verify_firebase_token)
+):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    try:
+        db.collection("audits").document(audit_id).delete()
+        return {"status": "success", "message": "Audit record deleted successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
