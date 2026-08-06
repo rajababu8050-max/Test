@@ -1042,8 +1042,7 @@ async def evaluate_quality_async(transcript, metrics_list):
 
             except (httpx.TimeoutException, httpx.RequestError):
                 await asyncio.sleep(retry_delay)
-                retry_delay = 0.5
-
+                retry_delay += 2.0
 
     raise Exception("Gemini Rate Limit Exceeded after retries.")
 
