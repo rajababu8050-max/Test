@@ -58,7 +58,7 @@ def get_next_gemini_key():
         return next(key_cycle)
     return ""
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.6-flash"
 
 # Single-worker processing for large 20+ minute audio files
 semaphore = asyncio.Semaphore(1)
