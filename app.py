@@ -44,25 +44,27 @@ else:
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 
-# Multiple Gemini API Keys Rotation Setup
+# ================= Gemini High-Speed API Key Rotation Setup =================
 raw_gemini_keys = os.environ.get("GEMINI_KEYS", os.environ.get("GEMINI_API_KEY", ""))
 GEMINI_KEYS = [k.strip() for k in raw_gemini_keys.split(",") if k.strip()]
 
 if not GEMINI_KEYS:
-    print("⚠️ Warning: No GEMINI_KEYS found in environment variables!")
+    print("⚠️ Warning: No GEMINI_KEYS or GEMINI_API_KEY found in environment variables!")
 
 key_cycle = itertools.cycle(GEMINI_KEYS) if GEMINI_KEYS else None
 
 def get_next_gemini_key():
+    """Rotates Gemini API Keys automatically across requests"""
     if key_cycle:
         return next(key_cycle)
     return ""
 
 GEMINI_MODEL = "gemini-3.6-flash"
 
-# Single-worker processing for large 20+ minute audio files
-semaphore = asyncio.Semaphore(1)
+# Balance concurrency: Process up to 2 files simultaneously
+semaphore = asyncio.Semaphore(2)
 
+# Default metrics to seed in Firestore if empty
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there an opportunity to pitch an upsell or add-on product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent attempt an upsell pitch during the call?"},
@@ -73,6 +75,7 @@ DEFAULT_METRICS = [
 ]
 
 def init_default_metrics():
+    """Seed initial metrics if collection is empty"""
     if db:
         try:
             docs = list(db.collection("metrics").limit(1).stream())
@@ -85,7 +88,7 @@ def init_default_metrics():
 
 init_default_metrics()
 
-# ================= Authentication Middleware Dependency =================
+# ================= Authentication Dependency =================
 
 async def verify_firebase_token(request: Request):
     auth_header = request.headers.get("Authorization")
@@ -111,7 +114,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro</title>
+    <title>AI Call Quality Auditor Pro (Bulk 50+ Audio)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = { darkMode: 'class' }
@@ -119,6 +122,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
+    <!-- Firebase Web SDK Integration -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
 
@@ -162,14 +166,15 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- MAIN DASHBOARD CONTENT -->
+    <!-- MAIN PROTECTED DASHBOARD CONTENT -->
     <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
+        
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
                     AI Call Quality Auditor Pro
                 </h1>
-                <p class="text-sub text-sm">Pharma Metrics Evaluation & Batch Quality Auditing</p>
+                <p class="text-sub text-sm">Pharma Metrics Evaluation & Bulk Batch Quality Auditing</p>
             </div>
             <div class="flex items-center gap-3 flex-wrap">
                 <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm shadow-lg shadow-purple-500/30 flex items-center gap-2 transform hover:-translate-y-0.5 transition duration-200 border border-purple-400/30">
@@ -191,7 +196,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg">
             <div class="space-y-3">
                 <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎙️</div>
-                <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav)</p>
+                <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav, .awb)</p>
                 <input type="file" id="audioInput" accept="audio/*" multiple class="hidden" onchange="fileSelected(event)">
                 
                 <div class="flex justify-center gap-3">
@@ -199,12 +204,19 @@ HTML_CONTENT = """<!DOCTYPE html>
                         Browse Files
                     </button>
                     <button type="button" onclick="uploadAudioBatch()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2 rounded-xl text-sm shadow-lg shadow-blue-500/20">
-                        Start Batch Analysis
+                        🚀 Start Bulk Batch Analysis
                     </button>
                 </div>
             </div>
-            <div id="loader" class="hidden mt-4 text-xs text-blue-400 animate-pulse font-medium">
-                ⏳ Auditing 20+ min long audio, evaluating metrics & generating summary... Please wait...
+            
+            <!-- Progress Bar -->
+            <div id="progressContainer" class="hidden mt-4 space-y-2">
+                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
+                    <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                </div>
+                <div id="loaderText" class="text-xs text-blue-400 font-medium">
+                    ⚡ Auditing speech & evaluating metrics... 0 / 0 Completed
+                </div>
             </div>
         </div>
 
@@ -222,7 +234,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- Summary Table -->
+            <!-- Aggregate Summary Table Box -->
             <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
@@ -293,7 +305,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     </div>
 
-    <!-- METRICS MODAL -->
+    <!-- METRICS MANAGEMENT MODAL -->
     <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
@@ -350,12 +362,13 @@ HTML_CONTENT = """<!DOCTYPE html>
         var currentBatchResults = [];
         var historyDataList = [];
         var activeMetrics = [];
+        
         var currentPage = 1;
         var itemsPerPage = 10;
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
-                idToken = await user.getIdToken();
+                idToken = await user.getIdToken(true);
                 document.getElementById('authModal').classList.add('hidden');
                 document.getElementById('dashboardContent').classList.remove('hidden');
                 fetchMetrics();
@@ -393,7 +406,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function fetchAuth(url, options = {}) {
             if (!options.headers) options.headers = {};
             if (auth.currentUser) {
-                idToken = await auth.currentUser.getIdToken();
+                idToken = await auth.currentUser.getIdToken(true);
             }
             options.headers['Authorization'] = 'Bearer ' + idToken;
             return fetch(url, options);
@@ -525,34 +538,56 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
+        // ================= RATE LIMIT SAFE CHUNKING BATCH UPLOAD FUNCTION =================
         async function uploadAudioBatch() {
-            if(selectedFiles.length === 0) {
+            if (selectedFiles.length === 0) {
                 alert("Pehle audio file(s) select karein!");
                 return;
             }
 
-            document.getElementById('loader').classList.remove('hidden');
-            document.getElementById('batchResultsContainer').classList.add('hidden');
+            document.getElementById('progressContainer').classList.remove('hidden');
+            document.getElementById('batchResultsContainer').classList.remove('hidden');
             
-            var formData = new FormData();
-            selectedFiles.forEach(function(file) {
-                formData.append("files", file);
-            });
+            currentBatchResults = [];
+            const totalFiles = selectedFiles.length;
+            const CHUNK_SIZE = 2; // Process 2 files per batch for safe TPM management
 
-            try {
-                var res = await fetchAuth("/api/analyze-batch", { method: "POST", body: formData });
-                var batchData = await res.json();
-                if(!res.ok) throw new Error(batchData.detail || "Server error");
+            let completedCount = 0;
 
-                currentBatchResults = batchData.results || [];
-                renderBatchResults(currentBatchResults);
-                document.getElementById('batchResultsContainer').classList.remove('hidden');
-                setTimeout(loadHistory, 1000);
-            } catch(err) {
-                alert("Error: " + err.message);
-            } finally {
-                document.getElementById('loader').classList.add('hidden');
+            for (let i = 0; i < totalFiles; i += CHUNK_SIZE) {
+                const chunk = selectedFiles.slice(i, i + CHUNK_SIZE);
+                const formData = new FormData();
+                chunk.forEach(file => formData.append("files", file));
+
+                try {
+                    const res = await fetchAuth("/api/analyze-batch", { method: "POST", body: formData });
+                    const batchData = await res.json();
+
+                    if (res.ok && batchData.results) {
+                        currentBatchResults.push(...batchData.results);
+                        renderBatchResults(currentBatchResults);
+                    } else {
+                        console.error("Chunk Error:", batchData.detail || "Chunk failed");
+                    }
+                } catch (err) {
+                    console.error("Batch processing error:", err);
+                }
+
+                completedCount += chunk.length;
+                const progressPct = Math.round((completedCount / totalFiles) * 100);
+                document.getElementById('progressBar').style.width = progressPct + "%";
+                document.getElementById('loaderText').innerText = `⚡ Auditing speech & evaluating metrics... ${completedCount} / ${totalFiles} Completed (${progressPct}%)`;
+
+                if (i + CHUNK_SIZE < totalFiles) {
+                    await new Promise(resolve => setTimeout(resolve, 800));
+                }
             }
+
+            setTimeout(() => {
+                document.getElementById('progressContainer').classList.add('hidden');
+            }, 2000);
+
+            setTimeout(loadHistory, 1000);
         }
 
         function renderBatchResults(results) {
@@ -645,17 +680,34 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
         }
 
+        // ================= UPDATED SAFE HISTORY LOADING =================
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
             try {
+                if (!auth.currentUser) {
+                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Please sign in again. Session expired.</td></tr>';
+                    return;
+                }
+
+                // Force refresh ID token before history request
+                idToken = await auth.currentUser.getIdToken(true);
                 var res = await fetchAuth("/api/history");
+
+                // If 401 Unauthorized occurs, retry once with fresh token
+                if (res.status === 401) {
+                    idToken = await auth.currentUser.getIdToken(true);
+                    res = await fetchAuth("/api/history");
+                }
+
+                if(!res.ok) throw new Error("HTTP error " + res.status);
+
                 var list = await res.json();
                 historyDataList = list || [];
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
                 console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server. Click Refresh to retry.</td></tr>';
             }
         }
 
@@ -728,6 +780,8 @@ HTML_CONTENT = """<!DOCTYPE html>
             html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
         }
     </script>
+
+    <p class="text-center text-sub text-[10px] mt-4">disclaimer: this is only education and testing purpose</p>
 </body>
 </html>
 """
@@ -750,6 +804,7 @@ async def serve_ai_page():
             <h1>✨ AI Quality Score Page</h1>
             <p>Apni <b>ai.html</b> file ko same folder me rakhein!</p>
             <a href="/" style="color:#38bdf8;">← Back to Home</a>
+            <p>disclaimer: only for education and testing purpose</p>
         </body>
         </html>
         """
@@ -834,8 +889,6 @@ async def delete_metric(
 def transcribe_bytes(audio_bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
     headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
-    
-    # Extended timeout to 600s (10 minutes) for 20+ minute long audio files
     response = requests.post(url, headers=headers, data=audio_bytes, timeout=600)
     if response.status_code != 200:
         raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
@@ -860,7 +913,7 @@ def transcribe_bytes(audio_bytes):
     wpm = int((total_words / duration) * 60) if duration > 0 else 0
     return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
-# ================= 20-Min Audio Safe Gemini Evaluation =================
+# ================= Gemini Evaluation Function (With Rate Limit Backoff) =================
 
 def evaluate_quality(transcript, metrics_list):
     evaluated_metrics_json = {}
@@ -873,8 +926,6 @@ def evaluate_quality(transcript, metrics_list):
         metric_instructions.append(f'- "{m_key}": {m_desc} (boolean)')
 
     metrics_guide = "\n".join(metric_instructions)
-
-    # Clean text transcript representation to optimize token usage for 20+ min audio
     compact_transcript_text = "\n".join([f"{item['speaker']}: {item['text']}" for item in transcript])
 
     prompt = f"""
@@ -883,10 +934,15 @@ def evaluate_quality(transcript, metrics_list):
     Evaluation Rules for Metrics:
     {metrics_guide}
 
+    Scoring Rule:
+    - Base score is 100.
+    - Deduct fixed points consistently for any agent mistakes or missing compliance.
+    - Be completely objective and deterministic in scoring.
+
     Transcript:
     {compact_transcript_text}
 
-    Return JSON strictly matching this schema format ONLY:
+    Return JSON strictly matching this schema format ONLY (No extra text, no markdown block outside json):
     {{
         "overall_score": 85,
         "summary": "Detailed call summary...",
@@ -905,20 +961,19 @@ def evaluate_quality(transcript, metrics_list):
     }
 
     max_retries = 15
-    base_delay = 4
+    retry_delay = 3
 
     for attempt in range(max_retries):
         active_key = get_next_gemini_key()
         if not active_key:
-            raise Exception("No GEMINI_KEYS or GEMINI_API_KEY found.")
+            raise Exception("No GEMINI_KEYS or GEMINI_API_KEY found in environment variables.")
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
         headers = {"Content-Type": "application/json"}
 
-        time.sleep(2.0)
+        time.sleep(1.5)
 
         try:
-            # Extended timeout to 360s (6 minutes) for 20-minute audio transcript processing
             response = requests.post(url, headers=headers, json=payload, timeout=360)
             
             if response.status_code == 200:
@@ -928,18 +983,18 @@ def evaluate_quality(transcript, metrics_list):
                 return json.loads(clean_json)
             
             elif response.status_code in [429, 503, 500]:
-                print(f"⚠️ Gemini API hit Limit/Overload ({response.status_code}). Rotating Key and Retrying in {base_delay}s... (Attempt {attempt + 1}/{max_retries})")
-                time.sleep(base_delay)
-                base_delay += 3
+                print(f"⚠️ Gemini API {response.status_code} Limit/Overload hit. Rotating key & Retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
+                time.sleep(retry_delay)
+                retry_delay += 3
             else:
                 raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
-                
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as conn_err:
-            print(f"⚠️ Connection/Timeout issue: {conn_err}. Retrying in {base_delay}s...")
-            time.sleep(base_delay)
-            base_delay += 3
 
-    raise Exception("Failed to complete Gemini request after maximum retries. Check API key daily quota limits.")
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as conn_err:
+            print(f"⚠️ Connection/Timeout issue: {conn_err}. Retrying in {retry_delay}s...")
+            time.sleep(retry_delay)
+            retry_delay += 3
+
+    raise Exception("Gemini Rate Limit / Quota Exceeded after maximum retries.")
 
 async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
     try:
@@ -972,7 +1027,10 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
 
 async def process_single_file_limited(file: UploadFile, active_metrics: List[Dict]):
     async with semaphore:
+        await asyncio.sleep(0.8)
         return await process_single_file(file, active_metrics)
+
+# ================= Batch Analysis & History APIs =================
 
 @app.post("/api/analyze-batch")
 async def analyze_audio_batch(
@@ -989,6 +1047,7 @@ async def analyze_audio_batch(
     results = await asyncio.gather(*tasks)
     return {"results": results}
 
+# ================= UPDATED SAFE GET HISTORY ENDPOINT =================
 @app.get("/api/history")
 async def get_history(user: dict = Depends(verify_firebase_token)):
     if not db:
@@ -1008,6 +1067,7 @@ async def get_history(user: dict = Depends(verify_firebase_token)):
                     "created_at": data.get("created_at", "")
                 })
         
+        # In-memory sorting to prevent index errors
         history.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
         return history
     except Exception as e:
