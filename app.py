@@ -58,11 +58,10 @@ def get_next_gemini_key():
         return next(key_cycle)
     return ""
 
-# Fixed Model Name to prevent fallback delays
 GEMINI_MODEL = "gemini-3.6-flash"
 
-# Concurrency Semaphore Set to 5 for Bulk Processing Safety
-semaphore = asyncio.Semaphore(5)
+# Safe Semaphore for 10 Concurrent Users: 3 active parallel streams
+semaphore = asyncio.Semaphore(3)
 
 # Default metrics to seed in Firestore if empty
 DEFAULT_METRICS = [
@@ -563,8 +562,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             
             currentBatchResults = [];
             const totalFiles = selectedFiles.length;
-            
-            // Safe chunk size for bulk 100+ files
             const CHUNK_SIZE = 3;
 
             let completedCount = 0;
@@ -592,9 +589,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 const progressPct = Math.round((completedCount / totalFiles) * 100);
                 document.getElementById('progressBar').style.width = progressPct + "%";
                 document.getElementById('loaderText').innerText = `⚡ Auditing speech & evaluating metrics... ${completedCount} / ${totalFiles} Completed (${progressPct}%)`;
-
-                // Safe delay to keep RPM low
-                await new Promise(r => setTimeout(r, 500));
             }
 
             setTimeout(() => {
@@ -947,36 +941,30 @@ async def transcribe_bytes_async(audio_bytes: bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
     headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
     
-    # Retry mechanism for Deepgram
-    for attempt in range(3):
-        async with httpx.AsyncClient(timeout=600.0) as client:
-            response = await client.post(url, headers=headers, content=audio_bytes)
-            if response.status_code == 200:
-                data = response.json()
-                duration = data.get("metadata", {}).get("duration", 1)
-                utterances = data.get("results", {}).get("utterances", [])
-                
-                formatted_transcript = []
-                total_words = 0
-                
-                for u in utterances:
-                    speaker_name = "Agent" if u['speaker'] == 0 else "Customer"
-                    text = u["transcript"].strip()
-                    total_words += len(text.split())
-                    
-                    if formatted_transcript and formatted_transcript[-1]["speaker"] == speaker_name:
-                        formatted_transcript[-1]["text"] += " " + text
-                    else:
-                        formatted_transcript.append({"speaker": speaker_name, "text": text})
-                        
-                wpm = int((total_words / duration) * 60) if duration > 0 else 0
-                return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
-            elif response.status_code in [429, 500, 503]:
-                await asyncio.sleep(1.5)
+    async with httpx.AsyncClient(timeout=600.0) as client:
+        response = await client.post(url, headers=headers, content=audio_bytes)
+        if response.status_code != 200:
+            raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
+            
+        data = response.json()
+        duration = data.get("metadata", {}).get("duration", 1)
+        utterances = data.get("results", {}).get("utterances", [])
+        
+        formatted_transcript = []
+        total_words = 0
+        
+        for u in utterances:
+            speaker_name = "Agent" if u['speaker'] == 0 else "Customer"
+            text = u["transcript"].strip()
+            total_words += len(text.split())
+            
+            if formatted_transcript and formatted_transcript[-1]["speaker"] == speaker_name:
+                formatted_transcript[-1]["text"] += " " + text
             else:
-                raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
+                formatted_transcript.append({"speaker": speaker_name, "text": text})
                 
-    raise Exception("Deepgram API limits exceeded.")
+        wpm = int((total_words / duration) * 60) if duration > 0 else 0
+        return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
 async def evaluate_quality_async(transcript, metrics_list):
     evaluated_metrics_json = {}
@@ -1023,11 +1011,10 @@ async def evaluate_quality_async(transcript, metrics_list):
         }
     }
 
-    # Fast Rotation across all GEMINI_KEYS (14 retries = 2 full cycles for 7 keys)
-    max_retries = 14
-    retry_delay = 0.3
+    max_retries = 10
+    retry_delay = 2.5
 
-    async with httpx.AsyncClient(timeout=120.0) as client:
+    async with httpx.AsyncClient(timeout=360.0) as client:
         for attempt in range(max_retries):
             active_key = get_next_gemini_key()
             if not active_key:
@@ -1045,16 +1032,19 @@ async def evaluate_quality_async(transcript, metrics_list):
                     clean_json = re.sub(r'```(?:json)?\n?', '', raw_text).replace('```', '').strip()
                     return json.loads(clean_json)
                 
-                elif response.status_code in [429, 500, 503, 403]:
-                    # Fast Key Switch on rate limits
+                elif response.status_code in [429, 500, 503]:
                     await asyncio.sleep(retry_delay)
+                    retry_delay += 2.0
+                elif response.status_code == 403:
+                    await asyncio.sleep(1.0)
                 else:
                     raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
 
             except (httpx.TimeoutException, httpx.RequestError):
                 await asyncio.sleep(retry_delay)
+                retry_delay += 2.0
 
-    raise Exception("Gemini Rate Limit Exceeded after retries across keys.")
+    raise Exception("Gemini Rate Limit Exceeded after retries.")
 
 async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
     try:
