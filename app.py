@@ -1,8 +1,10 @@
 import os
 import json
 import re
+import time
 import asyncio
 import requests
+import itertools
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -41,8 +43,22 @@ else:
     print("❌ FIREBASE_CREDENTIALS Environment Variable missing!")
 
 DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
+# Multiple Gemini API Keys Rotation Setup
+raw_gemini_keys = os.environ.get("GEMINI_KEYS", os.environ.get("GEMINI_API_KEY", ""))
+GEMINI_KEYS = [k.strip() for k in raw_gemini_keys.split(",") if k.strip()]
+
+if not GEMINI_KEYS:
+    print("⚠️ Warning: No GEMINI_KEYS found in environment variables!")
+
+key_cycle = itertools.cycle(GEMINI_KEYS) if GEMINI_KEYS else None
+
+def get_next_gemini_key():
+    if key_cycle:
+        return next(key_cycle)
+    return ""
+
+GEMINI_MODEL = "gemini-1.5-pro"
 semaphore = asyncio.Semaphore(2)
 
 # Default metrics to seed in Firestore if empty
@@ -56,7 +72,6 @@ DEFAULT_METRICS = [
 ]
 
 def init_default_metrics():
-    """Seed initial metrics if collection is empty"""
     if db:
         try:
             docs = list(db.collection("metrics").limit(1).stream())
@@ -88,7 +103,7 @@ async def verify_firebase_token(request: Request):
             detail=f"Unauthorized: Invalid or expired token ({str(e)})"
         )
 
-# ================= HTML Content with Integrated Admin Auth =================
+# ================= HTML Content =================
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -98,14 +113,11 @@ HTML_CONTENT = """<!DOCTYPE html>
     <title>AI Call Quality Auditor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-        }
+        tailwind.config = { darkMode: 'class' }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     
-    <!-- Firebase Web SDK Integration -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
 
@@ -149,10 +161,8 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
     </div>
 
-    <!-- MAIN PROTECTED DASHBOARD CONTENT -->
+    <!-- MAIN DASHBOARD CONTENT -->
     <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
-        
-        <!-- Top Header with Dark/Light Toggle & Links -->
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -193,7 +203,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
             <div id="loader" class="hidden mt-4 text-xs text-blue-400 animate-pulse font-medium">
-                ⏳ Auditing speech, analyzing metrics & generating summary... Please wait...
+                ⏳ Auditing long audio speech, evaluating metrics & generating summary... Please wait...
             </div>
         </div>
 
@@ -211,7 +221,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- Aggregate Pharma Upsell Table Box -->
+            <!-- Summary Table -->
             <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
@@ -282,7 +292,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     </div>
 
-    <!-- METRICS MANAGEMENT MODAL -->
+    <!-- METRICS MODAL -->
     <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
@@ -320,17 +330,16 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <script>
-        // ⚠️ REPLACE THIS WITH YOUR FIREBASE WEB PROJECT CONFIG ⚠️
         const firebaseConfig = {
-  apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
-  authDomain: "ai-call-quality-auditor-pro.firebaseapp.com",
-  databaseURL: "https://ai-call-quality-auditor-pro-default-rtdb.firebaseio.com",
-  projectId: "ai-call-quality-auditor-pro",
-  storageBucket: "ai-call-quality-auditor-pro.firebasestorage.app",
-  messagingSenderId: "788716678382",
-  appId: "1:788716678382:web:778853207b4fa11e0517ff",
-  measurementId: "G-R4R06JN2SK"
-};
+          apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
+          authDomain: "ai-call-quality-auditor-pro.firebaseapp.com",
+          databaseURL: "https://ai-call-quality-auditor-pro-default-rtdb.firebaseio.com",
+          projectId: "ai-call-quality-auditor-pro",
+          storageBucket: "ai-call-quality-auditor-pro.firebasestorage.app",
+          messagingSenderId: "788716678382",
+          appId: "1:788716678382:web:778853207b4fa11e0517ff",
+          measurementId: "G-R4R06JN2SK"
+        };
 
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
@@ -340,11 +349,9 @@ HTML_CONTENT = """<!DOCTYPE html>
         var currentBatchResults = [];
         var historyDataList = [];
         var activeMetrics = [];
-        
         var currentPage = 1;
         var itemsPerPage = 10;
 
-        // Listen for Authentication State
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 idToken = await user.getIdToken();
@@ -382,9 +389,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             auth.signOut();
         }
 
-        // Authenticated Fetch Helper
         async function fetchAuth(url, options = {}) {
             if (!options.headers) options.headers = {};
+            if (auth.currentUser) {
+                idToken = await auth.currentUser.getIdToken();
+            }
             options.headers['Authorization'] = 'Bearer ' + idToken;
             return fetch(url, options);
         }
@@ -726,8 +735,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 async def serve_ui():
     return HTML_CONTENT
 
-# ================= AI HTML Route =================
-
 @app.get("/ai.html", response_class=HTMLResponse)
 async def serve_ai_page():
     if os.path.exists("ai.html"):
@@ -776,7 +783,7 @@ async def create_metric(
     description = payload.get("description", "").strip()
 
     if not key or not label or not description:
-        raise HTTPException(status_code=400, detail="All fields (key, label, description) are required.")
+        raise HTTPException(status_code=400, detail="All fields are required.")
 
     existing = db.collection("metrics").where("key", "==", key).get()
     if len(existing) > 0:
@@ -802,7 +809,7 @@ async def update_metric(
     description = payload.get("description", "").strip()
 
     if not label or not description:
-        raise HTTPException(status_code=400, detail="Fields (label, description) are required.")
+        raise HTTPException(status_code=400, detail="Fields label & description are required.")
 
     db.collection("metrics").document(metric_id).update({
         "label": label,
@@ -821,13 +828,12 @@ async def delete_metric(
     db.collection("metrics").document(metric_id).delete()
     return {"status": "success"}
 
-
-# ================= Transcribe & Analyze =================
+# ================= Transcribe & Evaluate Core Logic =================
 
 def transcribe_bytes(audio_bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
     headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
-    response = requests.post(url, headers=headers, data=audio_bytes, timeout=120)
+    response = requests.post(url, headers=headers, data=audio_bytes, timeout=300)
     if response.status_code != 200:
         raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
         
@@ -851,9 +857,9 @@ def transcribe_bytes(audio_bytes):
     wpm = int((total_words / duration) * 60) if duration > 0 else 0
     return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
+# ================= Gemini Evaluation Function (With Retries & Backoff) =================
+
 def evaluate_quality(transcript, metrics_list):
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={GEMINI_API_KEY}"
-    
     evaluated_metrics_json = {}
     metric_instructions = []
 
@@ -884,13 +890,44 @@ def evaluate_quality(transcript, metrics_list):
     }}
     """
 
-    response = requests.post(url, headers={"Content-Type": "application/json"}, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=60)
-    if response.status_code != 200:
-        raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
-    res_data = response.json()
-    gemini_raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
-    clean_json = re.sub(r'```(?:json)?\n?', '', gemini_raw_text).replace('```', '').strip()
-    return json.loads(clean_json)
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.0
+        }
+    }
+
+    max_retries = 5
+    retry_delay = 4
+
+    for attempt in range(max_retries):
+        active_key = get_next_gemini_key()
+        if not active_key:
+            raise Exception("No GEMINI_KEYS or GEMINI_API_KEY found.")
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
+        headers = {"Content-Type": "application/json"}
+
+        response = requests.post(url, headers=headers, json=payload, timeout=180)
+        
+        if response.status_code == 200:
+            res_data = response.json()
+            try:
+                raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
+                clean_json = re.sub(r'```(?:json)?\n?', '', raw_text).replace('```', '').strip()
+                return json.loads(clean_json)
+            except Exception as parse_err:
+                raise Exception(f"Failed to parse Gemini response: {parse_err}")
+        
+        elif response.status_code in [503, 429, 500]:
+            print(f"⚠️ Gemini HTTP {response.status_code} Error on 15-min audio. Retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
+            time.sleep(retry_delay)
+            retry_delay += 3
+        else:
+            raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
+
+    raise Exception("Gemini API failed with 503 Overload after maximum retries. Please retry again.")
 
 async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
     try:
@@ -918,19 +955,18 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
 
         return {"status": "success", "filename": file.filename, "data": {"metrics": metrics, "transcript": transcript, "evaluation": evaluation}}
     except Exception as e:
+        print(f"❌ Error processing {file.filename}: {str(e)}")
         return {"status": "error", "filename": file.filename, "error": str(e)}
 
 async def process_single_file_limited(file: UploadFile, active_metrics: List[Dict]):
     async with semaphore:
         return await process_single_file(file, active_metrics)
 
-# Batch Processing Endpoint (Protected)
 @app.post("/api/analyze-batch")
 async def analyze_audio_batch(
     files: List[UploadFile] = File(...),
     user: dict = Depends(verify_firebase_token)
 ):
-    # Fetch metrics internally without requiring authentication context
     if db:
         docs = db.collection("metrics").stream()
         active_metrics = [doc.to_dict() for doc in docs]
@@ -941,27 +977,26 @@ async def analyze_audio_batch(
     results = await asyncio.gather(*tasks)
     return {"results": results}
 
-# History Fetch Endpoint (Protected)
 @app.get("/api/history")
 async def get_history(user: dict = Depends(verify_firebase_token)):
     if not db:
-        print("❌ Firebase DB Object is None in /api/history")
         return []
     try:
         docs = db.collection("audits").limit(50).stream()
         history = []
         for doc in docs:
             data = doc.to_dict()
-            history.append({
-                "filename": data.get("filename", "Unknown"),
-                "score": data.get("score", 0),
-                "summary": data.get("summary", ""),
-                "evaluated_metrics": data.get("evaluated_metrics", {}),
-                "wpm": data.get("wpm", 0),
-                "created_at": data.get("created_at", "")
-            })
+            if data:
+                history.append({
+                    "filename": data.get("filename", "Unknown"),
+                    "score": data.get("score", 0),
+                    "summary": data.get("summary", ""),
+                    "evaluated_metrics": data.get("evaluated_metrics", {}),
+                    "wpm": data.get("wpm", 0),
+                    "created_at": data.get("created_at", "")
+                })
         
-        history.sort(key=lambda x: x["created_at"], reverse=True)
+        history.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
         return history
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
