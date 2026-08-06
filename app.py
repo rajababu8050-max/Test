@@ -749,16 +749,37 @@ HTML_CONTENT = """<!DOCTYPE html>
             renderHistoryTable();
         }
 
+        // ================= UPDATED COMPLETE EXCEL EXPORT =================
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
+            
+            var exportData = currentBatchResults.map(function(i) {
+                var row = {
+                    "File Name": i.filename,
+                    "QA Score": i.data?.evaluation?.overall_score || 0,
+                    "WPM": i.data?.metrics?.wpm || 0,
+                    "Duration (sec)": Math.round(i.data?.metrics?.duration || 0),
+                    "Total Words": i.data?.metrics?.total_words || 0,
+                    "Summary": i.data?.evaluation?.summary || ""
+                };
+
+                // Add Dynamic Metrics evaluation (YES / NO) to Excel columns
+                var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
+                activeMetrics.forEach(function(m) {
+                    row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
+                });
+
+                // Add Strengths and Improvements
+                row["Strengths"] = (i.data?.evaluation?.strengths || []).join("; ");
+                row["Improvements"] = (i.data?.evaluation?.improvements || []).join("; ");
+
+                return row;
+            });
+
             var workbook = XLSX.utils.book_new();
-            var summarySheet = XLSX.utils.json_to_sheet(currentBatchResults.map(i => ({
-                "File Name": i.filename,
-                "QA Score": i.data?.evaluation?.overall_score || 0,
-                "Summary": i.data?.evaluation?.summary || ""
-            })));
+            var summarySheet = XLSX.utils.json_to_sheet(exportData);
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
-            XLSX.writeFile(workbook, "Call_Audit_Report.xlsx");
+            XLSX.writeFile(workbook, "Detailed_Call_Audit_Report.xlsx");
         }
 
         function exportHistoryExcel() {
