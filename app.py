@@ -60,7 +60,7 @@ def get_next_gemini_key():
     return ""
 
 # Official production-ready Gemini model
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.5-flash"
 
 # Balanced concurrency: Process up to 2 files simultaneously to stay rate-limit safe
 semaphore = asyncio.Semaphore(2)
