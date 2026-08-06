@@ -1197,7 +1197,7 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
         transcript, metrics = await loop.run_in_executor(None, transcribe_bytes, audio_bytes)
         evaluation = await loop.run_in_executor(None, evaluate_quality, transcript, active_metrics)
         
-        # Save exact Indian Standard Time (IST UTC+5:30) timestamp
+        # Exact Indian Standard Time (IST UTC+5:30) timestamp
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         created_time = datetime.now(ist_tz).isoformat()
 
