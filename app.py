@@ -59,9 +59,10 @@ def get_next_gemini_key():
         return next(key_cycle)
     return ""
 
-GEMINI_MODEL = "gemini-3.6-flash"
+# Official production-ready Gemini model
+GEMINI_MODEL = "gemini-1.5-flash"
 
-# Balance concurrency: Process up to 2 files simultaneously
+# Balanced concurrency: Process up to 2 files simultaneously to stay rate-limit safe
 semaphore = asyncio.Semaphore(2)
 
 # Default metrics to seed in Firestore if empty
@@ -550,7 +551,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             
             currentBatchResults = [];
             const totalFiles = selectedFiles.length;
-            const CHUNK_SIZE = 2; // Process 2 files per batch for safe TPM management
+            const CHUNK_SIZE = 2; // Process 2 files per batch for safe management
 
             let completedCount = 0;
 
@@ -689,11 +690,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     return;
                 }
 
-                // Force refresh ID token before history request
                 idToken = await auth.currentUser.getIdToken(true);
                 var res = await fetchAuth("/api/history");
 
-                // If 401 Unauthorized occurs, retry once with fresh token
                 if (res.status === 401) {
                     idToken = await auth.currentUser.getIdToken(true);
                     res = await fetchAuth("/api/history");
@@ -986,6 +985,10 @@ def evaluate_quality(transcript, metrics_list):
                 print(f"⚠️ Gemini API {response.status_code} Limit/Overload hit. Rotating key & Retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
                 time.sleep(retry_delay)
                 retry_delay += 3
+            # Rotate key immediately if 403 Permission Denied or Invalid Key is encountered
+            elif response.status_code == 403:
+                print(f"⚠️ Gemini API 403 Permission Denied / Key issue. Auto-switching to next API Key... (Attempt {attempt + 1}/{max_retries})")
+                time.sleep(1.0)
             else:
                 raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
 
