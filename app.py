@@ -6,7 +6,7 @@ import asyncio
 import requests
 import itertools
 from typing import List, Dict, Any, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Depends, status
 from fastapi.responses import HTMLResponse
@@ -265,8 +265,11 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         <!-- History Table Section -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
+                    <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-blue-500/30">0 Total</span>
+                </div>
                 <div class="flex gap-2">
                     <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1">
                         📊 Export History to Excel
@@ -281,7 +284,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">File</th>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
-                            <th class="p-2">Date</th>
+                            <th class="p-2">Date & Time</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
@@ -425,6 +428,17 @@ HTML_CONTENT = """<!DOCTYPE html>
                 html.classList.add('dark');
                 document.getElementById('themeIcon').innerText = "🌙";
                 document.getElementById('themeText').innerText = "Dark Mode";
+            }
+        }
+
+        function formatDateDisplay(dateStr) {
+            if(!dateStr) return "N/A";
+            try {
+                const date = new Date(dateStr);
+                if(isNaN(date.getTime())) return dateStr;
+                return date.toLocaleString();
+            } catch(e) {
+                return dateStr;
             }
         }
 
@@ -681,7 +695,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
         }
 
-        // ================= UPDATED SAFE HISTORY LOADING =================
+        // ================= UPDATED UNLIMITED HISTORY LOADING =================
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
             try {
@@ -702,6 +716,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 var list = await res.json();
                 historyDataList = list || [];
+                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total";
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
@@ -735,7 +750,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
                         '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
                         '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
-                        '<td class="p-2 text-sub">' + (item.created_at || 'N/A') + '</td>' +
+                        '<td class="p-2 text-sub">' + formatDateDisplay(item.created_at) + '</td>' +
                     '</tr>';
             });
 
@@ -749,7 +764,40 @@ HTML_CONTENT = """<!DOCTYPE html>
             renderHistoryTable();
         }
 
-        // ================= UPDATED COMPLETE EXCEL EXPORT =================
+        // ================= FULL DETAILED HISTORY EXCEL EXPORT =================
+        function exportHistoryExcel() {
+            if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
+
+            var exportData = historyDataList.map(function(item) {
+                var row = {
+                    "File Name": item.filename || "N/A",
+                    "QA Score": item.score || 0,
+                    "WPM": item.wpm || 0,
+                    "Duration (sec)": Math.round(item.duration || 0),
+                    "Total Words": item.total_words || 0,
+                    "Date & Time": formatDateDisplay(item.created_at),
+                    "Summary": item.summary || ""
+                };
+
+                // Add Dynamic Metrics evaluation (YES / NO)
+                var evalMetrics = item.evaluated_metrics || {};
+                activeMetrics.forEach(function(m) {
+                    row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
+                });
+
+                // Add Strengths and Improvements
+                row["Strengths"] = Array.isArray(item.strengths) ? item.strengths.join("; ") : "";
+                row["Improvements"] = Array.isArray(item.improvements) ? item.improvements.join("; ") : "";
+
+                return row;
+            });
+
+            var workbook = XLSX.utils.book_new();
+            var sheet = XLSX.utils.json_to_sheet(exportData);
+            XLSX.utils.book_append_sheet(workbook, sheet, "Cloud Audit History");
+            XLSX.writeFile(workbook, "Complete_Cloud_Audit_History.xlsx");
+        }
+
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
             
@@ -763,13 +811,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Summary": i.data?.evaluation?.summary || ""
                 };
 
-                // Add Dynamic Metrics evaluation (YES / NO) to Excel columns
                 var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
                 activeMetrics.forEach(function(m) {
                     row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
                 });
 
-                // Add Strengths and Improvements
                 row["Strengths"] = (i.data?.evaluation?.strengths || []).join("; ");
                 row["Improvements"] = (i.data?.evaluation?.improvements || []).join("; ");
 
@@ -780,19 +826,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             var summarySheet = XLSX.utils.json_to_sheet(exportData);
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
             XLSX.writeFile(workbook, "Detailed_Call_Audit_Report.xlsx");
-        }
-
-        function exportHistoryExcel() {
-            if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(historyDataList.map(item => ({
-                "File Name": item.filename,
-                "QA Score": item.score,
-                "WPM": item.wpm,
-                "Created At": item.created_at
-            })));
-            XLSX.utils.book_append_sheet(workbook, sheet, "History");
-            XLSX.writeFile(workbook, "Cloud_Audit_History.xlsx");
         }
 
         function downloadPDF() {
@@ -1006,7 +1039,6 @@ def evaluate_quality(transcript, metrics_list):
                 print(f"⚠️ Gemini API {response.status_code} Limit/Overload hit. Rotating key & Retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
                 time.sleep(retry_delay)
                 retry_delay += 3
-            # Rotate key immediately if 403 Permission Denied or Invalid Key is encountered
             elif response.status_code == 403:
                 print(f"⚠️ Gemini API 403 Permission Denied / Key issue. Auto-switching to next API Key... (Attempt {attempt + 1}/{max_retries})")
                 time.sleep(1.0)
@@ -1027,7 +1059,7 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
         transcript, metrics = await loop.run_in_executor(None, transcribe_bytes, audio_bytes)
         evaluation = await loop.run_in_executor(None, evaluate_quality, transcript, active_metrics)
         
-        created_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        created_time = datetime.now(timezone.utc).isoformat()
 
         if db:
             try:
@@ -1036,7 +1068,11 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
                     "score": evaluation.get("overall_score", 0),
                     "summary": evaluation.get("summary", ""),
                     "evaluated_metrics": evaluation.get("evaluated_metrics", {}),
+                    "strengths": evaluation.get("strengths", []),
+                    "improvements": evaluation.get("improvements", []),
                     "wpm": metrics.get("wpm", 0),
+                    "duration": metrics.get("duration", 0),
+                    "total_words": metrics.get("total_words", 0),
                     "created_at": created_time
                 }
                 db.collection("audits").add(audit_data)
@@ -1071,27 +1107,32 @@ async def analyze_audio_batch(
     results = await asyncio.gather(*tasks)
     return {"results": results}
 
-# ================= UPDATED SAFE GET HISTORY ENDPOINT =================
+# ================= UNLIMITED HISTORY ENDPOINT =================
 @app.get("/api/history")
 async def get_history(user: dict = Depends(verify_firebase_token)):
     if not db:
         return []
     try:
-        docs = db.collection("audits").limit(50).stream()
+        # Fetches ALL documents without limit
+        docs = db.collection("audits").stream()
         history = []
         for doc in docs:
             data = doc.to_dict()
             if data:
                 history.append({
+                    "id": doc.id,
                     "filename": data.get("filename", "Unknown"),
                     "score": data.get("score", 0),
                     "summary": data.get("summary", ""),
                     "evaluated_metrics": data.get("evaluated_metrics", {}),
+                    "strengths": data.get("strengths", []),
+                    "improvements": data.get("improvements", []),
                     "wpm": data.get("wpm", 0),
+                    "duration": data.get("duration", 0),
+                    "total_words": data.get("total_words", 0),
                     "created_at": data.get("created_at", "")
                 })
         
-        # In-memory sorting to prevent index errors
         history.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
         return history
     except Exception as e:
