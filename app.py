@@ -59,7 +59,7 @@ def get_next_gemini_key():
         return next(key_cycle)
     return ""
 
-GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_MODEL = "gemini-3.6-flash"
 
 # Balance concurrency: Process up to 2 files simultaneously
 semaphore = asyncio.Semaphore(2)
