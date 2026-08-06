@@ -59,7 +59,7 @@ def get_next_gemini_key():
     return ""
 
 # Fixed Model Name to prevent fallback delays
-GEMINI_MODEL = "gemini-1.5-flash"
+GEMINI_MODEL = "gemini-3.6-flash"
 
 # Concurrency Semaphore Set to 5 for Bulk Processing Safety
 semaphore = asyncio.Semaphore(5)
