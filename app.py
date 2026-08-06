@@ -25,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Firebase Setup
+# ================= Firebase Setup =================
 firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
 
 if firebase_json_env:
@@ -58,10 +58,11 @@ def get_next_gemini_key():
         return next(key_cycle)
     return ""
 
-GEMINI_MODEL = "gemini-1.5-pro"
-semaphore = asyncio.Semaphore(2)
+GEMINI_MODEL = "gemini-2.5-flash"
 
-# Default metrics to seed in Firestore if empty
+# Single-worker processing for large 20+ minute audio files
+semaphore = asyncio.Semaphore(1)
+
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there an opportunity to pitch an upsell or add-on product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent attempt an upsell pitch during the call?"},
@@ -203,7 +204,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
             <div id="loader" class="hidden mt-4 text-xs text-blue-400 animate-pulse font-medium">
-                ⏳ Auditing long audio speech, evaluating metrics & generating summary... Please wait...
+                ⏳ Auditing 20+ min long audio, evaluating metrics & generating summary... Please wait...
             </div>
         </div>
 
@@ -833,7 +834,9 @@ async def delete_metric(
 def transcribe_bytes(audio_bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
     headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
-    response = requests.post(url, headers=headers, data=audio_bytes, timeout=300)
+    
+    # Extended timeout to 600s (10 minutes) for 20+ minute long audio files
+    response = requests.post(url, headers=headers, data=audio_bytes, timeout=600)
     if response.status_code != 200:
         raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
         
@@ -857,7 +860,7 @@ def transcribe_bytes(audio_bytes):
     wpm = int((total_words / duration) * 60) if duration > 0 else 0
     return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
-# ================= Gemini Evaluation Function (With Retries & Backoff) =================
+# ================= 20-Min Audio Safe Gemini Evaluation =================
 
 def evaluate_quality(transcript, metrics_list):
     evaluated_metrics_json = {}
@@ -871,6 +874,9 @@ def evaluate_quality(transcript, metrics_list):
 
     metrics_guide = "\n".join(metric_instructions)
 
+    # Clean text transcript representation to optimize token usage for 20+ min audio
+    compact_transcript_text = "\n".join([f"{item['speaker']}: {item['text']}" for item in transcript])
+
     prompt = f"""
     Analyze the following audio call transcript and evaluate quality score (0-100) and evaluated metrics.
     
@@ -878,7 +884,7 @@ def evaluate_quality(transcript, metrics_list):
     {metrics_guide}
 
     Transcript:
-    {json.dumps(transcript, indent=2)}
+    {compact_transcript_text}
 
     Return JSON strictly matching this schema format ONLY:
     {{
@@ -898,8 +904,8 @@ def evaluate_quality(transcript, metrics_list):
         }
     }
 
-    max_retries = 5
-    retry_delay = 4
+    max_retries = 15
+    base_delay = 4
 
     for attempt in range(max_retries):
         active_key = get_next_gemini_key()
@@ -909,25 +915,31 @@ def evaluate_quality(transcript, metrics_list):
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
         headers = {"Content-Type": "application/json"}
 
-        response = requests.post(url, headers=headers, json=payload, timeout=180)
-        
-        if response.status_code == 200:
-            res_data = response.json()
-            try:
+        time.sleep(2.0)
+
+        try:
+            # Extended timeout to 360s (6 minutes) for 20-minute audio transcript processing
+            response = requests.post(url, headers=headers, json=payload, timeout=360)
+            
+            if response.status_code == 200:
+                res_data = response.json()
                 raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
                 clean_json = re.sub(r'```(?:json)?\n?', '', raw_text).replace('```', '').strip()
                 return json.loads(clean_json)
-            except Exception as parse_err:
-                raise Exception(f"Failed to parse Gemini response: {parse_err}")
-        
-        elif response.status_code in [503, 429, 500]:
-            print(f"⚠️ Gemini HTTP {response.status_code} Error on 15-min audio. Retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
-            time.sleep(retry_delay)
-            retry_delay += 3
-        else:
-            raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
+            
+            elif response.status_code in [429, 503, 500]:
+                print(f"⚠️ Gemini API hit Limit/Overload ({response.status_code}). Rotating Key and Retrying in {base_delay}s... (Attempt {attempt + 1}/{max_retries})")
+                time.sleep(base_delay)
+                base_delay += 3
+            else:
+                raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
+                
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as conn_err:
+            print(f"⚠️ Connection/Timeout issue: {conn_err}. Retrying in {base_delay}s...")
+            time.sleep(base_delay)
+            base_delay += 3
 
-    raise Exception("Gemini API failed with 503 Overload after maximum retries. Please retry again.")
+    raise Exception("Failed to complete Gemini request after maximum retries. Check API key daily quota limits.")
 
 async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
     try:
