@@ -1,5 +1,6 @@
 fastapi
 uvicorn
-requests
+gunicorn
+httpx
 firebase-admin
 python-multipart
