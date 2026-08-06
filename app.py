@@ -1,10 +1,9 @@
 import os
 import json
 import re
-import time
 import asyncio
-import requests
 import itertools
+import httpx
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 
@@ -16,7 +15,7 @@ import uvicorn
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 
-app = FastAPI()
+app = FastAPI(title="AI Call Quality Auditor Pro Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -59,11 +58,10 @@ def get_next_gemini_key():
         return next(key_cycle)
     return ""
 
-# Official production-ready Gemini model
 GEMINI_MODEL = "gemini-3.6-flash"
 
-# Balanced concurrency: Process up to 2 files simultaneously to stay rate-limit safe
-semaphore = asyncio.Semaphore(2)
+# Safe Semaphore for 10 Concurrent Users: 3 active parallel streams
+semaphore = asyncio.Semaphore(3)
 
 # Default metrics to seed in Firestore if empty
 DEFAULT_METRICS = [
@@ -431,7 +429,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        // Exact Indian Time Display Function
         function formatDateDisplay(dateStr) {
             if(!dateStr) return "N/A";
             try {
@@ -554,7 +551,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        // ================= RATE LIMIT SAFE CHUNKING BATCH UPLOAD FUNCTION =================
         async function uploadAudioBatch() {
             if (selectedFiles.length === 0) {
                 alert("Pehle audio file(s) select karein!");
@@ -566,7 +562,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             
             currentBatchResults = [];
             const totalFiles = selectedFiles.length;
-            const CHUNK_SIZE = 2; // Process 2 files per batch for safe management
+            const CHUNK_SIZE = 3;
 
             let completedCount = 0;
 
@@ -593,10 +589,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 const progressPct = Math.round((completedCount / totalFiles) * 100);
                 document.getElementById('progressBar').style.width = progressPct + "%";
                 document.getElementById('loaderText').innerText = `⚡ Auditing speech & evaluating metrics... ${completedCount} / ${totalFiles} Completed (${progressPct}%)`;
-
-                if (i + CHUNK_SIZE < totalFiles) {
-                    await new Promise(resolve => setTimeout(resolve, 800));
-                }
             }
 
             setTimeout(() => {
@@ -696,7 +688,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
         }
 
-        // ================= UNLIMITED HISTORY LOADING =================
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
             try {
@@ -706,18 +697,18 @@ HTML_CONTENT = """<!DOCTYPE html>
                 }
 
                 idToken = await auth.currentUser.getIdToken(true);
-                var res = await fetchAuth("/api/history");
+                var res = await fetchAuth("/api/history?limit=50");
 
                 if (res.status === 401) {
                     idToken = await auth.currentUser.getIdToken(true);
-                    res = await fetchAuth("/api/history");
+                    res = await fetchAuth("/api/history?limit=50");
                 }
 
                 if(!res.ok) throw new Error("HTTP error " + res.status);
 
                 var list = await res.json();
                 historyDataList = list || [];
-                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total";
+                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Loaded";
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
@@ -765,7 +756,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             renderHistoryTable();
         }
 
-        // ================= UPDATED DETAILED EXCEL EXPORT FOR HISTORY =================
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
 
@@ -780,13 +770,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Summary": item.summary || ""
                 };
 
-                // Add Dynamic Metrics evaluation (YES / NO)
                 var evalMetrics = item.evaluated_metrics || {};
                 activeMetrics.forEach(function(m) {
                     row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
                 });
 
-                // Add Strengths and Improvements
                 row["Strengths"] = Array.isArray(item.strengths) ? item.strengths.join("; ") : "";
                 row["Improvements"] = Array.isArray(item.improvements) ? item.improvements.join("; ") : "";
 
@@ -858,7 +846,6 @@ async def serve_ai_page():
             <h1>✨ AI Quality Score Page</h1>
             <p>Apni <b>ai.html</b> file ko same folder me rakhein!</p>
             <a href="/" style="color:#38bdf8;">← Back to Home</a>
-            <p>disclaimer: only for education and testing purpose</p>
         </body>
         </html>
         """
@@ -870,13 +857,16 @@ async def get_metrics(user: dict = Depends(verify_firebase_token)):
     if not db:
         return DEFAULT_METRICS
     try:
-        docs = db.collection("metrics").stream()
-        metrics = []
-        for doc in docs:
-            m = doc.to_dict()
-            m["id"] = doc.id
-            metrics.append(m)
-        return metrics
+        loop = asyncio.get_running_loop()
+        def fetch_metrics_db():
+            docs = db.collection("metrics").stream()
+            metrics = []
+            for doc in docs:
+                m = doc.to_dict()
+                m["id"] = doc.id
+                metrics.append(m)
+            return metrics
+        return await loop.run_in_executor(None, fetch_metrics_db)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -895,16 +885,21 @@ async def create_metric(
     if not key or not label or not description:
         raise HTTPException(status_code=400, detail="All fields are required.")
 
-    existing = db.collection("metrics").where("key", "==", key).get()
-    if len(existing) > 0:
-        raise HTTPException(status_code=400, detail=f"Metric key '{key}' already exists.")
+    loop = asyncio.get_running_loop()
+    def save_to_db():
+        existing = db.collection("metrics").where("key", "==", key).get()
+        if len(existing) > 0:
+            raise HTTPException(status_code=400, detail=f"Metric key '{key}' already exists.")
 
-    doc_ref = db.collection("metrics").add({
-        "key": key,
-        "label": label,
-        "description": description
-    })
-    return {"status": "success", "id": doc_ref[1].id}
+        doc_ref = db.collection("metrics").add({
+            "key": key,
+            "label": label,
+            "description": description
+        })
+        return doc_ref[1].id
+
+    doc_id = await loop.run_in_executor(None, save_to_db)
+    return {"status": "success", "id": doc_id}
 
 @app.put("/api/metrics/{metric_id}")
 async def update_metric(
@@ -921,10 +916,11 @@ async def update_metric(
     if not label or not description:
         raise HTTPException(status_code=400, detail="Fields label & description are required.")
 
-    db.collection("metrics").document(metric_id).update({
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, lambda: db.collection("metrics").document(metric_id).update({
         "label": label,
         "description": description
-    })
+    }))
     return {"status": "success"}
 
 @app.delete("/api/metrics/{metric_id}")
@@ -935,41 +931,42 @@ async def delete_metric(
     if not db:
         raise HTTPException(status_code=500, detail="Database not configured")
     
-    db.collection("metrics").document(metric_id).delete()
+    loop = asyncio.get_running_loop()
+    await loop.run_in_executor(None, lambda: db.collection("metrics").document(metric_id).delete())
     return {"status": "success"}
 
-# ================= Transcribe & Evaluate Core Logic =================
+# ================= Async Transcribe & Evaluate Core Logic =================
 
-def transcribe_bytes(audio_bytes):
+async def transcribe_bytes_async(audio_bytes: bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
     headers = {"Authorization": "Token " + DEEPGRAM_API_KEY, "Content-Type": "audio/mp3"}
-    response = requests.post(url, headers=headers, data=audio_bytes, timeout=600)
-    if response.status_code != 200:
-        raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
-        
-    data = response.json()
-    duration = data.get("metadata", {}).get("duration", 1)
-    utterances = data.get("results", {}).get("utterances", [])
     
-    formatted_transcript = []
-    total_words = 0
-    
-    for u in utterances:
-        speaker_name = "Agent" if u['speaker'] == 0 else "Customer"
-        text = u["transcript"].strip()
-        total_words += len(text.split())
-        
-        if formatted_transcript and formatted_transcript[-1]["speaker"] == speaker_name:
-            formatted_transcript[-1]["text"] += " " + text
-        else:
-            formatted_transcript.append({"speaker": speaker_name, "text": text})
+    async with httpx.AsyncClient(timeout=600.0) as client:
+        response = await client.post(url, headers=headers, content=audio_bytes)
+        if response.status_code != 200:
+            raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
             
-    wpm = int((total_words / duration) * 60) if duration > 0 else 0
-    return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
+        data = response.json()
+        duration = data.get("metadata", {}).get("duration", 1)
+        utterances = data.get("results", {}).get("utterances", [])
+        
+        formatted_transcript = []
+        total_words = 0
+        
+        for u in utterances:
+            speaker_name = "Agent" if u['speaker'] == 0 else "Customer"
+            text = u["transcript"].strip()
+            total_words += len(text.split())
+            
+            if formatted_transcript and formatted_transcript[-1]["speaker"] == speaker_name:
+                formatted_transcript[-1]["text"] += " " + text
+            else:
+                formatted_transcript.append({"speaker": speaker_name, "text": text})
+                
+        wpm = int((total_words / duration) * 60) if duration > 0 else 0
+        return formatted_transcript, {"duration": duration, "total_words": total_words, "wpm": wpm}
 
-# ================= Gemini Evaluation Function (With Rate Limit Backoff) =================
-
-def evaluate_quality(transcript, metrics_list):
+async def evaluate_quality_async(transcript, metrics_list):
     evaluated_metrics_json = {}
     metric_instructions = []
 
@@ -996,7 +993,7 @@ def evaluate_quality(transcript, metrics_list):
     Transcript:
     {compact_transcript_text}
 
-    Return JSON strictly matching this schema format ONLY (No extra text, no markdown block outside json):
+    Return JSON strictly matching this schema format ONLY:
     {{
         "overall_score": 85,
         "summary": "Detailed call summary...",
@@ -1014,53 +1011,47 @@ def evaluate_quality(transcript, metrics_list):
         }
     }
 
-    max_retries = 15
-    retry_delay = 3
+    max_retries = 10
+    retry_delay = 2.5
 
-    for attempt in range(max_retries):
-        active_key = get_next_gemini_key()
-        if not active_key:
-            raise Exception("No GEMINI_KEYS or GEMINI_API_KEY found in environment variables.")
+    async with httpx.AsyncClient(timeout=360.0) as client:
+        for attempt in range(max_retries):
+            active_key = get_next_gemini_key()
+            if not active_key:
+                raise Exception("No GEMINI_KEYS found in environment variables.")
 
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
-        headers = {"Content-Type": "application/json"}
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent?key={active_key}"
+            headers = {"Content-Type": "application/json"}
 
-        time.sleep(1.5)
+            try:
+                response = await client.post(url, headers=headers, json=payload)
+                
+                if response.status_code == 200:
+                    res_data = response.json()
+                    raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
+                    clean_json = re.sub(r'```(?:json)?\n?', '', raw_text).replace('```', '').strip()
+                    return json.loads(clean_json)
+                
+                elif response.status_code in [429, 500, 503]:
+                    await asyncio.sleep(retry_delay)
+                    retry_delay += 2.0
+                elif response.status_code == 403:
+                    await asyncio.sleep(1.0)
+                else:
+                    raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
 
-        try:
-            response = requests.post(url, headers=headers, json=payload, timeout=360)
-            
-            if response.status_code == 200:
-                res_data = response.json()
-                raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
-                clean_json = re.sub(r'```(?:json)?\n?', '', raw_text).replace('```', '').strip()
-                return json.loads(clean_json)
-            
-            elif response.status_code in [429, 503, 500]:
-                print(f"⚠️ Gemini API {response.status_code} Limit/Overload hit. Rotating key & Retrying in {retry_delay}s... (Attempt {attempt + 1}/{max_retries})")
-                time.sleep(retry_delay)
-                retry_delay += 3
-            elif response.status_code == 403:
-                print(f"⚠️ Gemini API 403 Permission Denied / Key issue. Auto-switching to next API Key... (Attempt {attempt + 1}/{max_retries})")
-                time.sleep(1.0)
-            else:
-                raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
+            except (httpx.TimeoutException, httpx.RequestError):
+                await asyncio.sleep(retry_delay)
+                retry_delay += 2.0
 
-        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError) as conn_err:
-            print(f"⚠️ Connection/Timeout issue: {conn_err}. Retrying in {retry_delay}s...")
-            time.sleep(retry_delay)
-            retry_delay += 3
-
-    raise Exception("Gemini Rate Limit / Quota Exceeded after maximum retries.")
+    raise Exception("Gemini Rate Limit Exceeded after retries.")
 
 async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
     try:
         audio_bytes = await file.read()
-        loop = asyncio.get_event_loop()
-        transcript, metrics = await loop.run_in_executor(None, transcribe_bytes, audio_bytes)
-        evaluation = await loop.run_in_executor(None, evaluate_quality, transcript, active_metrics)
+        transcript, metrics = await transcribe_bytes_async(audio_bytes)
+        evaluation = await evaluate_quality_async(transcript, active_metrics)
         
-        # Save exact Indian Standard Time (IST UTC+5:30) timestamp
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         created_time = datetime.now(ist_tz).isoformat()
 
@@ -1078,7 +1069,8 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
                     "total_words": metrics.get("total_words", 0),
                     "created_at": created_time
                 }
-                db.collection("audits").add(audit_data)
+                loop = asyncio.get_running_loop()
+                await loop.run_in_executor(None, lambda: db.collection("audits").add(audit_data))
                 print(f"✅ Document added to Firebase for {file.filename}")
             except Exception as fe:
                 print("❌ Firebase Write Error:", fe)
@@ -1090,7 +1082,6 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
 
 async def process_single_file_limited(file: UploadFile, active_metrics: List[Dict]):
     async with semaphore:
-        await asyncio.sleep(0.8)
         return await process_single_file(file, active_metrics)
 
 # ================= Batch Analysis & History APIs =================
@@ -1101,8 +1092,11 @@ async def analyze_audio_batch(
     user: dict = Depends(verify_firebase_token)
 ):
     if db:
-        docs = db.collection("metrics").stream()
-        active_metrics = [doc.to_dict() for doc in docs]
+        loop = asyncio.get_running_loop()
+        def fetch_metrics_db():
+            docs = db.collection("metrics").stream()
+            return [doc.to_dict() for doc in docs]
+        active_metrics = await loop.run_in_executor(None, fetch_metrics_db)
     else:
         active_metrics = DEFAULT_METRICS
 
@@ -1110,35 +1104,24 @@ async def analyze_audio_batch(
     results = await asyncio.gather(*tasks)
     return {"results": results}
 
-# ================= UNLIMITED GET HISTORY ENDPOINT =================
 @app.get("/api/history")
-async def get_history(user: dict = Depends(verify_firebase_token)):
+async def get_history(limit: int = 50, user: dict = Depends(verify_firebase_token)):
     if not db:
         return []
     try:
-        # Fetches ALL documents without limit
-        docs = db.collection("audits").stream()
-        history = []
-        for doc in docs:
-            data = doc.to_dict()
-            if data:
-                history.append({
-                    "id": doc.id,
-                    "filename": data.get("filename", "Unknown"),
-                    "score": data.get("score", 0),
-                    "summary": data.get("summary", ""),
-                    "evaluated_metrics": data.get("evaluated_metrics", {}),
-                    "strengths": data.get("strengths", []),
-                    "improvements": data.get("improvements", []),
-                    "wpm": data.get("wpm", 0),
-                    "duration": data.get("duration", 0),
-                    "total_words": data.get("total_words", 0),
-                    "created_at": data.get("created_at", "")
-                })
+        loop = asyncio.get_running_loop()
         
-        # In-memory sorting to prevent index errors
-        history.sort(key=lambda x: str(x.get("created_at", "")), reverse=True)
-        return history
+        def fetch_db():
+            docs = db.collection("audits").order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit).stream()
+            history = []
+            for doc in docs:
+                data = doc.to_dict()
+                if data:
+                    data["id"] = doc.id
+                    history.append(data)
+            return history
+
+        return await loop.run_in_executor(None, fetch_db)
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
