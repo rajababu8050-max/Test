@@ -8,7 +8,7 @@ HTML_CONTENT = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mausa Ji - Realistic Money Mindset</title>
+    <title>Mausa Ji - Realistic Money Mindset Pro</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -22,9 +22,9 @@ HTML_CONTENT = """
             overflow: hidden;
             position: relative;
             perspective: 1000px;
+            cursor: pointer;
         }
 
-        /* Ambient Lighting */
         .spotlight {
             position: absolute;
             width: 700px;
@@ -53,7 +53,6 @@ HTML_CONTENT = """
             z-index: 1;
         }
 
-        /* Photorealistic Glass Card */
         .card {
             position: relative;
             z-index: 2;
@@ -88,7 +87,6 @@ HTML_CONTENT = """
             50% { transform: translateY(-8px); }
         }
 
-        /* Metallic Gold Gradient Text */
         .quote {
             font-size: 26px;
             font-weight: 800;
@@ -110,9 +108,27 @@ HTML_CONTENT = """
             letter-spacing: 4px;
             text-transform: uppercase;
         }
+
+        /* Gold Sparkle Explosion Particle */
+        .sparkle {
+            position: absolute;
+            pointer-events: none;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #FFE57F;
+            box-shadow: 0 0 10px #D4AF37, 0 0 20px #FFF;
+            z-index: 99;
+            animation: burst 0.8s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+        }
+
+        @keyframes burst {
+            0% { opacity: 1; transform: translate(0, 0) scale(1); }
+            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); }
+        }
     </style>
 </head>
-<body>
+<body onclick="triggerEffects(event)">
 
     <div class="spotlight"></div>
     <canvas id="moneyCanvas"></canvas>
@@ -124,7 +140,71 @@ HTML_CONTENT = """
     </div>
 
     <script>
-        // Realistic Physics-based Rain Animation
+        // Web Audio API for Crisp Cash Register / Coin Sound Effect
+        let audioCtx;
+        function playCoinSound() {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+            
+            const now = audioCtx.currentTime;
+            
+            // High metallic chime
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(2400, now);
+            osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
+            gain1.gain.setValueAtTime(0.15, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+            
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.15);
+
+            // Secondary resonance chime
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(3200, now + 0.05);
+            osc2.frequency.exponentialRampToValueAtTime(1600, now + 0.2);
+            gain2.gain.setValueAtTime(0.1, now + 0.05);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.start(now + 0.05);
+            osc2.stop(now + 0.2);
+        }
+
+        // Tap Sparkle Particles & Sound Trigger
+        function triggerEffects(e) {
+            playCoinSound();
+
+            for (let k = 0; k < 18; k++) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkle.style.left = e.clientX + 'px';
+                sparkle.style.top = e.clientY + 'px';
+
+                const angle = Math.random() * Math.PI * 2;
+                const dist = Math.random() * 120 + 30;
+                const dx = Math.cos(angle) * dist + 'px';
+                const dy = Math.sin(angle) * dist + 'px';
+
+                sparkle.style.setProperty('--dx', dx);
+                sparkle.style.setProperty('--dy', dy);
+
+                document.body.appendChild(sparkle);
+                setTimeout(() => sparkle.remove(), 800);
+            }
+        }
+
+        // Realistic Background Rain Animation
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -189,7 +269,11 @@ HTML_CONTENT = """
                 i++; setTimeout(type, 45);
             } else if(j < a.length) {
                 document.getElementById('authorText').innerHTML += a[j];
-                j++; setTimeout(type, 65);
+                j++; 
+                setTimeout(type, 65);
+                if (j === a.length) {
+                    setTimeout(playCoinSound, 200);
+                }
             }
         }
         setTimeout(type, 300);
