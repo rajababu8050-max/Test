@@ -23,6 +23,7 @@ HTML_CONTENT = """
             position: relative;
             perspective: 1000px;
             cursor: pointer;
+            user-select: none;
         }
 
         .spotlight {
@@ -109,7 +110,6 @@ HTML_CONTENT = """
             text-transform: uppercase;
         }
 
-        /* Gold Sparkle Explosion Particle */
         .sparkle {
             position: absolute;
             pointer-events: none;
@@ -128,7 +128,7 @@ HTML_CONTENT = """
         }
     </style>
 </head>
-<body onclick="triggerEffects(event)">
+<body onclick="handleScreenTap(event)">
 
     <div class="spotlight"></div>
     <canvas id="moneyCanvas"></canvas>
@@ -139,52 +139,18 @@ HTML_CONTENT = """
         <div class="author" id="authorText"></div>
     </div>
 
+    <!-- Farzi "Paisa Hai Toh" Track Source -->
+    <audio id="bgMusic" loop preload="auto">
+        <source src="https://cdnsongs.com/music/data/Hindi_Movies/202301/Farzi/128/Paisa_Hai_Toh_1.mp3" type="audio/mpeg">
+    </audio>
+
     <script>
-        // Web Audio API for Crisp Cash Register / Coin Sound Effect
-        let audioCtx;
-        function playCoinSound() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioCtx.state === 'suspended') {
-                audioCtx.resume();
-            }
-            
-            const now = audioCtx.currentTime;
-            
-            // High metallic chime
-            const osc1 = audioCtx.createOscillator();
-            const gain1 = audioCtx.createGain();
-            osc1.type = 'sine';
-            osc1.frequency.setValueAtTime(2400, now);
-            osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.15);
-            gain1.gain.setValueAtTime(0.15, now);
-            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-            
-            osc1.connect(gain1);
-            gain1.connect(audioCtx.destination);
-            osc1.start(now);
-            osc1.stop(now + 0.15);
+        const bgAudio = document.getElementById('bgMusic');
+        let isMusicPlaying = false;
 
-            // Secondary resonance chime
-            const osc2 = audioCtx.createOscillator();
-            const gain2 = audioCtx.createGain();
-            osc2.type = 'triangle';
-            osc2.frequency.setValueAtTime(3200, now + 0.05);
-            osc2.frequency.exponentialRampToValueAtTime(1600, now + 0.2);
-            gain2.gain.setValueAtTime(0.1, now + 0.05);
-            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-
-            osc2.connect(gain2);
-            gain2.connect(audioCtx.destination);
-            osc2.start(now + 0.05);
-            osc2.stop(now + 0.2);
-        }
-
-        // Tap Sparkle Particles & Sound Trigger
-        function triggerEffects(e) {
-            playCoinSound();
-
+        // Screen Tap Toggle Play/Pause & Sparkle Effects
+        function handleScreenTap(e) {
+            // Gold Sparkles Burst
             for (let k = 0; k < 18; k++) {
                 const sparkle = document.createElement('div');
                 sparkle.className = 'sparkle';
@@ -202,9 +168,19 @@ HTML_CONTENT = """
                 document.body.appendChild(sparkle);
                 setTimeout(() => sparkle.remove(), 800);
             }
+
+            // Audio Toggle Logic
+            if (isMusicPlaying) {
+                bgAudio.pause();
+                isMusicPlaying = false;
+            } else {
+                bgAudio.play().then(() => {
+                    isMusicPlaying = true;
+                }).catch(err => console.log("User touch required"));
+            }
         }
 
-        // Realistic Background Rain Animation
+        // Realistic Rain Animation
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -269,11 +245,7 @@ HTML_CONTENT = """
                 i++; setTimeout(type, 45);
             } else if(j < a.length) {
                 document.getElementById('authorText').innerHTML += a[j];
-                j++; 
-                setTimeout(type, 65);
-                if (j === a.length) {
-                    setTimeout(playCoinSound, 200);
-                }
+                j++; setTimeout(type, 65);
             }
         }
         setTimeout(type, 300);
