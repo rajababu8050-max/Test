@@ -8,38 +8,24 @@ HTML_CONTENT = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mausa Ji - Money Mindset Pro</title>
+    <title>Mausa Ji - Cinematic Money Mindset</title>
+    <!-- Three.js Library for Cinematic 3D Graphics -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            background: radial-gradient(circle at center, #0f2310 0%, #030803 100%);
+            background: #020503;
             height: 100vh;
             display: flex;
-            flex-direction: column;
             justify-content: center;
             align-items: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
             overflow: hidden;
             position: relative;
             perspective: 1000px;
         }
 
-        .wealth-counter {
-            position: absolute;
-            top: 25px;
-            z-index: 10;
-            font-size: 20px;
-            font-weight: 900;
-            color: #ffd700;
-            background: rgba(0, 0, 0, 0.6);
-            padding: 10px 25px;
-            border-radius: 50px;
-            border: 1px solid #ffd700;
-            box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
-            letter-spacing: 1.5px;
-        }
-
-        #moneyCanvas {
+        #webgl-bg {
             position: absolute;
             top: 0;
             left: 0;
@@ -48,40 +34,59 @@ HTML_CONTENT = """
             z-index: 1;
         }
 
+        /* Top Wealth Bar */
+        .wealth-counter {
+            position: absolute;
+            top: 20px;
+            z-index: 10;
+            font-size: 18px;
+            font-weight: 900;
+            color: #ffd700;
+            background: rgba(0, 20, 10, 0.6);
+            padding: 10px 25px;
+            border-radius: 50px;
+            border: 1px solid rgba(255, 215, 0, 0.6);
+            box-shadow: 0 0 25px rgba(255, 215, 0, 0.3);
+            letter-spacing: 2px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Hologram Glass Card */
         .card {
             position: relative;
             z-index: 2;
-            background: rgba(5, 20, 10, 0.85);
-            border: 2px solid #00ff88;
-            box-shadow: 0 0 35px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.3);
-            padding: 45px 30px;
-            border-radius: 25px;
+            background: rgba(5, 15, 10, 0.65);
+            border: 1px solid rgba(0, 255, 136, 0.5);
+            box-shadow: 0 0 50px rgba(0, 255, 136, 0.25), inset 0 0 30px rgba(255, 215, 0, 0.15);
+            padding: 50px 35px;
+            border-radius: 20px;
             text-align: center;
-            max-width: 600px;
+            max-width: 650px;
             width: 90%;
-            backdrop-filter: blur(12px);
-            transition: transform 0.1s ease-out;
+            backdrop-filter: blur(16px);
             transform-style: preserve-3d;
+            transition: transform 0.1s ease-out;
         }
 
         .icon-header {
-            font-size: 45px;
-            margin-bottom: 15px;
-            animation: bounce 1.5s infinite;
+            font-size: 50px;
+            margin-bottom: 20px;
+            filter: drop-shadow(0 0 15px #ffd700);
+            animation: floatIcon 3s ease-in-out infinite;
         }
 
-        @keyframes bounce {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.15); }
+        @keyframes floatIcon {
+            0%, 100% { transform: translateY(0px) scale(1); }
+            50% { transform: translateY(-8px) scale(1.05); }
         }
 
         .quote {
-            font-size: 24px;
+            font-size: 26px;
             font-weight: 900;
-            background: linear-gradient(135deg, #ffd700 0%, #00ff88 100%);
+            background: linear-gradient(135deg, #fff 0%, #ffd700 50%, #00ff88 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            filter: drop-shadow(0 0 12px rgba(255, 215, 0, 0.4));
             margin-bottom: 20px;
             line-height: 1.4;
             min-height: 75px;
@@ -90,31 +95,19 @@ HTML_CONTENT = """
         .author {
             font-size: 18px;
             font-weight: 800;
-            color: #ffffff;
-            text-shadow: 0 0 10px #00ff88;
-            letter-spacing: 3px;
+            color: #00ff88;
+            text-shadow: 0 0 15px #00ff88;
+            letter-spacing: 4px;
             text-transform: uppercase;
-        }
-
-        .particle {
-            position: absolute;
-            pointer-events: none;
-            font-size: 24px;
-            z-index: 99;
-            animation: pop 0.8s ease-out forwards;
-        }
-
-        @keyframes pop {
-            0% { opacity: 1; transform: translate(0, 0) scale(1); }
-            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.8); }
         }
     </style>
 </head>
 <body>
 
-    <div class="wealth-counter">WEALTH: <span id="counter">$1,000,000</span></div>
+    <div class="wealth-counter">NET WORTH: <span id="counter">$1,000,000</span></div>
 
-    <canvas id="moneyCanvas"></canvas>
+    <!-- WebGL Background Canvas -->
+    <canvas id="webgl-bg"></canvas>
 
     <div class="card" id="tiltCard">
         <div class="icon-header">🤑 💰 💵</div>
@@ -123,14 +116,75 @@ HTML_CONTENT = """
     </div>
 
     <script>
-        // Live Wealth Counter
-        let count = 1000000;
-        setInterval(() => {
-            count += Math.floor(Math.random() * 500) + 100;
-            document.getElementById('counter').innerText = '$' + count.toLocaleString();
-        }, 100);
+        // 1. Three.js Cinematic 3D Graphics Setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('webgl-bg'), antialias: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
 
-        // Single Original Quote
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+
+        const pointLight = new THREE.PointLight(0xffd700, 2, 100);
+        pointLight.position.set(0, 0, 10);
+        scene.add(pointLight);
+
+        // 3D Gold Coins Creation
+        const coins = [];
+        const coinGeometry = new THREE.CylinderGeometry(0.6, 0.6, 0.1, 32);
+        const coinMaterial = new THREE.MeshStandardMaterial({
+            color: 0xffd700,
+            metalness: 0.9,
+            roughness: 0.1
+        });
+
+        for (let k = 0; k < 70; k++) {
+            const coin = new THREE.Mesh(coinGeometry, coinMaterial);
+            coin.position.set(
+                (Math.random() - 0.5) * 30,
+                (Math.random() - 0.5) * 30,
+                (Math.random() - 0.5) * 20
+            );
+            coin.rotation.x = Math.random() * Math.PI;
+            coin.rotation.y = Math.random() * Math.PI;
+            coin.rotSpeedX = (Math.random() - 0.5) * 0.03;
+            coin.rotSpeedY = (Math.random() - 0.5) * 0.03;
+            coin.fallSpeed = Math.random() * 0.05 + 0.02;
+            coins.push(coin);
+            scene.add(coin);
+        }
+
+        camera.position.z = 12;
+
+        // Render Loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            coins.forEach(coin => {
+                coin.rotation.x += coin.rotSpeedX;
+                coin.rotation.y += coin.rotSpeedY;
+                coin.position.y -= coin.fallSpeed;
+
+                if (coin.position.y < -15) {
+                    coin.position.y = 15;
+                    coin.position.x = (Math.random() - 0.5) * 30;
+                }
+            });
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // 2. Typing Effect
         const q = "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.";
         const a = "— BY MAUSA JI";
         let i = 0, j = 0;
@@ -146,61 +200,18 @@ HTML_CONTENT = """
         }
         setTimeout(type, 300);
 
-        // Money Rain Effect
-        const canvas = document.getElementById('moneyCanvas');
-        const ctx = canvas.getContext('2d');
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.onresize = resize; resize();
+        // 3. Live Wealth Counter
+        let count = 1000000;
+        setInterval(() => {
+            count += Math.floor(Math.random() * 500) + 100;
+            document.getElementById('counter').innerText = '$' + count.toLocaleString();
+        }, 80);
 
-        const currencies = ['$', '₹', '€', '£', '¥', '💰', '💵', '🤑', '💎'];
-        const drops = Array.from({length: 60}, () => ({
-            x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height - canvas.height,
-            speed: Math.random() * 3 + 2,
-            symbol: currencies[Math.floor(Math.random() * currencies.length)],
-            size: Math.random() * 20 + 16
-        }));
-
-        function drawMoney() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drops.forEach(d => {
-                ctx.font = `${d.size}px sans-serif`;
-                ctx.fillStyle = '#00ff88';
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = '#00ff88';
-                ctx.fillText(d.symbol, d.x, d.y);
-                d.y += d.speed;
-                if(d.y > canvas.height) {
-                    d.y = -30;
-                    d.x = Math.random() * canvas.width;
-                }
-            });
-            requestAnimationFrame(drawMoney);
-        }
-        drawMoney();
-
-        // Click Burst Effect
-        window.addEventListener('click', (e) => {
-            for(let k = 0; k < 12; k++) {
-                const p = document.createElement('div');
-                p.className = 'particle';
-                p.innerText = currencies[Math.floor(Math.random() * currencies.length)];
-                p.style.left = e.clientX + 'px';
-                p.style.top = e.clientY + 'px';
-                const dx = (Math.random() - 0.5) * 300 + 'px';
-                const dy = (Math.random() - 0.5) * 300 + 'px';
-                p.style.setProperty('--dx', dx);
-                p.style.setProperty('--dy', dy);
-                document.body.appendChild(p);
-                setTimeout(() => p.remove(), 800);
-            }
-        });
-
-        // 3D Card Tilt Effect
+        // 4. Smooth 3D Card Tilt Effect
         const card = document.getElementById('tiltCard');
         window.addEventListener('mousemove', (e) => {
-            const x = (window.innerWidth / 2 - e.clientX) / 20;
-            const y = (window.innerHeight / 2 - e.clientY) / 20;
+            const x = (window.innerWidth / 2 - e.clientX) / 25;
+            const y = (window.innerHeight / 2 - e.clientY) / 25;
             card.style.transform = `rotateY(${-x}deg) rotateX(${y}deg)`;
         });
     </script>
