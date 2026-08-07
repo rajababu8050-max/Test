@@ -3,7 +3,6 @@ from flask import Flask, send_from_directory
 
 app = Flask(__name__)
 
-# Main folder me rakhi audio file ka naam
 AUDIO_FILENAME = "song.mp3"
 
 HTML_CONTENT = """
@@ -74,7 +73,6 @@ HTML_CONTENT = """
             transition: transform 0.2s ease-out;
         }
 
-        /* Continuous Moving Class - Applied after typing completes */
         .card-moving {
             animation: floatAndRotate 4s ease-in-out infinite alternate !important;
         }
@@ -97,7 +95,7 @@ HTML_CONTENT = """
         .icon-header {
             font-size: 60px;
             margin-bottom: 25px;
-            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5));
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.8));
             animation: bounce 3s ease-in-out infinite;
         }
 
@@ -106,25 +104,43 @@ HTML_CONTENT = """
             50% { transform: translateY(-12px); }
         }
 
+        /* REALISTIC 3D GOLDEN TEXT */
         .quote {
-            font-size: 28px;
+            font-size: 30px;
             font-weight: 900;
-            background: linear-gradient(180deg, #FFFFFF 0%, #FFE57F 40%, #D4AF37 70%, #AA7C11 100%);
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFE57F 30%, #D4AF37 70%, #8A6400 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             margin-bottom: 30px;
-            line-height: 1.3;
+            line-height: 1.35;
             min-height: 80px;
-            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            
+            /* Multi-layer 3D Extrusion Shadow Effect */
+            filter: 
+                drop-shadow(1px 1px 0px #b8860b)
+                drop-shadow(2px 2px 0px #8b6508)
+                drop-shadow(3px 3px 0px #5c4305)
+                drop-shadow(4px 4px 2px rgba(0, 0, 0, 0.8))
+                drop-shadow(0px 0px 15px rgba(255, 215, 0, 0.6));
+            letter-spacing: 1px;
         }
 
+        /* REALISTIC 3D NEON AUTHOR TEXT */
         .author {
-            font-size: 20px;
+            font-size: 21px;
             font-weight: 900;
-            color: #50E3C2;
-            text-shadow: 0 0 15px rgba(80, 227, 194, 0.8);
+            color: #00ff88;
             letter-spacing: 5px;
             text-transform: uppercase;
+            
+            /* 3D Depth & Neon Ambient Emission */
+            text-shadow: 
+                0px 1px 0px #00a859,
+                0px 2px 0px #00753e,
+                0px 3px 0px #004223,
+                0px 4px 10px rgba(0, 0, 0, 0.9),
+                0px 0px 15px #00ff88,
+                0px 0px 30px rgba(0, 255, 136, 0.8);
         }
 
         .sparkle {
@@ -155,7 +171,6 @@ HTML_CONTENT = """
         <div class="author" id="authorText"></div>
     </div>
 
-    <!-- Flask Local Audio Route -->
     <audio id="bgMusic" loop preload="auto">
         <source src="/audio" type="audio/mpeg">
     </audio>
@@ -165,7 +180,6 @@ HTML_CONTENT = """
         let isMusicPlaying = false;
 
         function handleScreenTap(e) {
-            // Gold Sparkles Burst
             for (let k = 0; k < 20; k++) {
                 const sparkle = document.createElement('div');
                 sparkle.className = 'sparkle';
@@ -179,16 +193,14 @@ HTML_CONTENT = """
                 setTimeout(() => sparkle.remove(), 600);
             }
 
-            // Audio Toggle
             if (isMusicPlaying) {
                 bgAudio.pause();
                 isMusicPlaying = false;
             } else {
-                bgAudio.play().then(() => isMusicPlaying = true).catch(e => console.log("User tap required for audio"));
+                bgAudio.play().then(() => isMusicPlaying = true).catch(e => console.log("User tap required"));
             }
         }
 
-        // Fast Money Rain
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -199,7 +211,7 @@ HTML_CONTENT = """
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
             size: Math.random() * 20 + 16,
-            speedY: Math.random() * 8.0 + 5.0, // Fast speed
+            speedY: Math.random() * 8.0 + 5.0,
             symbol: symbols[Math.floor(Math.random() * symbols.length)]
         }));
 
@@ -218,7 +230,6 @@ HTML_CONTENT = """
         }
         drawParticles();
 
-        // Standard Smooth Typing Effect
         const q = "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.";
         const a = "— BY MAUSA JI";
         let i = 0, j = 0;
@@ -232,13 +243,11 @@ HTML_CONTENT = """
                 document.getElementById('authorText').innerHTML += a[j];
                 j++; setTimeout(type, 60);
             } else {
-                // Text complete hone ke baad Box ko continuous smooth movement animation milega
                 card.classList.add('card-moving');
             }
         }
         setTimeout(type, 300);
 
-        // Mousemove Parallax Shift (Jab tak typing chal rahi ho)
         window.addEventListener('mousemove', (e) => {
             if (!card.classList.contains('card-moving')) {
                 const x = (window.innerWidth / 2 - e.clientX) / 20;
@@ -255,7 +264,6 @@ HTML_CONTENT = """
 def index():
     return HTML_CONTENT
 
-# Main folder se audio serve karne ke liye Flask Route
 @app.route("/audio")
 def serve_audio():
     return send_from_directory(os.getcwd(), AUDIO_FILENAME)
