@@ -54,7 +54,7 @@ HTML_CONTENT = """
             background: rgba(5, 20, 10, 0.85);
             border: 2px solid #00ff88;
             box-shadow: 0 0 35px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.3);
-            padding: 40px 25px;
+            padding: 45px 30px;
             border-radius: 25px;
             text-align: center;
             max-width: 600px;
@@ -94,31 +94,6 @@ HTML_CONTENT = """
             text-shadow: 0 0 10px #00ff88;
             letter-spacing: 3px;
             text-transform: uppercase;
-            margin-bottom: 25px;
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .action-btn {
-            background: linear-gradient(135deg, #00ff88, #ffd700);
-            color: #000;
-            border: none;
-            padding: 12px 28px;
-            font-size: 15px;
-            font-weight: 800;
-            border-radius: 50px;
-            cursor: pointer;
-            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
-            transition: all 0.2s ease-in-out;
-        }
-
-        .action-btn:active {
-            transform: scale(0.92);
         }
 
         .particle {
@@ -145,37 +120,9 @@ HTML_CONTENT = """
         <div class="icon-header">🤑 💰 💵</div>
         <div class="quote" id="quoteText"></div>
         <div class="author" id="authorText"></div>
-        
-        <div class="btn-group">
-            <button class="action-btn" id="musicBtn" onclick="toggleMusic(event)">▶ PLAY MUSIC 🎵</button>
-        </div>
     </div>
 
-    <!-- Farzi Movie Audio Source -->
-    <audio id="farziAudio" loop preload="auto">
-        <source src="https://cdnsongs.com/music/data/Hindi_Movies/202301/Farzi/128/Paisa_Hai_Toh_1.mp3" type="audio/mpeg">
-    </audio>
-
     <script>
-        // Music Controller Button
-        const audio = document.getElementById('farziAudio');
-        const musicBtn = document.getElementById('musicBtn');
-        let isPlaying = false;
-
-        function toggleMusic(e) {
-            if (e) e.stopPropagation();
-            if (isPlaying) {
-                audio.pause();
-                isPlaying = false;
-                musicBtn.innerText = "▶ PLAY MUSIC 🎵";
-            } else {
-                audio.play().then(() => {
-                    isPlaying = true;
-                    musicBtn.innerText = "⏸ PAUSE MUSIC 🔊";
-                }).catch(err => alert("Please tap again to play music!"));
-            }
-        }
-
         // Live Wealth Counter
         let count = 1000000;
         setInterval(() => {
