@@ -1,65 +1,64 @@
-import tkinter as tk
-import time
-import random
+from flask import Flask, render_template_string
 
-# Window setup
-root = tk.Tk()
-root.title("Mausa Ji Quotes")
-root.geometry("700x450")
-root.configure(bg="#0f0c20")
-root.resizable(False, False)
+app = Flask(__name__)
 
-# Main Canvas for graphics
-canvas = tk.Canvas(root, width=700, height=450, bg="#0f0c20", highlightthickness=0)
-canvas.pack(fill="both", expand=True)
+HTML_CODE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mausa Ji Quotes</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #0b0c10;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        .card {
+            border: 3px solid #ffd700;
+            box-shadow: 0 0 25px #ffd700, inset 0 0 15px #ffd700;
+            padding: 50px 30px;
+            border-radius: 15px;
+            text-align: center;
+            background: rgba(15, 12, 32, 0.85);
+            max-width: 650px;
+            width: 90%;
+        }
+        .quote {
+            font-size: 26px;
+            font-weight: bold;
+            color: #ffd700;
+            text-shadow: 0 0 10px #ffd700;
+            margin-bottom: 25px;
+            line-height: 1.4;
+        }
+        .author {
+            font-size: 20px;
+            font-weight: 600;
+            color: #66fcf1;
+            text-shadow: 0 0 8px #66fcf1;
+            letter-spacing: 2px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="quote">"MONEY IS EVERYTHING,<br>IF U HARD WORKING, U DESERVE."</div>
+        <div class="author">— BY MAUSA JI</div>
+    </div>
+</body>
+</html>
+"""
 
-# Background animated stars
-stars = []
-for _ in range(60):
-    x = random.randint(10, 690)
-    y = random.randint(10, 440)
-    r = random.randint(1, 3)
-    star = canvas.create_oval(x - r, y - r, x + r, y + r, fill="#4a4e69", outline="")
-    stars.append((star, r))
+@app.route("/")
+def home():
+    return render_template_string(HTML_CODE)
 
-# Neon Glowing Border Box
-canvas.create_rectangle(30, 30, 670, 420, outline="#e0a96d", width=2)
-canvas.create_rectangle(35, 35, 665, 415, outline="#ffd700", width=3)
-canvas.create_rectangle(40, 40, 660, 410, outline="#e0a96d", width=2)
-
-# Text elements
-quote_text = "MONEY IS EVERYTHING,\nIF U HARD WORKING, U DESERVE."
-author_text = "— BY MAUSA JI"
-
-# Text placement
-quote_id = canvas.create_text(
-    350, 180, text="", font=("Helvetica", 22, "bold"), fill="#ffd700", justify="center"
-)
-author_id = canvas.create_text(
-    350, 320, text="", font=("Courier", 18, "bold"), fill="#00ffff", justify="center"
-)
-
-
-# Typing Animation Function
-def type_writer(text, text_id, delay=0.06, current_index=0):
-    if current_index <= len(text):
-        canvas.itemconfig(text_id, text=text[:current_index])
-        root.after(int(delay * 1000), type_writer, text, text_id, delay, current_index + 1)
-    elif text_id == quote_id:
-        # Quote type hone ke baad author name start hoga
-        root.after(300, type_writer, author_text, author_id, 0.08, 0)
-
-
-# Star twinkling animation effect
-def animate_stars():
-    for star, r in stars:
-        color = random.choice(["#ffffff", "#ffd700", "#00ffff", "#4a4e69", "#ff007f"])
-        canvas.itemconfig(star, fill=color)
-    root.after(300, animate_stars)
-
-
-# Start Animations
-animate_stars()
-root.after(500, type_writer, quote_text, quote_id)
-
-root.mainloop()
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
