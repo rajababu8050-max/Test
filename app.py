@@ -8,18 +8,40 @@ HTML_CONTENT = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mausa Ji - Money Mindset</title>
+    <title>Mausa Ji - Realistic Money Mindset</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
+        
         body {
-            background: radial-gradient(circle at center, #112211 0%, #050a05 100%);
+            background: #030604;
             height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
             overflow: hidden;
             position: relative;
+            perspective: 1000px;
+        }
+
+        /* Ambient Lighting */
+        .spotlight {
+            position: absolute;
+            width: 700px;
+            height: 700px;
+            background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, rgba(0, 255, 136, 0.08) 40%, transparent 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+            pointer-events: none;
+            filter: blur(50px);
+            animation: pulseLight 6s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulseLight {
+            0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
+            100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
         }
 
         #moneyCanvas {
@@ -31,111 +53,132 @@ HTML_CONTENT = """
             z-index: 1;
         }
 
+        /* Photorealistic Glass Card */
         .card {
             position: relative;
             z-index: 2;
-            background: rgba(5, 20, 10, 0.85);
-            border: 2px solid #00ff88;
-            box-shadow: 0 0 30px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.3);
-            padding: 45px 30px;
-            border-radius: 25px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.4));
+            border: 1px solid rgba(212, 175, 55, 0.5);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            border-left: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 
+                0 30px 60px rgba(0, 0, 0, 0.8),
+                0 0 40px rgba(212, 175, 55, 0.2),
+                inset 0 0 20px rgba(255, 255, 255, 0.05);
+            padding: 50px 35px;
+            border-radius: 24px;
             text-align: center;
-            max-width: 600px;
+            max-width: 620px;
             width: 90%;
-            backdrop-filter: blur(12px);
-            animation: float 4s ease-in-out infinite, pulseGlow 2s infinite alternate;
-        }
-
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-        }
-
-        @keyframes pulseGlow {
-            0% { border-color: #00ff88; box-shadow: 0 0 25px rgba(0, 255, 136, 0.4); }
-            100% { border-color: #ffd700; box-shadow: 0 0 45px rgba(255, 215, 0, 0.6); }
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            transform-style: preserve-3d;
+            transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
         }
 
         .icon-header {
-            font-size: 50px;
+            font-size: 55px;
             margin-bottom: 20px;
-            animation: bounce 1.5s infinite;
+            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
+            animation: floatIcon 3.5s ease-in-out infinite;
         }
 
-        @keyframes bounce {
-            0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.15); }
+        @keyframes floatIcon {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-8px); }
         }
 
+        /* Metallic Gold Gradient Text */
         .quote {
             font-size: 26px;
-            font-weight: 900;
-            background: linear-gradient(135deg, #ffd700 0%, #00ff88 100%);
+            font-weight: 800;
+            background: linear-gradient(180deg, #FFFFFF 0%, #FFE57F 40%, #D4AF37 70%, #AA7C11 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
             margin-bottom: 25px;
-            line-height: 1.4;
-            min-height: 70px;
+            line-height: 1.45;
+            min-height: 75px;
+            letter-spacing: 0.5px;
         }
 
         .author {
-            font-size: 20px;
+            font-size: 19px;
             font-weight: 800;
-            color: #ffffff;
-            text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88;
-            letter-spacing: 3px;
+            color: #50E3C2;
+            text-shadow: 0 0 12px rgba(80, 227, 194, 0.6);
+            letter-spacing: 4px;
             text-transform: uppercase;
         }
     </style>
 </head>
 <body>
 
+    <div class="spotlight"></div>
     <canvas id="moneyCanvas"></canvas>
 
-    <div class="card">
-        <div class="icon-header">🤑 💰 💵</div>
+    <div class="card" id="card3d">
+        <div class="icon-header">💎 💰 💵</div>
         <div class="quote" id="quoteText"></div>
         <div class="author" id="authorText"></div>
     </div>
 
     <script>
-        // Money Rain Effect
+        // Realistic Physics-based Rain Animation
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
 
-        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-        window.onresize = resize; resize();
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.onresize = resize;
+        resize();
 
-        const currencies = ['$', '₹', '€', '£', '¥', '💰', '💵', '🤑', '💎'];
-        const drops = Array.from({length: 60}, () => ({
+        const symbols = ['$', '₹', '€', '£', '¥', '💰', '💵', '💎'];
+        const particles = Array.from({length: 70}, () => ({
             x: Math.random() * canvas.width,
-            y: Math.random() * canvas.height - canvas.height,
-            speed: Math.random() * 3 + 2,
-            symbol: currencies[Math.floor(Math.random() * currencies.length)],
-            size: Math.random() * 20 + 16
+            y: Math.random() * canvas.height,
+            size: Math.random() * 18 + 14,
+            speedY: Math.random() * 2.5 + 1.2,
+            speedX: (Math.random() - 0.5) * 0.5,
+            rotation: Math.random() * 360,
+            rotSpeed: (Math.random() - 0.5) * 2,
+            opacity: Math.random() * 0.7 + 0.3,
+            symbol: symbols[Math.floor(Math.random() * symbols.length)]
         }));
 
-        function drawMoney() {
+        function drawParticles() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            drops.forEach(d => {
-                ctx.font = `${d.size}px sans-serif`;
-                ctx.fillStyle = d.symbol === '💰' || d.symbol === '💵' || d.symbol === '🤑' ? '#ffffff' : '#00ff88';
-                ctx.shadowBlur = 8;
-                ctx.shadowColor = '#00ff88';
-                ctx.fillText(d.symbol, d.x, d.y);
+
+            particles.forEach(p => {
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate((p.rotation * Math.PI) / 180);
                 
-                d.y += d.speed;
-                if(d.y > canvas.height) {
-                    d.y = -30;
-                    d.x = Math.random() * canvas.width;
+                ctx.font = `${p.size}px 'Segoe UI', sans-serif`;
+                ctx.fillStyle = `rgba(212, 175, 55, ${p.opacity})`;
+                ctx.shadowBlur = 12;
+                ctx.shadowColor = 'rgba(212, 175, 55, 0.5)';
+                ctx.fillText(p.symbol, 0, 0);
+                
+                ctx.restore();
+
+                p.y += p.speedY;
+                p.x += p.speedX;
+                p.rotation += p.rotSpeed;
+
+                if (p.y > canvas.height + 30) {
+                    p.y = -30;
+                    p.x = Math.random() * canvas.width;
                 }
             });
-            requestAnimationFrame(drawMoney);
-        }
-        drawMoney();
 
-        // Typing Effect
+            requestAnimationFrame(drawParticles);
+        }
+        drawParticles();
+
+        // Typewriter Logic
         const q = "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.";
         const a = "— BY MAUSA JI";
         let i = 0, j = 0;
@@ -143,13 +186,21 @@ HTML_CONTENT = """
         function type() {
             if(i < q.length) {
                 document.getElementById('quoteText').innerHTML += q[i] === '\\n' ? '<br>' : q[i];
-                i++; setTimeout(type, 50);
+                i++; setTimeout(type, 45);
             } else if(j < a.length) {
                 document.getElementById('authorText').innerHTML += a[j];
-                j++; setTimeout(type, 70);
+                j++; setTimeout(type, 65);
             }
         }
         setTimeout(type, 300);
+
+        // Smooth Parallax Card Shift
+        const card = document.getElementById('card3d');
+        window.addEventListener('mousemove', (e) => {
+            const xAxis = (window.innerWidth / 2 - e.clientX) / 30;
+            const yAxis = (window.innerHeight / 2 - e.clientY) / 30;
+            card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+        });
     </script>
 </body>
 </html>
