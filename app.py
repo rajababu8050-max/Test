@@ -1,3 +1,8 @@
+from flask import Flask
+
+app = Flask(__name__)
+
+HTML_CONTENT = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,7 +10,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mausa Ji Quotes</title>
     <style>
-        /* CSS Styling */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             background-color: #0b0c10;
@@ -63,7 +67,6 @@
     </div>
 
     <script>
-        // Star Background
         const canvas = document.getElementById('starCanvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -83,14 +86,13 @@
         }
         draw();
 
-        // Text Animation
-        const q = "MONEY IS EVERYTHING,\nIF U HARD WORKING, U DESERVE.";
+        const q = "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.";
         const a = "— BY MAUSA JI";
         let i = 0, j = 0;
 
         function type() {
             if(i < q.length) {
-                document.getElementById('quoteText').innerHTML += q[i] === '\n' ? '<br>' : q[i];
+                document.getElementById('quoteText').innerHTML += q[i] === '\\n' ? '<br>' : q[i];
                 i++; setTimeout(type, 60);
             } else if(j < a.length) {
                 document.getElementById('authorText').innerHTML += a[j];
@@ -101,3 +103,11 @@
     </script>
 </body>
 </html>
+"""
+
+@app.route("/")
+def index():
+    return HTML_CONTENT
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=8000)
