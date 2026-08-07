@@ -24,12 +24,11 @@ HTML_CONTENT = """
             perspective: 1000px;
         }
 
-        /* Top Wealth Counter */
         .wealth-counter {
             position: absolute;
-            top: 25px;
+            top: 20px;
             z-index: 10;
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 900;
             color: #ffd700;
             background: rgba(0, 0, 0, 0.6);
@@ -49,14 +48,13 @@ HTML_CONTENT = """
             z-index: 1;
         }
 
-        /* 3D Glassmorphism Card */
         .card {
             position: relative;
             z-index: 2;
             background: rgba(5, 20, 10, 0.85);
             border: 2px solid #00ff88;
             box-shadow: 0 0 35px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.3);
-            padding: 40px 25px;
+            padding: 35px 25px;
             border-radius: 25px;
             text-align: center;
             max-width: 600px;
@@ -68,7 +66,7 @@ HTML_CONTENT = """
 
         .icon-header {
             font-size: 45px;
-            margin-bottom: 15px;
+            margin-bottom: 10px;
             animation: bounce 1.5s infinite;
         }
 
@@ -96,13 +94,12 @@ HTML_CONTENT = """
             text-shadow: 0 0 10px #00ff88;
             letter-spacing: 3px;
             text-transform: uppercase;
-            margin-bottom: 25px;
+            margin-bottom: 20px;
         }
 
-        /* Button Group */
         .btn-group {
             display: flex;
-            gap: 12px;
+            gap: 10px;
             justify-content: center;
             flex-wrap: wrap;
         }
@@ -111,8 +108,8 @@ HTML_CONTENT = """
             background: linear-gradient(135deg, #ffd700, #00ff88);
             color: #000;
             border: none;
-            padding: 12px 20px;
-            font-size: 14px;
+            padding: 10px 18px;
+            font-size: 13px;
             font-weight: 800;
             border-radius: 50px;
             cursor: pointer;
@@ -124,7 +121,6 @@ HTML_CONTENT = """
             transform: scale(0.92);
         }
 
-        /* Particle Particle burst */
         .particle {
             position: absolute;
             pointer-events: none;
@@ -151,20 +147,45 @@ HTML_CONTENT = """
         <div class="author" id="authorText"></div>
         
         <div class="btn-group">
-            <button class="action-btn" onclick="nextQuote()">NEXT QUOTE 🎲</button>
-            <button class="action-btn" onclick="copyQuote()">COPY QUOTE 📋</button>
+            <button class="action-btn" onclick="nextQuote(event)">NEXT QUOTE 🎲</button>
+            <button class="action-btn" id="musicBtn" onclick="toggleAudio(event)">🔊 MUSIC: OFF</button>
         </div>
     </div>
 
+    <!-- Universal Compatible Background Audio -->
+    <audio id="bgAudio" loop preload="auto">
+        <source src="https://codeskulptor-demos.commondatastorage.googleapis.com/assets_sounddog/soundtrack.mp3" type="audio/mpeg">
+    </audio>
+
     <script>
-        // 1. Live Wealth Counter
+        // Audio Controls
+        const audio = document.getElementById('bgAudio');
+        const musicBtn = document.getElementById('musicBtn');
+        let isPlaying = false;
+
+        function toggleAudio(e) {
+            if (e) e.stopPropagation();
+            if (isPlaying) {
+                audio.pause();
+                isPlaying = false;
+                musicBtn.innerText = "🔇 MUSIC: OFF";
+                musicBtn.style.background = "linear-gradient(135deg, #ffd700, #00ff88)";
+            } else {
+                audio.play();
+                isPlaying = true;
+                musicBtn.innerText = "🔊 MUSIC: ON";
+                musicBtn.style.background = "#00ff88";
+            }
+        }
+
+        // Live Wealth Counter
         let count = 1000000;
         setInterval(() => {
             count += Math.floor(Math.random() * 500) + 100;
             document.getElementById('counter').innerText = '$' + count.toLocaleString();
         }, 100);
 
-        // 2. Multi-Quotes List
+        // Multi-Quotes List
         const quotesList = [
             "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.",
             "PAISA BOLTA NAHI,\\nLEKIN SABKI BOLTI BAND KAR DETA HAI.",
@@ -173,7 +194,8 @@ HTML_CONTENT = """
         ];
         let currentQuoteIndex = 0;
 
-        function nextQuote() {
+        function nextQuote(e) {
+            if (e) e.stopPropagation();
             currentQuoteIndex = (currentQuoteIndex + 1) % quotesList.length;
             document.getElementById('quoteText').innerHTML = "";
             document.getElementById('authorText').innerHTML = "";
@@ -182,13 +204,7 @@ HTML_CONTENT = """
             type();
         }
 
-        function copyQuote() {
-            const textToCopy = quotesList[currentQuoteIndex].replace('\\n', ' ') + " — BY MAUSA JI";
-            navigator.clipboard.writeText(textToCopy);
-            alert("Quote copied to clipboard! 🚀");
-        }
-
-        // 3. Typing Effect
+        // Typing Effect
         let q = quotesList[0];
         const a = "— BY MAUSA JI";
         let i = 0, j = 0;
@@ -204,7 +220,7 @@ HTML_CONTENT = """
         }
         setTimeout(type, 300);
 
-        // 4. Money Rain Animation
+        // Money Rain Animation
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -237,8 +253,12 @@ HTML_CONTENT = """
         }
         drawMoney();
 
-        // 5. Interactive Click Burst Effect
+        // Interactive Click Burst + Auto Start Audio on First Touch
         window.addEventListener('click', (e) => {
+            if (!isPlaying) {
+                toggleAudio();
+            }
+
             for(let k = 0; k < 12; k++) {
                 const p = document.createElement('div');
                 p.className = 'particle';
@@ -254,7 +274,7 @@ HTML_CONTENT = """
             }
         });
 
-        // 6. 3D Card Tilt Effect
+        // 3D Card Tilt Effect
         const card = document.getElementById('tiltCard');
         window.addEventListener('mousemove', (e) => {
             const x = (window.innerWidth / 2 - e.clientX) / 20;
