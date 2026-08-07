@@ -71,7 +71,27 @@ HTML_CONTENT = """
             width: 90%;
             backdrop-filter: blur(30px);
             transform-style: preserve-3d;
-            transition: transform 0.1s ease-out;
+            transition: transform 0.2s ease-out;
+        }
+
+        /* Continuous Moving Class - Applied after typing completes */
+        .card-moving {
+            animation: floatAndRotate 4s ease-in-out infinite alternate !important;
+        }
+
+        @keyframes floatAndRotate {
+            0% {
+                transform: translateY(0px) rotateX(0deg) rotateY(0deg) scale(1);
+                box-shadow: 0 0 50px rgba(0, 0, 0, 0.5), 0 0 20px rgba(212, 175, 55, 0.3);
+            }
+            50% {
+                transform: translateY(-20px) rotateX(6deg) rotateY(-8deg) scale(1.03);
+                box-shadow: 0 25px 60px rgba(0, 255, 136, 0.4), 0 0 40px rgba(212, 175, 55, 0.6);
+            }
+            100% {
+                transform: translateY(15px) rotateX(-6deg) rotateY(8deg) scale(1.01);
+                box-shadow: 0 15px 50px rgba(0, 0, 0, 0.7), 0 0 30px rgba(255, 215, 0, 0.5);
+            }
         }
 
         .icon-header {
@@ -202,6 +222,7 @@ HTML_CONTENT = """
         const q = "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.";
         const a = "— BY MAUSA JI";
         let i = 0, j = 0;
+        const card = document.getElementById('card3d');
 
         function type() {
             if(i < q.length) {
@@ -210,16 +231,20 @@ HTML_CONTENT = """
             } else if(j < a.length) {
                 document.getElementById('authorText').innerHTML += a[j];
                 j++; setTimeout(type, 60);
+            } else {
+                // Text complete hone ke baad Box ko continuous smooth movement animation milega
+                card.classList.add('card-moving');
             }
         }
         setTimeout(type, 300);
 
-        // Card Parallax Shift
-        const card = document.getElementById('card3d');
+        // Mousemove Parallax Shift (Jab tak typing chal rahi ho)
         window.addEventListener('mousemove', (e) => {
-            const x = (window.innerWidth / 2 - e.clientX) / 20;
-            const y = (window.innerHeight / 2 - e.clientY) / 20;
-            card.style.transform = `rotateY(${-x}deg) rotateX(${y}deg)`;
+            if (!card.classList.contains('card-moving')) {
+                const x = (window.innerWidth / 2 - e.clientX) / 20;
+                const y = (window.innerHeight / 2 - e.clientY) / 20;
+                card.style.transform = `rotateY(${-x}deg) rotateX(${y}deg)`;
+            }
         });
     </script>
 </body>
