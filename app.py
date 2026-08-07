@@ -152,14 +152,13 @@ HTML_CONTENT = """
         </div>
     </div>
 
-    <!-- Universal Compatible Background Audio -->
-    <audio id="bgAudio" loop preload="auto">
-        <source src="https://codeskulptor-demos.commondatastorage.googleapis.com/assets_sounddog/soundtrack.mp3" type="audio/mpeg">
+    <!-- Farzi "Paisa Hai Toh" Audio Track -->
+    <audio id="farziAudio" loop preload="auto">
+        <source src="https://cdnsongs.com/music/data/Hindi_Movies/202301/Farzi/128/Paisa_Hai_Toh_1.mp3" type="audio/mpeg">
     </audio>
 
     <script>
-        // Audio Controls
-        const audio = document.getElementById('bgAudio');
+        const audio = document.getElementById('farziAudio');
         const musicBtn = document.getElementById('musicBtn');
         let isPlaying = false;
 
@@ -171,10 +170,11 @@ HTML_CONTENT = """
                 musicBtn.innerText = "🔇 MUSIC: OFF";
                 musicBtn.style.background = "linear-gradient(135deg, #ffd700, #00ff88)";
             } else {
-                audio.play();
-                isPlaying = true;
-                musicBtn.innerText = "🔊 MUSIC: ON";
-                musicBtn.style.background = "#00ff88";
+                audio.play().then(() => {
+                    isPlaying = true;
+                    musicBtn.innerText = "🔊 MUSIC: ON";
+                    musicBtn.style.background = "#00ff88";
+                }).catch(err => console.log("User interaction required"));
             }
         }
 
@@ -220,7 +220,7 @@ HTML_CONTENT = """
         }
         setTimeout(type, 300);
 
-        // Money Rain Animation
+        // Money Rain Effect
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
         function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
@@ -253,7 +253,7 @@ HTML_CONTENT = """
         }
         drawMoney();
 
-        // Interactive Click Burst + Auto Start Audio on First Touch
+        // Click Burst Effect & Screen Touch Auto Audio Trigger
         window.addEventListener('click', (e) => {
             if (!isPlaying) {
                 toggleAudio();
