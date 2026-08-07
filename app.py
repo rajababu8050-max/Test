@@ -105,21 +105,16 @@ HTML_CONTENT = """
         }
 
         .action-btn {
-            background: linear-gradient(135deg, #ffd700, #00ff88);
+            background: linear-gradient(135deg, #00ff88, #ffd700);
             color: #000;
             border: none;
-            padding: 12px 22px;
-            font-size: 14px;
+            padding: 12px 28px;
+            font-size: 15px;
             font-weight: 800;
             border-radius: 50px;
             cursor: pointer;
-            box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
-            transition: all 0.2s ease-in-out;
-        }
-
-        .music-btn {
-            background: linear-gradient(135deg, #00ff88, #ffd700);
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
+            transition: all 0.2s ease-in-out;
         }
 
         .action-btn:active {
@@ -152,8 +147,7 @@ HTML_CONTENT = """
         <div class="author" id="authorText"></div>
         
         <div class="btn-group">
-            <button class="action-btn" onclick="nextQuote(event)">NEXT QUOTE 🎲</button>
-            <button class="action-btn music-btn" id="musicBtn" onclick="toggleMusic(event)">▶ PLAY MUSIC 🎵</button>
+            <button class="action-btn" id="musicBtn" onclick="toggleMusic(event)">▶ PLAY MUSIC 🎵</button>
         </div>
     </div>
 
@@ -189,27 +183,8 @@ HTML_CONTENT = """
             document.getElementById('counter').innerText = '$' + count.toLocaleString();
         }, 100);
 
-        // Multi-Quotes List
-        const quotesList = [
-            "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.",
-            "PAISA BOLTA NAHI,\\nLEKIN SABKI BOLTI BAND KAR DETA HAI.",
-            "WORK HARD IN SILENCE,\\nLET YOUR BANK BALANCE MAKE THE NOISE.",
-            "APNA TIME AATA NAHI,\\nPAISE SE LANA PADTA HAI."
-        ];
-        let currentQuoteIndex = 0;
-
-        function nextQuote(e) {
-            if (e) e.stopPropagation();
-            currentQuoteIndex = (currentQuoteIndex + 1) % quotesList.length;
-            document.getElementById('quoteText').innerHTML = "";
-            document.getElementById('authorText').innerHTML = "";
-            i = 0; j = 0;
-            q = quotesList[currentQuoteIndex];
-            type();
-        }
-
-        // Typing Effect
-        let q = quotesList[0];
+        // Single Original Quote
+        const q = "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.";
         const a = "— BY MAUSA JI";
         let i = 0, j = 0;
 
