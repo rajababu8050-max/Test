@@ -57,7 +57,6 @@ HTML_CONTENT = """
             z-index: 1;
         }
 
-        /* 3D Glass Card Container */
         .card {
             position: relative;
             z-index: 2;
@@ -110,7 +109,6 @@ HTML_CONTENT = """
             50% { transform: translateY(-12px); }
         }
 
-        /* ULTRA-REALISTIC 3D GOLD EMBOSSED TEXT */
         .quote {
             font-size: 31px;
             font-weight: 900;
@@ -120,8 +118,6 @@ HTML_CONTENT = """
             margin-bottom: 30px;
             line-height: 1.4;
             min-height: 85px;
-            
-            /* Realistic 3D Depth Extrusion Layers */
             filter: 
                 drop-shadow(0px 1px 0px #CBB04E)
                 drop-shadow(1px 2px 0px #A3852C)
@@ -132,7 +128,6 @@ HTML_CONTENT = """
             letter-spacing: 1.2px;
         }
 
-        /* REALISTIC 3D EMERALD NEON AUTHOR */
         .author {
             font-size: 22px;
             font-weight: 900;
@@ -141,7 +136,6 @@ HTML_CONTENT = """
             -webkit-text-fill-color: transparent;
             letter-spacing: 5px;
             text-transform: uppercase;
-            
             filter: 
                 drop-shadow(0px 1px 0px #008044)
                 drop-shadow(1px 2px 0px #00592F)
@@ -168,7 +162,7 @@ HTML_CONTENT = """
         }
     </style>
 </head>
-<body onclick="handleScreenTap(event)">
+<body>
 
     <div class="spotlight"></div>
     <canvas id="moneyCanvas"></canvas>
@@ -187,7 +181,16 @@ HTML_CONTENT = """
         const bgAudio = document.getElementById('bgMusic');
         let isMusicPlaying = false;
 
+        function playAudio() {
+            if (!isMusicPlaying) {
+                bgAudio.play().then(() => {
+                    isMusicPlaying = true;
+                }).catch(e => console.log("User interaction required"));
+            }
+        }
+
         function handleScreenTap(e) {
+            // Gold Sparkles Burst
             for (let k = 0; k < 20; k++) {
                 const sparkle = document.createElement('div');
                 sparkle.className = 'sparkle';
@@ -205,9 +208,15 @@ HTML_CONTENT = """
                 bgAudio.pause();
                 isMusicPlaying = false;
             } else {
-                bgAudio.play().then(() => isMusicPlaying = true).catch(e => console.log("User tap required"));
+                playAudio();
             }
         }
+
+        // Tap, Scroll, Wheel, Touch Event Triggers for Sound
+        window.addEventListener('click', handleScreenTap);
+        window.addEventListener('wheel', playAudio, { passive: true });
+        window.addEventListener('touchmove', playAudio, { passive: true });
+        window.addEventListener('scroll', playAudio, { passive: true });
 
         // Fast Money Rain Animation
         const canvas = document.getElementById('moneyCanvas');
