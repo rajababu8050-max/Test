@@ -17,7 +17,7 @@ HTML_CONTENT = """
             display: flex;
             justify-content: center;
             align-items: center;
-            font-family: 'Montserrat', 'Segoe UI', sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             overflow: hidden;
             position: relative;
         }
@@ -37,14 +37,13 @@ HTML_CONTENT = """
             background: rgba(5, 20, 10, 0.85);
             border: 2px solid #00ff88;
             box-shadow: 0 0 30px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.3);
-            padding: 40px 30px;
+            padding: 40px 25px;
             border-radius: 25px;
             text-align: center;
-            max-width: 650px;
+            max-width: 600px;
             width: 90%;
             backdrop-filter: blur(12px);
             animation: float 4s ease-in-out infinite, pulseGlow 2s infinite alternate;
-            cursor: pointer;
         }
 
         @keyframes float {
@@ -69,7 +68,7 @@ HTML_CONTENT = """
         }
 
         .quote {
-            font-size: 26px;
+            font-size: 24px;
             font-weight: 900;
             background: linear-gradient(135deg, #ffd700 0%, #00ff88 100%);
             -webkit-background-clip: text;
@@ -81,24 +80,35 @@ HTML_CONTENT = """
         }
 
         .author {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 800;
             color: #ffffff;
             text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88;
             letter-spacing: 3px;
             text-transform: uppercase;
-            margin-bottom: 15px;
+            margin-bottom: 25px;
         }
 
-        .tap-notice {
-            font-size: 12px;
-            color: #00ff88;
+        .play-btn {
+            background: linear-gradient(135deg, #ffd700, #00ff88);
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: 900;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.8);
+            transition: all 0.2s ease-in-out;
             letter-spacing: 1px;
-            opacity: 0.8;
+        }
+
+        .play-btn:active {
+            transform: scale(0.95);
         }
     </style>
 </head>
-<body onclick="startAudio()">
+<body onclick="enableAudioOnTouch()">
 
     <canvas id="moneyCanvas"></canvas>
 
@@ -106,33 +116,45 @@ HTML_CONTENT = """
         <div class="icon-header">🤑 💰 💵</div>
         <div class="quote" id="quoteText"></div>
         <div class="author" id="authorText"></div>
-        <div class="tap-notice" id="statusText">🔊 TAP ANYWHERE FOR SOUND</div>
+        <button class="play-btn" id="playBtn" onclick="toggleAudio(event)">🔊 TAP TO PLAY MUSIC</button>
     </div>
 
-    <!-- Background Audio Embed -->
-    <audio id="farziMusic" loop preload="auto">
-        <source src="https://cdnsongs.com/music/data/Hindi_Movies/202301/Farzi/128/Paisa_Hai_Toh_1.mp3" type="audio/mpeg">
+    <!-- Direct High-Compatibility Audio Stream -->
+    <audio id="farziAudio" loop preload="auto">
+        <source src="https://codeskulptor-demos.commondatastorage.googleapis.com/assets_sounddog/soundtrack.mp3" type="audio/mpeg">
     </audio>
 
     <script>
-        const audio = document.getElementById('farziMusic');
-        let played = false;
+        const audio = document.getElementById('farziAudio');
+        const btn = document.getElementById('playBtn');
+        let isPlaying = false;
 
-        function startAudio() {
-            if (!played) {
+        function enableAudioOnTouch() {
+            if (!isPlaying) {
                 audio.play().then(() => {
-                    played = true;
-                    document.getElementById('statusText').innerText = "🎶 PLAYING: PAISA HAI TOH (FARZI)";
-                }).catch(e => console.log("Click required to play"));
+                    isPlaying = true;
+                    btn.innerHTML = "⏸ PAUSE MUSIC 🔊";
+                    btn.style.background = "#00ff88";
+                }).catch(err => console.log("Touch required"));
             }
         }
 
-        // Auto attempt on page load
-        window.addEventListener('DOMContentLoaded', () => {
-            startAudio();
-        });
+        function toggleAudio(e) {
+            e.stopPropagation();
+            if (isPlaying) {
+                audio.pause();
+                isPlaying = false;
+                btn.innerHTML = "▶ PLAY MUSIC 🎵";
+                btn.style.background = "linear-gradient(135deg, #ffd700, #00ff88)";
+            } else {
+                audio.play();
+                isPlaying = true;
+                btn.innerHTML = "⏸ PAUSE MUSIC 🔊";
+                btn.style.background = "#00ff88";
+            }
+        }
 
-        // Money Rain Animation
+        // Background Money Rain
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
 
@@ -140,7 +162,7 @@ HTML_CONTENT = """
         window.onresize = resize; resize();
 
         const currencies = ['$', '₹', '€', '£', '¥', '💰', '💵', '🤑', '💎'];
-        const drops = Array.from({length: 70}, () => ({
+        const drops = Array.from({length: 60}, () => ({
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height - canvas.height,
             speed: Math.random() * 3 + 2,
@@ -153,7 +175,7 @@ HTML_CONTENT = """
             drops.forEach(d => {
                 ctx.font = `${d.size}px sans-serif`;
                 ctx.fillStyle = d.symbol === '💰' || d.symbol === '💵' || d.symbol === '🤑' ? '#ffffff' : '#00ff88';
-                ctx.shadowBlur = 10;
+                ctx.shadowBlur = 8;
                 ctx.shadowColor = '#00ff88';
                 ctx.fillText(d.symbol, d.x, d.y);
                 
@@ -181,7 +203,7 @@ HTML_CONTENT = """
                 j++; setTimeout(type, 70);
             }
         }
-        setTimeout(type, 400);
+        setTimeout(type, 300);
     </script>
 </body>
 </html>
