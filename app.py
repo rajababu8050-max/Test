@@ -139,16 +139,15 @@ HTML_CONTENT = """
         <div class="author" id="authorText"></div>
     </div>
 
-    <!-- Farzi "Paisa Hai Toh" Track Source -->
+    <!-- Direct Working High Energy Audio Stream -->
     <audio id="bgMusic" loop preload="auto">
-        <source src="https://cdnsongs.com/music/data/Hindi_Movies/202301/Farzi/128/Paisa_Hai_Toh_1.mp3" type="audio/mpeg">
-    </audio>
+    <source src="song.mp3" type="audio/mpeg">
+</audio>
 
     <script>
         const bgAudio = document.getElementById('bgMusic');
         let isMusicPlaying = false;
 
-        // Screen Tap Toggle Play/Pause & Sparkle Effects
         function handleScreenTap(e) {
             // Gold Sparkles Burst
             for (let k = 0; k < 18; k++) {
@@ -176,7 +175,7 @@ HTML_CONTENT = """
             } else {
                 bgAudio.play().then(() => {
                     isMusicPlaying = true;
-                }).catch(err => console.log("User touch required"));
+                }).catch(err => alert("Tap screen once again to allow audio playback!"));
             }
         }
 
