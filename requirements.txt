@@ -4,4 +4,3 @@ gunicorn
 httpx
 firebase-admin
 python-multipart
-flask
