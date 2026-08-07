@@ -1,6 +1,10 @@
-from flask import Flask
+import os
+from flask import Flask, send_from_directory
 
 app = Flask(__name__)
+
+# Audio file ka naam yahan change kar sakte hain agar zaroorat ho
+AUDIO_FILENAME = "song.mp3"
 
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -8,7 +12,7 @@ HTML_CONTENT = """
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mausa Ji - Realistic Money Mindset Pro</title>
+    <title>Mausa Ji - Billionaire Mode</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         
@@ -28,21 +32,21 @@ HTML_CONTENT = """
 
         .spotlight {
             position: absolute;
-            width: 700px;
-            height: 700px;
-            background: radial-gradient(circle, rgba(212, 175, 55, 0.15) 0%, rgba(0, 255, 136, 0.08) 40%, transparent 70%);
+            width: 800px;
+            height: 800px;
+            background: radial-gradient(circle, rgba(212, 175, 55, 0.2) 0%, rgba(0, 255, 136, 0.1) 40%, transparent 70%);
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
             z-index: 1;
             pointer-events: none;
-            filter: blur(50px);
-            animation: pulseLight 6s ease-in-out infinite alternate;
+            filter: blur(60px);
+            animation: pulseLight 4s ease-in-out infinite alternate;
         }
 
         @keyframes pulseLight {
-            0% { transform: translate(-50%, -50%) scale(0.9); opacity: 0.6; }
-            100% { transform: translate(-50%, -50%) scale(1.2); opacity: 1; }
+            0% { transform: translate(-50%, -50%) scale(0.95); opacity: 0.7; }
+            100% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
         }
 
         #moneyCanvas {
@@ -57,74 +61,66 @@ HTML_CONTENT = """
         .card {
             position: relative;
             z-index: 2;
-            background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(0, 0, 0, 0.4));
-            border: 1px solid rgba(212, 175, 55, 0.5);
-            border-top: 1px solid rgba(255, 255, 255, 0.3);
-            border-left: 1px solid rgba(255, 255, 255, 0.3);
-            box-shadow: 
-                0 30px 60px rgba(0, 0, 0, 0.8),
-                0 0 40px rgba(212, 175, 55, 0.2),
-                inset 0 0 20px rgba(255, 255, 255, 0.05);
-            padding: 50px 35px;
-            border-radius: 24px;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(0, 0, 0, 0.5));
+            border: 1px solid rgba(212, 175, 55, 0.6);
+            box-shadow: 0 0 50px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(255, 255, 255, 0.05);
+            padding: 60px 40px;
+            border-radius: 30px;
             text-align: center;
-            max-width: 620px;
+            max-width: 600px;
             width: 90%;
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
+            backdrop-filter: blur(30px);
             transform-style: preserve-3d;
-            transition: transform 0.2s cubic-bezier(0.25, 1, 0.5, 1);
+            transition: transform 0.1s ease-out;
         }
 
         .icon-header {
-            font-size: 55px;
-            margin-bottom: 20px;
-            filter: drop-shadow(0 10px 15px rgba(0,0,0,0.5));
-            animation: floatIcon 3.5s ease-in-out infinite;
+            font-size: 60px;
+            margin-bottom: 25px;
+            filter: drop-shadow(0 5px 10px rgba(0,0,0,0.5));
+            animation: bounce 3s ease-in-out infinite;
         }
 
-        @keyframes floatIcon {
+        @keyframes bounce {
             0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-8px); }
+            50% { transform: translateY(-12px); }
         }
 
         .quote {
-            font-size: 26px;
-            font-weight: 800;
+            font-size: 28px;
+            font-weight: 900;
             background: linear-gradient(180deg, #FFFFFF 0%, #FFE57F 40%, #D4AF37 70%, #AA7C11 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.6));
-            margin-bottom: 25px;
-            line-height: 1.45;
-            min-height: 75px;
-            letter-spacing: 0.5px;
+            margin-bottom: 30px;
+            line-height: 1.3;
+            min-height: 80px;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.5);
         }
 
         .author {
-            font-size: 19px;
-            font-weight: 800;
+            font-size: 20px;
+            font-weight: 900;
             color: #50E3C2;
-            text-shadow: 0 0 12px rgba(80, 227, 194, 0.6);
-            letter-spacing: 4px;
+            text-shadow: 0 0 15px rgba(80, 227, 194, 0.8);
+            letter-spacing: 5px;
             text-transform: uppercase;
         }
 
         .sparkle {
             position: absolute;
             pointer-events: none;
-            width: 8px;
-            height: 8px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             background: #FFE57F;
-            box-shadow: 0 0 10px #D4AF37, 0 0 20px #FFF;
             z-index: 99;
-            animation: burst 0.8s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
+            animation: burst 0.6s ease-out forwards;
         }
 
         @keyframes burst {
-            0% { opacity: 1; transform: translate(0, 0) scale(1); }
-            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.2); }
+            0% { opacity: 1; transform: translate(0, 0) scale(1.5); }
+            100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
         }
     </style>
 </head>
@@ -139,10 +135,10 @@ HTML_CONTENT = """
         <div class="author" id="authorText"></div>
     </div>
 
-    <!-- Direct Working High Energy Audio Stream -->
+    <!-- Local File Route -->
     <audio id="bgMusic" loop preload="auto">
-    <source src="song.mp3" type="audio/mpeg">
-</audio>
+        <source src="/audio" type="audio/mpeg">
+    </audio>
 
     <script>
         const bgAudio = document.getElementById('bgMusic');
@@ -150,22 +146,17 @@ HTML_CONTENT = """
 
         function handleScreenTap(e) {
             // Gold Sparkles Burst
-            for (let k = 0; k < 18; k++) {
+            for (let k = 0; k < 20; k++) {
                 const sparkle = document.createElement('div');
                 sparkle.className = 'sparkle';
                 sparkle.style.left = e.clientX + 'px';
                 sparkle.style.top = e.clientY + 'px';
-
                 const angle = Math.random() * Math.PI * 2;
-                const dist = Math.random() * 120 + 30;
-                const dx = Math.cos(angle) * dist + 'px';
-                const dy = Math.sin(angle) * dist + 'px';
-
-                sparkle.style.setProperty('--dx', dx);
-                sparkle.style.setProperty('--dy', dy);
-
+                const dist = Math.random() * 150 + 50;
+                sparkle.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+                sparkle.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
                 document.body.appendChild(sparkle);
-                setTimeout(() => sparkle.remove(), 800);
+                setTimeout(() => sparkle.remove(), 600);
             }
 
             // Audio Toggle Logic
@@ -173,88 +164,60 @@ HTML_CONTENT = """
                 bgAudio.pause();
                 isMusicPlaying = false;
             } else {
-                bgAudio.play().then(() => {
-                    isMusicPlaying = true;
-                }).catch(err => alert("Tap screen once again to allow audio playback!"));
+                bgAudio.play().then(() => isMusicPlaying = true).catch(e => console.log("Audio needs touch to play"));
             }
         }
 
-        // Realistic Rain Animation
+        // HIGH SPEED RAIN
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
-
-        function resize() {
-            canvas.width = window.innerWidth;
-            canvas.height = window.innerHeight;
-        }
-        window.onresize = resize;
-        resize();
+        function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+        window.onresize = resize; resize();
 
         const symbols = ['$', '₹', '€', '£', '¥', '💰', '💵', '💎'];
-        const particles = Array.from({length: 70}, () => ({
+        const particles = Array.from({length: 80}, () => ({
             x: Math.random() * canvas.width,
             y: Math.random() * canvas.height,
-            size: Math.random() * 18 + 14,
-            speedY: Math.random() * 2.5 + 1.2,
-            speedX: (Math.random() - 0.5) * 0.5,
-            rotation: Math.random() * 360,
-            rotSpeed: (Math.random() - 0.5) * 2,
-            opacity: Math.random() * 0.7 + 0.3,
+            size: Math.random() * 20 + 16,
+            speedY: Math.random() * 8.0 + 5.0, // HIGH SPEED
             symbol: symbols[Math.floor(Math.random() * symbols.length)]
         }));
 
         function drawParticles() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-
             particles.forEach(p => {
-                ctx.save();
-                ctx.translate(p.x, p.y);
-                ctx.rotate((p.rotation * Math.PI) / 180);
-                
-                ctx.font = `${p.size}px 'Segoe UI', sans-serif`;
-                ctx.fillStyle = `rgba(212, 175, 55, ${p.opacity})`;
-                ctx.shadowBlur = 12;
-                ctx.shadowColor = 'rgba(212, 175, 55, 0.5)';
-                ctx.fillText(p.symbol, 0, 0);
-                
-                ctx.restore();
-
+                ctx.font = `${p.size}px Arial`;
+                ctx.fillStyle = 'rgba(212, 175, 55, 0.8)';
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#D4AF37';
+                ctx.fillText(p.symbol, p.x, p.y);
                 p.y += p.speedY;
-                p.x += p.speedX;
-                p.rotation += p.rotSpeed;
-
-                if (p.y > canvas.height + 30) {
-                    p.y = -30;
-                    p.x = Math.random() * canvas.width;
-                }
+                if (p.y > canvas.height) { p.y = -30; p.x = Math.random() * canvas.width; }
             });
-
             requestAnimationFrame(drawParticles);
         }
         drawParticles();
 
-        // Typewriter Logic
+        // Typing
         const q = "MONEY IS EVERYTHING,\\nIF U HARD WORKING, U DESERVE.";
         const a = "— BY MAUSA JI";
         let i = 0, j = 0;
-
         function type() {
             if(i < q.length) {
                 document.getElementById('quoteText').innerHTML += q[i] === '\\n' ? '<br>' : q[i];
-                i++; setTimeout(type, 45);
+                i++; setTimeout(type, 40);
             } else if(j < a.length) {
                 document.getElementById('authorText').innerHTML += a[j];
-                j++; setTimeout(type, 65);
+                j++; setTimeout(type, 60);
             }
         }
         setTimeout(type, 300);
 
-        // Smooth Parallax Card Shift
         const card = document.getElementById('card3d');
         window.addEventListener('mousemove', (e) => {
-            const xAxis = (window.innerWidth / 2 - e.clientX) / 30;
-            const yAxis = (window.innerHeight / 2 - e.clientY) / 30;
-            card.style.transform = `rotateY(${xAxis}deg) rotateX(${yAxis}deg)`;
+            const x = (window.innerWidth / 2 - e.clientX) / 20;
+            const y = (window.innerHeight / 2 - e.clientY) / 20;
+            card.style.transform = `rotateY(${-x}deg) rotateX(${y}deg)`;
         });
     </script>
 </body>
@@ -264,3 +227,8 @@ HTML_CONTENT = """
 @app.route("/")
 def index():
     return HTML_CONTENT
+
+# Main folder se audio play karne ka route
+@app.route("/audio")
+def get_audio():
+    return send_from_directory(os.getcwd(), AUDIO_FILENAME)
