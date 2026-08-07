@@ -119,9 +119,9 @@ HTML_CONTENT = """
         <button class="play-btn" id="playBtn" onclick="toggleAudio(event)">🔊 TAP TO PLAY MUSIC</button>
     </div>
 
-    <!-- Direct High-Compatibility Audio Stream -->
+    <!-- Farzi "Paisa Hai Toh" Working Track Stream -->
     <audio id="farziAudio" loop preload="auto">
-        <source src="https://codeskulptor-demos.commondatastorage.googleapis.com/assets_sounddog/soundtrack.mp3" type="audio/mpeg">
+        <source src="https://cdnsongs.com/music/data/Hindi_Movies/202301/Farzi/128/Paisa_Hai_Toh_1.mp3" type="audio/mpeg">
     </audio>
 
     <script>
@@ -135,7 +135,7 @@ HTML_CONTENT = """
                     isPlaying = true;
                     btn.innerHTML = "⏸ PAUSE MUSIC 🔊";
                     btn.style.background = "#00ff88";
-                }).catch(err => console.log("Touch required"));
+                }).catch(err => console.log("User touch required"));
             }
         }
 
@@ -154,7 +154,7 @@ HTML_CONTENT = """
             }
         }
 
-        // Background Money Rain
+        // Money Rain Effect
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
 
