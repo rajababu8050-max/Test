@@ -22,7 +22,6 @@ HTML_CONTENT = """
             position: relative;
         }
 
-        /* Matrix / Rain Canvas */
         #moneyCanvas {
             position: absolute;
             top: 0;
@@ -32,25 +31,25 @@ HTML_CONTENT = """
             z-index: 1;
         }
 
-        /* VIP Card Design */
         .card {
             position: relative;
             z-index: 2;
-            background: rgba(5, 20, 10, 0.75);
+            background: rgba(5, 20, 10, 0.85);
             border: 2px solid #00ff88;
             box-shadow: 0 0 30px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.3);
-            padding: 50px 40px;
+            padding: 40px 30px;
             border-radius: 25px;
             text-align: center;
             max-width: 650px;
             width: 90%;
             backdrop-filter: blur(12px);
             animation: float 4s ease-in-out infinite, pulseGlow 2s infinite alternate;
+            cursor: pointer;
         }
 
         @keyframes float {
             0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-12px); }
+            50% { transform: translateY(-10px); }
         }
 
         @keyframes pulseGlow {
@@ -59,40 +58,47 @@ HTML_CONTENT = """
         }
 
         .icon-header {
-            font-size: 50px;
+            font-size: 45px;
             margin-bottom: 15px;
             animation: bounce 1.5s infinite;
         }
 
         @keyframes bounce {
             0%, 100% { transform: scale(1); }
-            50% { transform: scale(1.2); }
+            50% { transform: scale(1.15); }
         }
 
         .quote {
-            font-size: 28px;
+            font-size: 26px;
             font-weight: 900;
             background: linear-gradient(135deg, #ffd700 0%, #00ff88 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             text-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
-            margin-bottom: 25px;
+            margin-bottom: 20px;
             line-height: 1.4;
-            letter-spacing: 1px;
-            min-height: 80px;
+            min-height: 70px;
         }
 
         .author {
-            font-size: 22px;
+            font-size: 20px;
             font-weight: 800;
             color: #ffffff;
             text-shadow: 0 0 10px #00ff88, 0 0 20px #00ff88;
-            letter-spacing: 4px;
+            letter-spacing: 3px;
             text-transform: uppercase;
+            margin-bottom: 15px;
+        }
+
+        .tap-notice {
+            font-size: 12px;
+            color: #00ff88;
+            letter-spacing: 1px;
+            opacity: 0.8;
         }
     </style>
 </head>
-<body>
+<body onclick="startAudio()">
 
     <canvas id="moneyCanvas"></canvas>
 
@@ -100,9 +106,32 @@ HTML_CONTENT = """
         <div class="icon-header">🤑 💰 💵</div>
         <div class="quote" id="quoteText"></div>
         <div class="author" id="authorText"></div>
+        <div class="tap-notice" id="statusText">🔊 TAP ANYWHERE FOR SOUND</div>
     </div>
 
+    <!-- Background Audio Embed -->
+    <audio id="farziMusic" loop preload="auto">
+        <source src="https://cdnsongs.com/music/data/Hindi_Movies/202301/Farzi/128/Paisa_Hai_Toh_1.mp3" type="audio/mpeg">
+    </audio>
+
     <script>
+        const audio = document.getElementById('farziMusic');
+        let played = false;
+
+        function startAudio() {
+            if (!played) {
+                audio.play().then(() => {
+                    played = true;
+                    document.getElementById('statusText').innerText = "🎶 PLAYING: PAISA HAI TOH (FARZI)";
+                }).catch(e => console.log("Click required to play"));
+            }
+        }
+
+        // Auto attempt on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            startAudio();
+        });
+
         // Money Rain Animation
         const canvas = document.getElementById('moneyCanvas');
         const ctx = canvas.getContext('2d');
