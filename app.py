@@ -26,7 +26,7 @@ HTML_CONTENT = """
 
         .wealth-counter {
             position: absolute;
-            top: 20px;
+            top: 25px;
             z-index: 10;
             font-size: 20px;
             font-weight: 900;
@@ -54,7 +54,7 @@ HTML_CONTENT = """
             background: rgba(5, 20, 10, 0.85);
             border: 2px solid #00ff88;
             box-shadow: 0 0 35px rgba(0, 255, 136, 0.4), inset 0 0 20px rgba(255, 215, 0, 0.3);
-            padding: 35px 25px;
+            padding: 40px 25px;
             border-radius: 25px;
             text-align: center;
             max-width: 600px;
@@ -66,7 +66,7 @@ HTML_CONTENT = """
 
         .icon-header {
             font-size: 45px;
-            margin-bottom: 10px;
+            margin-bottom: 15px;
             animation: bounce 1.5s infinite;
         }
 
@@ -94,12 +94,12 @@ HTML_CONTENT = """
             text-shadow: 0 0 10px #00ff88;
             letter-spacing: 3px;
             text-transform: uppercase;
-            margin-bottom: 20px;
+            margin-bottom: 25px;
         }
 
         .btn-group {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: center;
             flex-wrap: wrap;
         }
@@ -108,13 +108,18 @@ HTML_CONTENT = """
             background: linear-gradient(135deg, #ffd700, #00ff88);
             color: #000;
             border: none;
-            padding: 10px 18px;
-            font-size: 13px;
+            padding: 12px 22px;
+            font-size: 14px;
             font-weight: 800;
             border-radius: 50px;
             cursor: pointer;
             box-shadow: 0 0 15px rgba(0, 255, 136, 0.6);
             transition: all 0.2s ease-in-out;
+        }
+
+        .music-btn {
+            background: linear-gradient(135deg, #00ff88, #ffd700);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
         }
 
         .action-btn:active {
@@ -148,33 +153,32 @@ HTML_CONTENT = """
         
         <div class="btn-group">
             <button class="action-btn" onclick="nextQuote(event)">NEXT QUOTE 🎲</button>
-            <button class="action-btn" id="musicBtn" onclick="toggleAudio(event)">🔊 MUSIC: OFF</button>
+            <button class="action-btn music-btn" id="musicBtn" onclick="toggleMusic(event)">▶ PLAY MUSIC 🎵</button>
         </div>
     </div>
 
-    <!-- Farzi "Paisa Hai Toh" Audio Track -->
+    <!-- Farzi Movie Audio Source -->
     <audio id="farziAudio" loop preload="auto">
         <source src="https://cdnsongs.com/music/data/Hindi_Movies/202301/Farzi/128/Paisa_Hai_Toh_1.mp3" type="audio/mpeg">
     </audio>
 
     <script>
+        // Music Controller Button
         const audio = document.getElementById('farziAudio');
         const musicBtn = document.getElementById('musicBtn');
         let isPlaying = false;
 
-        function toggleAudio(e) {
+        function toggleMusic(e) {
             if (e) e.stopPropagation();
             if (isPlaying) {
                 audio.pause();
                 isPlaying = false;
-                musicBtn.innerText = "🔇 MUSIC: OFF";
-                musicBtn.style.background = "linear-gradient(135deg, #ffd700, #00ff88)";
+                musicBtn.innerText = "▶ PLAY MUSIC 🎵";
             } else {
                 audio.play().then(() => {
                     isPlaying = true;
-                    musicBtn.innerText = "🔊 MUSIC: ON";
-                    musicBtn.style.background = "#00ff88";
-                }).catch(err => console.log("User interaction required"));
+                    musicBtn.innerText = "⏸ PAUSE MUSIC 🔊";
+                }).catch(err => alert("Please tap again to play music!"));
             }
         }
 
@@ -253,12 +257,8 @@ HTML_CONTENT = """
         }
         drawMoney();
 
-        // Click Burst Effect & Screen Touch Auto Audio Trigger
+        // Click Burst Effect
         window.addEventListener('click', (e) => {
-            if (!isPlaying) {
-                toggleAudio();
-            }
-
             for(let k = 0; k < 12; k++) {
                 const p = document.createElement('div');
                 p.className = 'particle';
