@@ -251,10 +251,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date & Time (IST)</th>
+                            <th class="p-2 text-center">Action</th>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="4" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -354,7 +355,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             } catch (error) {
                 errorDiv.innerText = error.message;
                 errorDiv.classList.remove('hidden');
-            } finally {
+            } font-medium {
                 loginBtn.innerText = "Sign In";
             }
         }
@@ -617,14 +618,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
                 return;
             }
             var totalPages = Math.ceil(historyDataList.length / itemsPerPage);
@@ -635,13 +636,27 @@ HTML_CONTENT = """<!DOCTYPE html>
             var pageItems = historyDataList.slice(startIndex, startIndex + itemsPerPage);
 
             hTable.innerHTML = "";
-            pageItems.forEach(item => {
+            pageItems.forEach((item, index) => {
+                var globalIndex = startIndex + index;
                 hTable.innerHTML += `
                     <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
                         <td class="p-2 font-medium">${item.filename || 'N/A'}</td>
                         <td class="p-2 text-emerald-400 font-bold">${item.score || 0}/100</td>
                         <td class="p-2 text-sub max-w-xs truncate">${item.summary || 'N/A'}</td>
                         <td class="p-2 text-sub">${formatDateDisplay(item.created_at)}</td>
+                        <td class="p-2 text-center">
+                            <div class="flex items-center justify-center gap-1.5">
+                                <button onclick="viewHistoryDetails(${globalIndex})" title="View Details" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white px-2 py-1 rounded text-[11px] font-medium transition">
+                                    👁️ View
+                                </button>
+                                <button onclick="downloadSingleHistoryExcel(${globalIndex})" title="Export Excel" class="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white px-2 py-1 rounded text-[11px] font-medium transition">
+                                    📊 Excel
+                                </button>
+                                <button onclick="deleteHistoryItem('${item.id}', ${globalIndex})" title="Delete Audit" class="bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white px-2 py-1 rounded text-[11px] font-medium transition">
+                                    🗑️ Delete
+                                </button>
+                            </div>
+                        </td>
                     </tr>`;
             });
 
@@ -651,6 +666,70 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function changePage(direction) { currentPage += direction; renderHistoryTable(); }
+
+        function viewHistoryDetails(index) {
+            var item = historyDataList[index];
+            if(!item) return;
+
+            var metricsInfo = "";
+            var evalMetrics = item.evaluated_metrics || {};
+            
+            activeMetrics.forEach(m => {
+                var statusStr = evalMetrics[m.key] ? "YES ✅" : "NO ❌";
+                metricsInfo += `\n• ${m.label}: ${statusStr}`;
+            });
+
+            var detailText = `📁 File: ${item.filename}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
+            alert(detailText);
+        }
+
+        function downloadSingleHistoryExcel(index) {
+            var item = historyDataList[index];
+            if(!item) return;
+
+            var row = {
+                "File Name": item.filename || "N/A",
+                "QA Score": item.score || 0,
+                "WPM": item.wpm || 0,
+                "Duration (sec)": Math.round(item.duration || 0),
+                "Total Words": item.total_words || 0,
+                "Date & Time (IST)": formatDateDisplay(item.created_at),
+                "Summary": item.summary || ""
+            };
+            
+            var evalMetrics = item.evaluated_metrics || {};
+            activeMetrics.forEach(m => {
+                row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
+            });
+
+            var workbook = XLSX.utils.book_new();
+            var sheet = XLSX.utils.json_to_sheet([row]);
+            XLSX.utils.book_append_sheet(workbook, sheet, "Audit Details");
+            XLSX.writeFile(workbook, `${item.filename}_Audit.xlsx`);
+        }
+
+        async function deleteHistoryItem(auditId, index) {
+            if(!auditId) {
+                alert("Cannot delete this record (Missing Document ID).");
+                return;
+            }
+            
+            if(!confirm("Kya aap sach me is audit record ko Firestore se delete karna chahte hain?")) {
+                return;
+            }
+
+            try {
+                var res = await fetchAuth(`/api/history/${auditId}`, { method: 'DELETE' });
+                if(!res.ok) throw new Error("Delete failed on server side.");
+
+                historyDataList.splice(index, 1);
+                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Loaded";
+                renderHistoryTable();
+                alert("Record deleted successfully!");
+            } catch(err) {
+                alert("Error deleting record: " + err.message);
+            }
+        }
 
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
@@ -1068,6 +1147,21 @@ async def get_history(limit: int = 50, user: dict = Depends(verify_firebase_toke
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
+
+@app.delete("/api/history/{audit_id}")
+async def delete_audit_history(
+    audit_id: str,
+    user: dict = Depends(verify_firebase_token)
+):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
+    try:
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, lambda: db.collection("audits").document(audit_id).delete())
+        return {"status": "success", "message": "Audit record deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
