@@ -274,6 +274,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                                 <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer">
                             </th>
                             <th class="p-2">File</th>
+                            <th class="p-2">Uploaded By</th>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
                             <th class="p-2">Date & Time (IST)</th>
@@ -281,7 +282,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="6" class="p-3 text-center text-slate-500">Loading full history...</td></tr>
+                        <tr><td colspan="7" class="p-3 text-center text-slate-500">Loading full history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -360,7 +361,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 idToken = await user.getIdToken(true);
                 
                 // Show Name or Email Prefix on Dashboard UI
-                const userName = user.displayName || user.email.split('@')[0];
+                const userName = user.displayName || (user.email ? user.email.split('@')[0] : "Admin");
                 document.getElementById('userDisplayName').innerText = userName;
 
                 document.getElementById('authModal').classList.add('hidden');
@@ -653,14 +654,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
-                hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
                 return;
             }
             var totalPages = Math.ceil(historyDataList.length / itemsPerPage);
@@ -674,12 +675,15 @@ HTML_CONTENT = """<!DOCTYPE html>
             pageItems.forEach((item, index) => {
                 var globalIndex = startIndex + index;
                 var isChecked = selectedAuditIds.has(item.id) ? "checked" : "";
+                var uploadedUser = item.uploaded_by || "Unknown";
+                
                 hTable.innerHTML += `
                     <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
                         <td class="p-2 text-center">
                             <input type="checkbox" value="${item.id}" ${isChecked} onchange="toggleAuditSelect('${item.id}', this)" class="row-checkbox rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer">
                         </td>
                         <td class="p-2 font-medium">${item.filename || 'N/A'}</td>
+                        <td class="p-2 font-semibold text-indigo-300">👤 ${uploadedUser}</td>
                         <td class="p-2 text-emerald-400 font-bold">${item.score || 0}/100</td>
                         <td class="p-2 text-sub max-w-xs truncate">${item.summary || 'N/A'}</td>
                         <td class="p-2 text-sub">${formatDateDisplay(item.created_at)}</td>
@@ -741,6 +745,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var exportData = targetItems.map(item => {
                 var row = {
                     "File Name": item.filename || "N/A",
+                    "Uploaded By": item.uploaded_by || "Unknown",
                     "QA Score": item.score || 0,
                     "WPM": item.wpm || 0,
                     "Duration (sec)": Math.round(item.duration || 0),
@@ -765,6 +770,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var exportData = historyDataList.map(item => {
                 var row = {
                     "File Name": item.filename || "N/A",
+                    "Uploaded By": item.uploaded_by || "Unknown",
                     "QA Score": item.score || 0,
                     "WPM": item.wpm || 0,
                     "Duration (sec)": Math.round(item.duration || 0),
@@ -840,7 +846,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 metricsInfo += `\n• ${m.label}: ${statusStr}`;
             });
 
-            var detailText = `📁 File: ${item.filename}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
+            var detailText = `📁 File: ${item.filename}\n👤 Uploaded By: ${item.uploaded_by || 'Unknown'}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
             alert(detailText);
         }
 
@@ -850,6 +856,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var row = {
                 "File Name": item.filename || "N/A",
+                "Uploaded By": item.uploaded_by || "Unknown",
                 "QA Score": item.score || 0,
                 "WPM": item.wpm || 0,
                 "Duration (sec)": Math.round(item.duration || 0),
@@ -1210,7 +1217,7 @@ async def evaluate_quality_async(transcript, metrics_list):
 
     raise Exception("Gemini Rate Limit Exceeded after retries.")
 
-async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
+async def process_single_file(file: UploadFile, active_metrics: List[Dict], user_info: dict = None):
     try:
         audio_bytes = await file.read()
         transcript, metrics = await transcribe_bytes_async(audio_bytes)
@@ -1219,10 +1226,16 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         created_time = datetime.now(ist_tz).isoformat()
 
+        # Extract uploader name or email
+        uploader_name = "Admin"
+        if user_info:
+            uploader_name = user_info.get("name") or user_info.get("email", "").split("@")[0] or "Admin"
+
         if db:
             try:
                 audit_data = {
                     "filename": file.filename,
+                    "uploaded_by": uploader_name,
                     "score": evaluation.get("overall_score", 0),
                     "summary": evaluation.get("summary", ""),
                     "evaluated_metrics": evaluation.get("evaluated_metrics", {}),
@@ -1242,9 +1255,9 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
     except Exception as e:
         return {"status": "error", "filename": file.filename, "error": str(e)}
 
-async def process_single_file_limited(file: UploadFile, active_metrics: List[Dict]):
+async def process_single_file_limited(file: UploadFile, active_metrics: List[Dict], user_info: dict = None):
     async with semaphore:
-        return await process_single_file(file, active_metrics)
+        return await process_single_file(file, active_metrics, user_info)
 
 # ================= Batch Analysis & History APIs =================
 
@@ -1262,7 +1275,7 @@ async def analyze_audio_batch(
     else:
         active_metrics = DEFAULT_METRICS
 
-    tasks = [process_single_file_limited(file, active_metrics) for file in files]
+    tasks = [process_single_file_limited(file, active_metrics, user) for file in files]
     results = await asyncio.gather(*tasks)
     return {"results": results}
 
