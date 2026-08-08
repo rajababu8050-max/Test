@@ -7,7 +7,7 @@ import httpx
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Depends, status, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Depends, status
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -99,7 +99,7 @@ async def verify_firebase_token(request: Request):
             detail=f"Unauthorized: Invalid or expired token ({str(e)})"
         )
 
-# ================= HTML Content =================
+# ================= HTML Content (Main Dashboard) =================
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
@@ -195,7 +195,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
                     <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
-                <div id="loaderText" class="text-xs text-blue-400 font-medium">⚡ Auditing speech & evaluating metrics... 0 / 0 Completed</div>
+                <div id="loaderText" class="text-xs text-blue-400 font-medium">⚡ Auditing... 0 / 0 Completed</div>
             </div>
         </div>
 
@@ -717,20 +717,26 @@ async def serve_ai_page():
     else:
         return HTMLResponse("<h1>ai.html File missing in project root folder!</h1>", status_code=404)
 
-# ================= Groq Audio Transcribe & Diarize API (SECURE BACKEND API) =================
+# ================= Groq ONLY Audio Transcribe & Diarize API =================
 
 @app.post("/api/groq-transcribe-eval")
 async def groq_transcribe_eval(
     file: UploadFile = File(...),
     user: dict = Depends(verify_firebase_token)
 ):
+    """
+    Dedicated endpoint ONLY for ai.html - Uses strictly GROQ API (Whisper + LLaMA-3)
+    """
     if not GROQ_API_KEY:
-        raise HTTPException(status_code=500, detail="GROQ_API_KEY environment variable missing on Render server!")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="GROQ_API_KEY environment variable missing on Render server!"
+        )
 
     try:
         audio_bytes = await file.read()
         
-        # 1. Groq Whisper API Call
+        # 1. Direct Groq Whisper Audio Transcription Call
         async with httpx.AsyncClient(timeout=300.0) as client:
             files_payload = {"file": (file.filename, audio_bytes, file.content_type or "audio/mpeg")}
             data_payload = {
@@ -749,11 +755,11 @@ async def groq_transcribe_eval(
             )
 
             if whisper_res.status_code != 200:
-                raise Exception(f"Groq Whisper Error: {whisper_res.text}")
+                raise Exception(f"Groq Whisper Error ({whisper_res.status_code}): {whisper_res.text}")
 
             raw_transcript = whisper_res.json().get("text", "").strip()
 
-            # 2. Groq LLaMA-3 Diarization Call
+            # 2. Direct Groq LLaMA-3 Diarization Call
             llm_prompt = f"""
 You are an expert Call Center QA Auditor.
 Below is a full raw transcript of a customer service call in Hindi/Hinglish/English:
@@ -881,7 +887,7 @@ async def delete_metric(
     await loop.run_in_executor(None, lambda: db.collection("metrics").document(metric_id).delete())
     return {"status": "success"}
 
-# ================= Core Transcription Logic =================
+# ================= Core Transcription Logic (App Main Flow) =================
 
 async def transcribe_bytes_async(audio_bytes: bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
