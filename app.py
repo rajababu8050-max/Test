@@ -129,8 +129,8 @@ HTML_CONTENT = """<!DOCTYPE html>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
 
-    <!-- ADMIN LOGIN MODAL -->
-    <div id="authModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
+    <!-- ADMIN LOGIN MODAL (HIDDEN BY DEFAULT TO PREVENT FLICKER FOR LOGGED-IN USERS) -->
+    <div id="authModal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl">
             <div class="text-center space-y-2">
                 <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🔒</div>
@@ -160,8 +160,8 @@ HTML_CONTENT = """<!DOCTYPE html>
     <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
-                <!-- CLICKABLE HOME PAGE TITLE HEADER -->
-                <h1 onclick="window.location.href='/'" class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 cursor-pointer hover:opacity-90 transition" title="Go to Home Page">
+                <!-- SMART HOME NAV (SMOOTH RESET WITHOUT LOGIN FLICKER) -->
+                <h1 onclick="goToHome()" class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 cursor-pointer hover:opacity-90 transition" title="Go to Dashboard Home">
                     AI Call Quality Auditor Pro
                 </h1>
                 <p class="text-sub text-sm">Pharma Metrics Evaluation & Bulk Batch Quality Auditing</p>
@@ -443,6 +443,19 @@ HTML_CONTENT = """<!DOCTYPE html>
         var itemsPerPage = 10;
         var selectedAuditIds = new Set();
 
+        // SMART NAV FUNCTION TO RESET DASHBOARD WITHOUT PAGE RELOAD / LOGIN FLICKER
+        function goToHome() {
+            if (auth.currentUser) {
+                document.getElementById('batchResultsContainer').classList.add('hidden');
+                document.getElementById('audioInput').value = "";
+                document.getElementById('fileName').innerText = "Select Audio File(s) (.mp3, .wav, .m4a)";
+                selectedFiles = [];
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                window.location.reload();
+            }
+        }
+
         function extractDuration(item) {
             return Math.round(item.duration ?? item.data?.metrics?.duration ?? 0);
         }
@@ -494,13 +507,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
-        // PERFECT HORIZONTAL & VERTICAL CENTER ALIGNMENT VIA HTML TABLE CONVERSION
         function exportStyledWorkbook(exportData, sheetName, fileName) {
             if (!exportData || exportData.length === 0) return;
 
             var keys = Object.keys(exportData[0]);
 
-            // Construct HTML Table String with Explicit Center & Middle CSS Alignment
             var html = '<table border="1"><thead><tr>';
             keys.forEach(k => {
                 html += `<th style="text-align: center; vertical-align: middle; background-color: #1e293b; color: #ffffff; font-weight: bold; padding: 8px;">${k}</th>`;
@@ -517,7 +528,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
             html += '</tbody></table>';
 
-            // Convert HTML Table String directly to Workbook
             var worksheet = XLSX.utils.table_to_sheet(
                 new DOMParser().parseFromString(html, 'text/html').body.getElementsByTagName('table')[0],
                 { raw: true }
@@ -525,7 +535,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var workbook = XLSX.utils.book_new();
 
-            // Set Column Widths cleanly
             var colWidths = keys.map(key => {
                 var maxLen = key.length;
                 exportData.forEach(row => {
@@ -541,19 +550,22 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         auth.onAuthStateChanged(async (user) => {
+            var authModal = document.getElementById('authModal');
+            var dashContent = document.getElementById('dashboardContent');
+
             if (user) {
                 idToken = await user.getIdToken(true);
                 currentUserName = user.displayName || (user.email ? user.email.split('@')[0] : "Admin");
                 document.getElementById('userDisplayName').innerText = currentUserName;
 
-                document.getElementById('authModal').classList.add('hidden');
-                document.getElementById('dashboardContent').classList.remove('hidden');
+                if (authModal) authModal.classList.add('hidden');
+                if (dashContent) dashContent.classList.remove('hidden');
                 await fetchMetrics();
                 loadHistory();
             } else {
                 idToken = "";
-                document.getElementById('authModal').classList.remove('hidden');
-                document.getElementById('dashboardContent').classList.add('hidden');
+                if (dashContent) dashContent.classList.add('hidden');
+                if (authModal) authModal.classList.remove('hidden');
             }
         });
 
