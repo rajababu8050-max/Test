@@ -1,25 +1,11 @@
 import os
 import json
 import re
-import io
 import asyncio
 import itertools
 import httpx
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
-
-# Fix for Python 3.13+ missing audioop / pyaudioop issue in pydub
-try:
-    import audioop
-except ImportError:
-    try:
-        import pyaudioop as audioop
-        import sys
-        sys.modules["audioop"] = audioop
-    except ImportError:
-        pass
-
-from pydub import AudioSegment
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Depends, status
 from fastapi.responses import HTMLResponse
@@ -198,7 +184,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg">
             <div class="space-y-3">
                 <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎙️</div>
-                <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav, .awb)</p>
+                <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav, .m4a)</p>
                 <input type="file" id="audioInput" accept="audio/*" multiple class="hidden" onchange="fileSelected(event)">
                 <div class="flex justify-center gap-3">
                     <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-600 font-medium px-4 py-2 rounded-xl text-sm">Browse Files</button>
@@ -731,7 +717,7 @@ async def serve_ai_page():
     else:
         return HTMLResponse("<h1>ai.html File missing in project root folder!</h1>", status_code=404)
 
-# ================= Groq ONLY Audio Transcribe & Diarize API (Auto Convert Non-Supported Formats) =================
+# ================= Groq ONLY Audio Transcribe & Diarize API =================
 
 @app.post("/api/groq-transcribe-eval")
 async def groq_transcribe_eval(
@@ -746,21 +732,8 @@ async def groq_transcribe_eval(
 
     try:
         audio_bytes = await file.read()
-        filename = file.filename.lower()
+        filename = file.filename
         content_type = file.content_type or "audio/mpeg"
-
-        allowed_extensions = ('.flac', '.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.ogg', '.opus', '.wav', '.webm')
-
-        if not filename.endswith(allowed_extensions):
-            try:
-                audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
-                mp3_buffer = io.BytesIO()
-                audio.export(mp3_buffer, format="mp3")
-                audio_bytes = mp3_buffer.getvalue()
-                filename = "converted_audio.mp3"
-                content_type = "audio/mpeg"
-            except Exception as conv_err:
-                raise HTTPException(status_code=400, detail=f"Audio conversion failed for '{file.filename}': {str(conv_err)}")
 
         async with httpx.AsyncClient(timeout=300.0) as client:
             files_payload = {"file": (filename, audio_bytes, content_type)}
