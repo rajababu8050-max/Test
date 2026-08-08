@@ -4,3 +4,4 @@ gunicorn
 httpx
 firebase-admin
 python-multipart
+pydub
