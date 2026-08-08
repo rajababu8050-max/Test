@@ -760,7 +760,8 @@ HTML_CONTENT = """<!DOCTYPE html>
             } catch (error) {
                 errorDiv.innerText = error.message;
                 errorDiv.classList.remove('hidden');
-            } font-bold text-xs px-5 py-2 rounded-xl transition">Close</button>
+            } finally {
+                loginBtn.innerText = "AUTHENTICATE";
             }
         }
 
