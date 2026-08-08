@@ -160,7 +160,8 @@ HTML_CONTENT = """<!DOCTYPE html>
     <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
-                <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+                <!-- CLICKABLE HOME PAGE TITLE HEADER -->
+                <h1 onclick="window.location.href='/'" class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 cursor-pointer hover:opacity-90 transition" title="Go to Home Page">
                     AI Call Quality Auditor Pro
                 </h1>
                 <p class="text-sub text-sm">Pharma Metrics Evaluation & Bulk Batch Quality Auditing</p>
@@ -464,8 +465,8 @@ HTML_CONTENT = """<!DOCTYPE html>
             var strengthsList = isBatchResult ? (item.data?.evaluation?.strengths || []) : (item.strengths || []);
             var improvementsList = isBatchResult ? (item.data?.evaluation?.improvements || []) : (item.improvements || []);
 
-            var formattedStrengths = strengthsList.length > 0 ? strengthsList.map(s => "• " + s).join("; ") : "None";
-            var formattedImprovements = improvementsList.length > 0 ? improvementsList.map(i => "• " + i).join("; ") : "None";
+            var formattedStrengths = strengthsList.length > 0 ? strengthsList.map(s => "• " + s).join("<br/>") : "None";
+            var formattedImprovements = improvementsList.length > 0 ? improvementsList.map(i => "• " + i).join("<br/>") : "None";
 
             var row = {
                 "File Name": fileName,
@@ -493,40 +494,47 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
-        // MIDDLE & CENTER ALIGNMENT FOR ALL CELLS AND HEADERS IN EXCEL
+        // PERFECT HORIZONTAL & VERTICAL CENTER ALIGNMENT VIA HTML TABLE CONVERSION
         function exportStyledWorkbook(exportData, sheetName, fileName) {
-            var workbook = XLSX.utils.book_new();
-            var worksheet = XLSX.utils.json_to_sheet(exportData);
+            if (!exportData || exportData.length === 0) return;
 
-            if (exportData.length > 0) {
-                var range = XLSX.utils.decode_range(worksheet['!ref']);
-                
-                // Set Middle Vertical and Center Horizontal Alignment for ALL Cells
-                for (var R = range.s.r; R <= range.e.r; ++R) {
-                    for (var C = range.s.c; C <= range.e.c; ++C) {
-                        var cell_address = XLSX.utils.encode_cell({ r: R, c: C });
-                        if (!worksheet[cell_address]) continue;
-                        
-                        if (!worksheet[cell_address].s) worksheet[cell_address].s = {};
-                        worksheet[cell_address].s.alignment = {
-                            horizontal: "center",
-                            vertical: "center",
-                            wrapText: true
-                        };
-                    }
-                }
+            var keys = Object.keys(exportData[0]);
 
-                var colWidths = Object.keys(exportData[0]).map(key => {
-                    var maxLen = key.length;
-                    exportData.forEach(row => {
-                        var val = row[key] ? row[key].toString() : "";
-                        if (val.length > maxLen) maxLen = val.length;
-                    });
-                    return { wch: Math.min(Math.max(maxLen + 3, 14), 30) };
+            // Construct HTML Table String with Explicit Center & Middle CSS Alignment
+            var html = '<table border="1"><thead><tr>';
+            keys.forEach(k => {
+                html += `<th style="text-align: center; vertical-align: middle; background-color: #1e293b; color: #ffffff; font-weight: bold; padding: 8px;">${k}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            exportData.forEach(row => {
+                html += '<tr>';
+                keys.forEach(k => {
+                    var val = row[k] !== undefined && row[k] !== null ? row[k] : "";
+                    html += `<td style="text-align: center; vertical-align: middle; padding: 6px; mso-number-format:'\@';">${val}</td>`;
                 });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
 
-                worksheet["!cols"] = colWidths;
-            }
+            // Convert HTML Table String directly to Workbook
+            var worksheet = XLSX.utils.table_to_sheet(
+                new DOMParser().parseFromString(html, 'text/html').body.getElementsByTagName('table')[0],
+                { raw: true }
+            );
+
+            var workbook = XLSX.utils.book_new();
+
+            // Set Column Widths cleanly
+            var colWidths = keys.map(key => {
+                var maxLen = key.length;
+                exportData.forEach(row => {
+                    var val = row[key] ? row[key].toString() : "";
+                    if (val.length > maxLen) maxLen = val.length;
+                });
+                return { wch: Math.min(Math.max(maxLen + 4, 14), 30) };
+            });
+            worksheet["!cols"] = colWidths;
 
             XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
             XLSX.writeFile(workbook, fileName);
