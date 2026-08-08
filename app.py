@@ -365,6 +365,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <!-- VIEW AUDIT DETAILS CUSTOM SCROLLABLE MODAL -->
     <div id="viewDetailsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+            <!-- MODAL HEADER -->
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-shrink-0">
                 <div>
                     <h3 id="viewModalFileName" class="text-lg font-bold text-blue-400">📁 Audit Details</h3>
@@ -374,20 +375,33 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
             
             <div class="space-y-4 overflow-y-auto pr-2 flex-grow">
-                <!-- METRICS GRID CONTAINER -->
+                <!-- PACE / DURATION / WORDS METRICS BADGES -->
+                <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                    <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">PACE</span><span id="viewModalWPM" class="font-bold text-blue-400">0 WPM</span></div>
+                    <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">DURATION</span><span id="viewModalDuration" class="font-bold text-indigo-400">0s</span></div>
+                    <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">WORDS</span><span id="viewModalWords" class="font-bold text-amber-400">0</span></div>
+                </div>
+
+                <!-- ALL EVALUATED METRICS GRID CONTAINER -->
                 <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-3">
                     <div class="font-bold text-emerald-400 text-xs uppercase tracking-wider flex justify-between items-center">
-                        <span>💊 All Evaluated Metrics</span>
+                        <span>💊 Call Metrics Evaluation</span>
                         <span id="viewMetricsCount" class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20"></span>
                     </div>
-                    <div id="viewModalMetricsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs"></div>
+                    <div id="viewModalMetricsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs"></div>
                 </div>
 
                 <!-- CALL SUMMARY -->
                 <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-2">
-                    <div class="font-bold text-blue-300 text-xs uppercase tracking-wider">📝 Detailed Call Summary</div>
+                    <div class="font-bold text-blue-300 text-xs uppercase tracking-wider">Detailed Call Summary</div>
                     <p id="viewModalSummary" class="text-xs text-sub leading-relaxed whitespace-pre-wrap"></p>
                 </div>
+
+                <!-- DIARIZED TRANSCRIPT SECTION -->
+                <details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs" open>
+                    <summary class="font-bold text-sub cursor-pointer">📄 Full Diarized Transcript</summary>
+                    <div id="viewModalTranscript" class="mt-3 space-y-2 max-h-60 overflow-y-auto pr-2 pt-2 border-t border-slate-800"></div>
+                </details>
             </div>
 
             <div class="flex justify-end pt-2 border-t border-slate-700/60 flex-shrink-0">
@@ -1014,7 +1028,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        // VIEW DETAILS MODAL OPEN & CLOSE LOGIC
+        // VIEW DETAILS MODAL OPEN & CLOSE LOGIC (EXACTLY MATCHING BATCH RESULT CARD DETAILS)
         function viewHistoryDetails(index) {
             var item = filteredHistoryList[index];
             if(!item) return;
@@ -1022,16 +1036,20 @@ HTML_CONTENT = """<!DOCTYPE html>
             var evalMetrics = item.evaluated_metrics || {};
             var uName = item.uploaded_by || currentUserName || 'Admin';
 
-            // Populate Modal Header Meta Info
+            // Populate Modal Header & Stat Badges
             document.getElementById('viewModalFileName').innerText = "📁 " + (item.filename || "Audit Details");
-            document.getElementById('viewModalMeta').innerText = `👤 Uploaded By: ${uName} | ⭐ Score: ${item.score}/100 | ⏱️ Duration: ${extractDuration(item)}s | Pace: ${extractWPM(item)} WPM | Words: ${extractTotalWords(item)}`;
+            document.getElementById('viewModalMeta').innerText = `👤 Uploaded By: ${uName} | ⭐ Score: ${item.score || 0}/100 | Date: ${formatDateDisplay(item.created_at)}`;
+            
+            document.getElementById('viewModalWPM').innerText = extractWPM(item) + " WPM";
+            document.getElementById('viewModalDuration').innerText = extractDuration(item) + "s";
+            document.getElementById('viewModalWords').innerText = extractTotalWords(item);
+
             document.getElementById('viewModalSummary').innerText = item.summary || "No summary available.";
 
-            // Render ALL Evaluated Metrics Dynamically
+            // Dynamic Metrics Rendering (Matches Card Layout)
             var gridContainer = document.getElementById('viewModalMetricsGrid');
             gridContainer.innerHTML = "";
 
-            // Collect all available keys from both activeMetrics and item's evaluated_metrics
             var metricKeysSet = new Set([
                 ...activeMetrics.map(m => m.key),
                 ...Object.keys(evalMetrics)
@@ -1043,20 +1061,29 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var label = metricDef ? metricDef.label : key;
                 var val = evalMetrics[key];
 
-                var statusBadge = val === true 
-                    ? '<span class="bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded text-[11px] border border-emerald-500/30">YES ✅</span>'
-                    : '<span class="bg-rose-500/20 text-rose-400 font-bold px-2 py-0.5 rounded text-[11px] border border-rose-500/30">NO ❌</span>';
+                var fmt = (val === true) 
+                    ? '<span class="text-emerald-400 font-bold">YES</span>' 
+                    : '<span class="text-rose-400 font-bold">NO</span>';
 
-                gridContainer.innerHTML += `
-                    <div class="card-bg p-2.5 rounded-lg border border-slate-700/80 flex justify-between items-center">
-                        <span class="font-medium text-slate-200 text-xs">${label}</span>
-                        <div>${statusBadge}</div>
-                    </div>
-                `;
+                gridContainer.innerHTML += `<div class="inner-bg p-2 rounded border border-slate-700/40">${label}:${fmt}</div>`;
                 metricsCount++;
             });
 
-            document.getElementById('viewMetricsCount').innerText = `${metricsCount} Total Metrics`;
+            document.getElementById('viewMetricsCount').innerText = `${metricsCount} Metrics Evaluated`;
+
+            // Diarized Transcript Rendering
+            var transcriptContainer = document.getElementById('viewModalTranscript');
+            transcriptContainer.innerHTML = "";
+
+            var transcriptList = item.transcript || [];
+            if (transcriptList.length === 0) {
+                transcriptContainer.innerHTML = '<div class="text-sub italic">No transcript recorded or stored for this call.</div>';
+            } else {
+                transcriptList.forEach(t => {
+                    var colorClass = t.speaker === 'Agent' ? 'text-blue-400' : 'text-emerald-400';
+                    transcriptContainer.innerHTML += `<div class="mb-1"><b class="${colorClass}">${t.speaker}:</b> ${t.text}</div>`;
+                });
+            }
 
             // Open Modal
             var modal = document.getElementById('viewDetailsModal');
@@ -1471,6 +1498,7 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict], user
                     "wpm": calc_wpm,
                     "duration": calc_duration,
                     "total_words": calc_total_words,
+                    "transcript": transcript,
                     "created_at": created_time
                 }
                 loop = asyncio.get_running_loop()
