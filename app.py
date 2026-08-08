@@ -232,7 +232,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS -->
+        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS & YES/NO FILTER -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-2">
@@ -257,6 +257,17 @@ HTML_CONTENT = """<!DOCTYPE html>
                         Refresh
                     </button>
                 </div>
+            </div>
+
+            <!-- METRICS FILTER DROPDOWN BAR WITH YES / NO CHOICE -->
+            <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex items-center justify-between flex-wrap gap-3">
+                <div class="flex items-center gap-2 text-xs flex-wrap">
+                    <span class="font-bold text-blue-400 flex items-center gap-1">🔍 Filter Metric Status:</span>
+                    <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-600 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer min-w-[240px]">
+                        <option value="ALL">All Metrics (Show All)</option>
+                    </select>
+                </div>
+                <div id="filterStatusBadge" class="text-xs text-sub font-medium">Showing All Records</div>
             </div>
 
             <div class="overflow-x-auto">
@@ -343,6 +354,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         var selectedFiles = [];
         var currentBatchResults = [];
         var historyDataList = [];
+        var filteredHistoryList = [];
         var activeMetrics = [];
         var currentPage = 1;
         var itemsPerPage = 10;
@@ -421,7 +433,20 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetchAuth("/api/metrics");
                 activeMetrics = await res.json();
                 renderMetricsList();
+                populateMetricFilterDropdown();
             } catch(e) { console.error(e); }
+        }
+
+        // Populates BOTH YES & NO Options for each metric
+        function populateMetricFilterDropdown() {
+            var select = document.getElementById('metricFilterSelect');
+            select.innerHTML = '<option value="ALL">All Metrics (Show All)</option>';
+            if(activeMetrics && activeMetrics.length > 0) {
+                activeMetrics.forEach(m => {
+                    select.innerHTML += `<option value="${m.key}:YES">✅ ${m.label} = YES</option>`;
+                    select.innerHTML += `<option value="${m.key}:NO">❌ ${m.label} = NO</option>`;
+                });
+            }
         }
 
         function renderMetricsList() {
@@ -600,6 +625,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     dynamicCardsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}:${fmt}</div>`;
                 });
 
+                var strengthsList = (evalData.strengths || []).map(s => `<li>• ${s}</li>`).join('') || "<li>• None noted</li>";
+                var improvementsList = (evalData.improvements || []).map(i => `<li>• ${i}</li>`).join('') || "<li>• None noted</li>";
+
                 card.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                         <h3 class="font-bold text-blue-400 text-sm">📁 ${item.filename}</h3>
@@ -614,9 +642,19 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <div class="font-bold text-emerald-400 text-[11px] uppercase">💊 Call Metrics Evaluation</div>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">${dynamicCardsHtml}</div>
                     </div>
-                    <div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">
+                    <div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-2">
                         <div class="font-bold text-blue-300 text-[11px] uppercase">Detailed Call Summary</div>
                         <p class="text-sub leading-relaxed">${evalData.summary || "N/A"}</p>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div class="inner-bg p-3 rounded-xl border border-emerald-500/30 space-y-1">
+                            <div class="font-bold text-emerald-400 text-[11px] uppercase flex items-center gap-1">💪 Agent Strengths</div>
+                            <ul class="text-sub space-y-1 leading-relaxed">${strengthsList}</ul>
+                        </div>
+                        <div class="inner-bg p-3 rounded-xl border border-amber-500/30 space-y-1">
+                            <div class="font-bold text-amber-400 text-[11px] uppercase flex items-center gap-1">🎯 Areas of Improvement</div>
+                            <ul class="text-sub space-y-1 leading-relaxed">${improvementsList}</ul>
+                        </div>
                     </div>
                     <details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">
                         <summary class="font-bold text-sub cursor-pointer">📄 Full Diarized Transcript</summary>
@@ -638,25 +676,65 @@ HTML_CONTENT = """<!DOCTYPE html>
                 selectedAuditIds.clear();
                 document.getElementById('selectAllCheckbox').checked = false;
                 document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
-                currentPage = 1;
-                renderHistoryTable();
+                
+                applyMetricFilter();
             } catch(e) {
                 hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
             }
         }
 
+        // ================= Enhanced YES / NO Metric Filter Logic =================
+
+        function applyMetricFilter() {
+            var filterValue = document.getElementById('metricFilterSelect').value;
+            var statusBadge = document.getElementById('filterStatusBadge');
+
+            if(filterValue === "ALL") {
+                filteredHistoryList = [...historyDataList];
+                statusBadge.innerText = `Showing All (${filteredHistoryList.length}) Records`;
+                statusBadge.className = "text-xs text-sub font-medium";
+            } else {
+                var parts = filterValue.split(":");
+                var key = parts[0];
+                var targetBool = (parts[1] === "YES");
+
+                filteredHistoryList = historyDataList.filter(item => {
+                    var evalMetrics = item.evaluated_metrics || {};
+                    var metricVal = (evalMetrics[key] === true);
+                    return metricVal === targetBool;
+                });
+
+                var mObj = activeMetrics.find(m => m.key === key);
+                var labelName = mObj ? mObj.label : key;
+                var colorClass = targetBool ? "text-emerald-400" : "text-rose-400";
+                var boolText = targetBool ? "YES" : "NO";
+                
+                statusBadge.innerText = `Filtered: ${filteredHistoryList.length} calls with "${labelName} = ${boolText}"`;
+                statusBadge.className = `text-xs font-bold ${colorClass}`;
+            }
+
+            currentPage = 1;
+            renderHistoryTable();
+        }
+
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
-            if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
+            var displayList = filteredHistoryList || [];
+
+            if(!displayList || displayList.length === 0) {
+                hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">No matching audit records found.</td></tr>';
+                document.getElementById('pageInfoText').innerText = "Page 0 of 0 (0 items)";
+                document.getElementById('prevPageBtn').disabled = true;
+                document.getElementById('nextPageBtn').disabled = true;
                 return;
             }
-            var totalPages = Math.ceil(historyDataList.length / itemsPerPage);
+
+            var totalPages = Math.ceil(displayList.length / itemsPerPage);
             if(currentPage > totalPages) currentPage = totalPages;
             if(currentPage < 1) currentPage = 1;
 
             var startIndex = (currentPage - 1) * itemsPerPage;
-            var pageItems = historyDataList.slice(startIndex, startIndex + itemsPerPage);
+            var pageItems = displayList.slice(startIndex, startIndex + itemsPerPage);
 
             hTable.innerHTML = "";
             pageItems.forEach((item, index) => {
@@ -687,7 +765,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </tr>`;
             });
 
-            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} items)`;
+            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${displayList.length} items)`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
         }
@@ -734,7 +812,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Duration (sec)": Math.round(item.duration || 0),
                     "Total Words": item.total_words || 0,
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
-                    "Summary": item.summary || ""
+                    "Summary": item.summary || "",
+                    "Agent Strengths": (item.strengths || []).join(" | "),
+                    "Areas of Improvement": (item.improvements || []).join(" | ")
                 };
                 var evalMetrics = item.evaluated_metrics || {};
                 activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
@@ -758,7 +838,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Duration (sec)": Math.round(item.duration || 0),
                     "Total Words": item.total_words || 0,
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
-                    "Summary": item.summary || ""
+                    "Summary": item.summary || "",
+                    "Agent Strengths": (item.strengths || []).join(" | "),
+                    "Areas of Improvement": (item.improvements || []).join(" | ")
                 };
                 var evalMetrics = item.evaluated_metrics || {};
                 activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
@@ -817,7 +899,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function viewHistoryDetails(index) {
-            var item = historyDataList[index];
+            var item = filteredHistoryList[index];
             if(!item) return;
 
             var metricsInfo = "";
@@ -828,12 +910,15 @@ HTML_CONTENT = """<!DOCTYPE html>
                 metricsInfo += `\n• ${m.label}: ${statusStr}`;
             });
 
-            var detailText = `📁 File: ${item.filename}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
+            var strengthsStr = (item.strengths || []).map(s => `\n • ${s}`).join('') || "\n • None";
+            var improvementsStr = (item.improvements || []).map(i => `\n • ${i}`).join('') || "\n • None";
+
+            var detailText = `📁 File: ${item.filename}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💪 Agent Strengths:${strengthsStr}\n\n🎯 Areas of Improvement:${improvementsStr}\n\n💊 Evaluated Metrics:${metricsInfo}`;
             alert(detailText);
         }
 
         function downloadSingleHistoryExcel(index) {
-            var item = historyDataList[index];
+            var item = filteredHistoryList[index];
             if(!item) return;
 
             var row = {
@@ -843,7 +928,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "Duration (sec)": Math.round(item.duration || 0),
                 "Total Words": item.total_words || 0,
                 "Date & Time (IST)": formatDateDisplay(item.created_at),
-                "Summary": item.summary || ""
+                "Summary": item.summary || "",
+                "Agent Strengths": (item.strengths || []).join(" | "),
+                "Areas of Improvement": (item.improvements || []).join(" | ")
             };
             
             var evalMetrics = item.evaluated_metrics || {};
@@ -871,10 +958,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetchAuth(`/api/history/${auditId}`, { method: 'DELETE' });
                 if(!res.ok) throw new Error("Delete failed on server side.");
 
-                historyDataList.splice(index, 1);
+                historyDataList = historyDataList.filter(x => x.id !== auditId);
                 selectedAuditIds.delete(auditId);
                 document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
-                renderHistoryTable();
+                applyMetricFilter();
                 alert("Record deleted successfully!");
             } catch(err) {
                 alert("Error deleting record: " + err.message);
@@ -890,7 +977,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "WPM": i.data?.metrics?.wpm || 0,
                     "Duration (sec)": Math.round(i.data?.metrics?.duration || 0),
                     "Total Words": i.data?.metrics?.total_words || 0,
-                    "Summary": i.data?.evaluation?.summary || ""
+                    "Summary": i.data?.evaluation?.summary || "",
+                    "Agent Strengths": (i.data?.evaluation?.strengths || []).join(" | "),
+                    "Areas of Improvement": (i.data?.evaluation?.improvements || []).join(" | ")
                 };
                 var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
                 activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
@@ -1153,8 +1242,8 @@ async def evaluate_quality_async(transcript, metrics_list):
         "overall_score": 85,
         "summary": "Detailed call summary...",
         "evaluated_metrics": {json.dumps(evaluated_metrics_json)},
-        "strengths": ["Strong point"],
-        "improvements": ["Improvement point"]
+        "strengths": ["Strong point 1", "Strong point 2"],
+        "improvements": ["Improvement point 1", "Improvement point 2"]
     }}
     """
 
