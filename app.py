@@ -239,27 +239,17 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS & METRIC FILTER -->
+        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL ACTIONS & METRIC FILTER -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-2 flex-wrap">
                     <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
                     <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total Records</span>
-                    <!-- SELECTION BADGE -->
-                    <span id="selectedCountHeaderBadge" class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition">
-                        Selected: 0
-                    </span>
                 </div>
-                <!-- GLOBAL BULK ACTIONS CONTROL -->
+                <!-- GLOBAL ACTIONS CONTROL -->
                 <div class="flex gap-2 flex-wrap items-center">
                     <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
                         📊 Export ALL Data to Excel
-                    </button>
-                    <button type="button" onclick="exportSelectedExcel()" class="text-xs bg-teal-700 hover:bg-teal-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-teal-700/20">
-                        📋 Export Marked
-                    </button>
-                    <button type="button" onclick="deleteSelectedAudits()" class="text-xs bg-amber-700 hover:bg-amber-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-amber-700/20">
-                        🗑️ Delete Marked
                     </button>
                     <button type="button" onclick="deleteAllHistoryData()" class="text-xs bg-rose-700 hover:bg-rose-600 px-3 py-1.5 rounded-lg text-white font-bold flex items-center gap-1 shadow-lg shadow-rose-700/20">
                         🔥 Delete ALL Data
@@ -287,6 +277,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <button onclick="resetMetricFilter()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg transition font-medium">
                     Reset Filter
                 </button>
+
+                <!-- EXPORT FILTERED EXCEL BUTTON -->
+                <button type="button" onclick="exportFilteredExcel()" class="bg-teal-700 hover:bg-teal-600 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-lg shadow-teal-700/20">
+                    📥 Export Filtered Data to Excel
+                </button>
+
                 <span id="filterCountBadge" class="text-sub font-medium ml-auto"></span>
             </div>
 
@@ -294,9 +290,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <table class="w-full text-left text-xs text-sub">
                     <thead class="inner-bg uppercase font-semibold">
                         <tr>
-                            <th class="p-2 text-center w-8">
-                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer">
-                            </th>
                             <th class="p-2">File</th>
                             <th class="p-2">Uploaded By</th>
                             <th class="p-2">Score</th>
@@ -306,7 +299,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="7" class="p-3 text-center text-slate-500">Loading full history...</td></tr>
+                        <tr><td colspan="6" class="p-3 text-center text-slate-500">Loading full history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -380,7 +373,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         var activeMetrics = [];
         var currentPage = 1;
         var itemsPerPage = 10;
-        var selectedAuditIds = new Set();
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -683,14 +675,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 if(!res.ok) throw new Error("HTTP error " + res.status);
                 var list = await res.json();
                 historyDataList = list || [];
-                selectedAuditIds.clear();
-                document.getElementById('selectAllCheckbox').checked = false;
                 document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
                 
-                updateSelectedCounter();
                 applyMetricFilter();
             } catch(e) {
-                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
             }
         }
 
@@ -734,7 +723,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var dataToRender = filteredHistoryList || [];
 
             if(!dataToRender || dataToRender.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No audits found for selected filter.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">No audits found for selected filter.</td></tr>';
                 document.getElementById('pageInfoText').innerText = "Page 0 of 0";
                 document.getElementById('prevPageBtn').disabled = true;
                 document.getElementById('nextPageBtn').disabled = true;
@@ -751,7 +740,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             hTable.innerHTML = "";
             pageItems.forEach((item, index) => {
                 var globalIndex = startIndex + index;
-                var isChecked = selectedAuditIds.has(item.id) ? "checked" : "";
                 
                 // Fallback Logic for Uploader Name
                 var uploadedUser = item.uploaded_by;
@@ -761,9 +749,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 
                 hTable.innerHTML += `
                     <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
-                        <td class="p-2 text-center">
-                            <input type="checkbox" value="${item.id}" ${isChecked} onchange="toggleAuditSelect('${item.id}', this)" class="row-checkbox rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer">
-                        </td>
                         <td class="p-2 font-medium">${item.filename || 'N/A'}</td>
                         <td class="p-2 font-semibold text-indigo-300">👤 ${uploadedUser}</td>
                         <td class="p-2 text-emerald-400 font-bold">${item.score || 0}/100</td>
@@ -792,54 +777,12 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         function changePage(direction) { currentPage += direction; renderHistoryTable(); }
 
-        // ================= Checkbox Multi-Select & Counter Logic =================
-
-        function updateSelectedCounter() {
-            var count = selectedAuditIds.size;
-            var badge = document.getElementById('selectedCountHeaderBadge');
-            if(badge) {
-                badge.innerText = "Selected: " + count;
-                if(count > 0) {
-                    badge.classList.remove('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
-                    badge.classList.add('bg-blue-500', 'text-white', 'border-blue-400');
-                } else {
-                    badge.classList.remove('bg-blue-500', 'text-white', 'border-blue-400');
-                    badge.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
-                }
+        // Export Filtered Items to Excel
+        function exportFilteredExcel() {
+            var targetItems = filteredHistoryList || [];
+            if(targetItems.length === 0) {
+                return alert("Export karne ke liye koi filtered data nahi mila!");
             }
-        }
-
-        function toggleSelectAll(masterCheckbox) {
-            var checkboxes = document.querySelectorAll('.row-checkbox');
-            checkboxes.forEach(cb => {
-                cb.checked = masterCheckbox.checked;
-                if(masterCheckbox.checked) {
-                    selectedAuditIds.add(cb.value);
-                } else {
-                    selectedAuditIds.delete(cb.value);
-                }
-            });
-            updateSelectedCounter();
-        }
-
-        function toggleAuditSelect(id, checkbox) {
-            if(checkbox.checked) {
-                selectedAuditIds.add(id);
-            } else {
-                selectedAuditIds.delete(id);
-                document.getElementById('selectAllCheckbox').checked = false;
-            }
-            updateSelectedCounter();
-        }
-
-        // Export Selected Items to Excel
-        function exportSelectedExcel() {
-            if(selectedAuditIds.size === 0) {
-                return alert("Pehle items mark/select karein!");
-            }
-
-            var targetItems = historyDataList.filter(item => selectedAuditIds.has(item.id));
-            if(targetItems.length === 0) return;
 
             var exportData = targetItems.map(item => {
                 var row = {
@@ -859,8 +802,8 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var workbook = XLSX.utils.book_new();
             var sheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Selected Cloud Audits");
-            XLSX.writeFile(workbook, `Selected_Audits_Export_${targetItems.length}.xlsx`);
+            XLSX.utils.book_append_sheet(workbook, sheet, "Filtered Audits");
+            XLSX.writeFile(workbook, `Filtered_Audits_Export_${targetItems.length}.xlsx`);
         }
 
         // Export ALL History Data to Excel
@@ -886,30 +829,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             var sheet = XLSX.utils.json_to_sheet(exportData);
             XLSX.utils.book_append_sheet(workbook, sheet, "All Cloud Audit History");
             XLSX.writeFile(workbook, `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`);
-        }
-
-        // Bulk Delete Selected Audits
-        async function deleteSelectedAudits() {
-            if(selectedAuditIds.size === 0) {
-                return alert("Pehle delete karne ke liye records select karein!");
-            }
-
-            if(!confirm(`Kya aap sach me selected (${selectedAuditIds.size}) records ko Firestore se permanent delete karna chahte hain?`)) {
-                return;
-            }
-
-            var idsToDelete = Array.from(selectedAuditIds);
-            var successCount = 0;
-
-            for(let id of idsToDelete) {
-                try {
-                    var res = await fetchAuth(`/api/history/${id}`, { method: 'DELETE' });
-                    if(res.ok) successCount++;
-                } catch(e) { console.error(e); }
-            }
-
-            alert(`${successCount} / ${idsToDelete.length} records successfully delete ho gaye!`);
-            await loadHistory();
         }
 
         // DELETE ALL DATA IN FIRESTORE
