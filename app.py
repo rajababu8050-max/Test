@@ -119,7 +119,7 @@ async def verify_firebase_token(request: Request):
             detail=f"Unauthorized: Invalid or expired token ({str(e)})"
         )
 
-# ================= HTML Content (Owlbrain AI Light Gradient Theme) =================
+# ================= HTML Content (Owlbrain AI Pro Dashboard) =================
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="light">
@@ -303,7 +303,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </span>
                 <div class="flex gap-2">
                     <button type="button" onclick="downloadExcel()" class="bg-emerald-50 border border-emerald-200 hover:bg-emerald-600 hover:text-white text-emerald-700 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
-                        📊 Export Excel (.xlsx)
+                        📊 Export Management Excel (.xlsx)
                     </button>
                     <button type="button" onclick="downloadPDF()" class="inner-bg border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-bold px-4 py-2 rounded-xl transition">
                         📥 Export PDF
@@ -349,7 +349,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
                 <div class="flex gap-2 flex-wrap items-center">
                     <button type="button" id="exportAllBtn" onclick="exportHistoryExcel(event)" class="text-xs bg-emerald-50 border border-emerald-200 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition shadow-sm">
-                        📊 Export ALL Excel
+                        📊 Export Executive Excel
                     </button>
                     <button type="button" onclick="exportSelectedExcel()" class="text-xs inner-bg border border-slate-300 hover:border-slate-400 px-3 py-1.5 rounded-lg text-slate-700 font-semibold transition">
                         📋 Export Marked
@@ -658,7 +658,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
             });
 
-            // ================= 1. EXECUTIVE CRISP SUMMARY SHEET (MANAGEMENT TAB) =================
+            // ================= 1. EXECUTIVE C-SUITE SUMMARY TAB =================
             var execSummaryHtml = `<table border="1">
                 <thead>
                     <tr><th colspan="4" style="text-align:center; vertical-align:middle; background-color:#0f172a; color:#38bdf8; font-weight:bold; font-size:18px; padding:12px;">📊 OWLBRAIN.AI EXECUTIVE CALL QUALITY SUMMARY & STRATEGIC DASHBOARD</th></tr>
@@ -719,7 +719,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </tbody>
             </table>`;
 
-            // ================= 2. DASHBOARD ANALYTICS TABLE =================
+            // ================= 2. KPI ANALYTICS DASHBOARD TAB =================
             var dashboardHtml = `<table border="1">
                 <thead>
                     <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0f172a; color:#38bdf8; font-weight:bold; font-size:16px; padding:10px;">📊 OWLBRAIN AI BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
@@ -750,7 +750,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             dashboardHtml += '</tbody></table>';
 
-            // ================= 3. INDIVIDUAL CALL DETAILS TABLE =================
+            // ================= 3. INDIVIDUAL CALL AUDITS MATRIX TAB =================
             var rawRows = rawItemsList.map(item => buildExcelRow(item, isBatchResult));
             var rawKeys = Object.keys(rawRows[0]);
 
@@ -770,21 +770,21 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
             detailsHtml += '</tbody></table>';
 
-            // ================= WORKBOOK BUILDER =================
+            // ================= MULTI-TAB WORKBOOK BUILDER =================
             var parser = new DOMParser();
             var workbook = XLSX.utils.book_new();
 
-            // SHEET 1: Executive Crisp Summary (Management Level)
+            // TAB 1: Executive Summary (High-Level Management Insights)
             var execSheet = XLSX.utils.table_to_sheet(parser.parseFromString(execSummaryHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
             execSheet["!cols"] = [{ wch: 32 }, { wch: 22 }, { wch: 22 }, { wch: 32 }];
             XLSX.utils.book_append_sheet(workbook, execSheet, "👑 Executive Summary");
 
-            // SHEET 2: Metric Analytics Dashboard
+            // TAB 2: Metric Analytics Dashboard
             var dashSheet = XLSX.utils.table_to_sheet(parser.parseFromString(dashboardHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
             dashSheet["!cols"] = [{ wch: 32 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 32 }];
             XLSX.utils.book_append_sheet(workbook, dashSheet, "📌 KPI Analytics");
 
-            // SHEET 3: Individual Call Breakdowns
+            // TAB 3: Individual Call Breakdowns Matrix
             var detailSheet = XLSX.utils.table_to_sheet(parser.parseFromString(detailsHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
             var detailWidths = rawKeys.map(key => {
                 var maxLen = key.length;
@@ -1945,3 +1945,4 @@ async def delete_audit_history(
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+        
