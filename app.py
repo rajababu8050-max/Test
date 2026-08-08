@@ -119,289 +119,365 @@ async def verify_firebase_token(request: Request):
             detail=f"Unauthorized: Invalid or expired token ({str(e)})"
         )
 
-# ================= HTML Content (Main Dashboard) =================
+# ================= HTML Content (Pro UI Refresh) =================
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro (Bulk 50+ Audio)</title>
+    <title>AI Call Quality Auditor Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
-        tailwind.config = { darkMode: 'class' }
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            500: '#06b6d4',
+                            600: '#0891b2',
+                            900: '#0e7490'
+                        }
+                    }
+                }
+            }
+        }
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 
     <style>
-        .dark body { background-color: #0f172a; color: #f8fafc; }
-        body { background-color: #0f172a; color: #f8fafc; transition: background-color 0.3s, color 0.3s; }
-        .card-bg { background-color: #1e293b; }
-        .light .card-bg { background-color: #ffffff; border-color: #e2e8f0; color: #1e293b; }
-        .inner-bg { background-color: #0f172a; }
-        .light .inner-bg { background-color: #f1f5f9; color: #1e293b; }
+        body { font-family: 'Inter', sans-serif; }
+        .dark body { background: #090d16; color: #f1f5f9; }
+        body { background: #f8fafc; color: #0f172a; transition: background-color 0.3s, color 0.3s; }
+        
+        /* Glassmorphism Cards */
+        .card-bg { 
+            background: rgba(15, 23, 42, 0.75); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(51, 65, 85, 0.5); 
+        }
+        .light .card-bg { 
+            background: rgba(255, 255, 255, 0.9); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(226, 232, 240, 0.9); 
+            color: #0f172a; 
+        }
+
+        .inner-bg { background-color: rgba(30, 41, 59, 0.6); }
+        .light .inner-bg { background-color: #f1f5f9; color: #0f172a; }
+
         .text-sub { color: #94a3b8; }
         .light .text-sub { color: #64748b; }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #475569; }
     </style>
 </head>
-<body class="min-h-screen p-4 md:p-8 font-sans">
+<body class="min-h-screen antialiased selection:bg-cyan-500 selection:text-white">
 
     <!-- INITIAL FULLSCREEN APP LOADER -->
     <div id="initialAppLoader" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center space-y-4 z-[200]">
-        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-        <p class="text-xs font-semibold text-blue-400 uppercase tracking-widest">Loading Dashboard...</p>
+        <div class="relative flex items-center justify-center">
+            <div class="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
+            <div class="absolute text-cyan-400 font-bold text-xs">AI</div>
+        </div>
+        <p class="text-xs font-semibold text-slate-400 uppercase tracking-widest animate-pulse">Initializing Auditor Engine...</p>
     </div>
 
     <!-- ADMIN LOGIN MODAL -->
-    <div id="authModal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
-        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl">
-            <div class="text-center space-y-2">
-                <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🔒</div>
-                <h2 class="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
+    <div id="authModal" class="hidden fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
+        <div class="card-bg rounded-3xl w-full max-w-md p-8 space-y-6 shadow-2xl relative overflow-hidden">
+            <div class="absolute -top-10 -left-10 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl"></div>
+            <div class="text-center space-y-2 relative z-10">
+                <div class="w-14 h-14 bg-gradient-to-tr from-cyan-500 to-indigo-500 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-lg shadow-cyan-500/20">
+                    🛡️
+                </div>
+                <h2 class="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400">
                     Admin Portal Access
                 </h2>
-                <p class="text-xs text-sub">Please sign in with your Firebase credentials</p>
+                <p class="text-xs text-sub">Sign in with authorized Firebase admin credentials</p>
             </div>
-            <form onsubmit="handleLogin(event)" class="space-y-4">
+            <form onsubmit="handleLogin(event)" class="space-y-4 relative z-10">
                 <div>
-                    <label class="block text-xs font-semibold text-sub mb-1">Admin Email</label>
-                    <input type="email" id="adminEmail" required placeholder="admin@example.com" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                    <label class="block text-xs font-semibold text-sub mb-1.5 uppercase tracking-wider">Admin Email</label>
+                    <input type="email" id="adminEmail" required placeholder="admin@enterprise.com" class="w-full inner-bg border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-sub mb-1">Password</label>
-                    <input type="password" id="adminPassword" required placeholder="••••••••" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                    <label class="block text-xs font-semibold text-sub mb-1.5 uppercase tracking-wider">Password</label>
+                    <input type="password" id="adminPassword" required placeholder="••••••••" class="w-full inner-bg border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition">
                 </div>
-                <div id="authError" class="text-rose-400 text-xs text-center hidden font-medium"></div>
-                <button type="submit" id="loginBtn" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-lg shadow-blue-500/20">
-                    Sign In
+                <div id="authError" class="text-rose-400 text-xs text-center hidden font-medium p-2 bg-rose-500/10 rounded-lg border border-rose-500/20"></div>
+                <button type="submit" id="loginBtn" class="w-full bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold py-3 rounded-xl text-xs transition shadow-lg shadow-cyan-500/25 tracking-wide">
+                    Authenticate Account
                 </button>
             </form>
         </div>
     </div>
 
     <!-- MAIN PROTECTED DASHBOARD CONTENT -->
-    <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
-        <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
+    <div id="dashboardContent" class="hidden max-w-7xl mx-auto p-4 md:p-8 space-y-8">
+        
+        <!-- HEADER NAVBAR -->
+        <div class="flex justify-between items-center border-b border-slate-800/80 pb-6 flex-wrap gap-4">
             <div>
-                <h1 onclick="goToHome()" class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 cursor-pointer hover:opacity-90 transition" title="Go to Dashboard Home">
-                    AI Call Quality Auditor Pro
-                </h1>
-                <p class="text-sub text-sm">Pharma Metrics Evaluation & Bulk Batch Quality Auditing</p>
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 bg-gradient-to-tr from-cyan-500 via-indigo-500 to-purple-500 rounded-xl flex items-center justify-center text-lg font-bold text-white shadow-lg shadow-cyan-500/20">
+                        ⚡
+                    </div>
+                    <div>
+                        <h1 onclick="goToHome()" class="text-2xl md:text-3xl font-extrabold tracking-tight cursor-pointer text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-indigo-400 hover:opacity-90 transition">
+                            AI Call Auditor Pro
+                        </h1>
+                        <p class="text-xs text-sub font-medium">Enterprise QA Analytics & Bulk Audio Evaluation Engine</p>
+                    </div>
+                </div>
             </div>
+
             <div class="flex items-center gap-3 flex-wrap">
-                <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2 rounded-xl text-xs sm:text-sm shadow-lg shadow-purple-500/30 flex items-center gap-2 transform hover:-translate-y-0.5 transition duration-200 border border-purple-400/30">
+                <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 border border-purple-400/30 transition transform hover:-translate-y-0.5">
                     ✨ AI Quality Score
                 </a>
-                <button onclick="toggleTheme()" class="card-bg border border-slate-600 px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow">
-                    <span id="themeIcon">🌙</span> <span id="themeText">Dark Mode</span>
+                <button onclick="toggleTheme()" class="card-bg border border-slate-700/80 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow hover:border-slate-500 transition">
+                    <span id="themeIcon">🌙</span> <span id="themeText">Dark</span>
                 </button>
-                <button onclick="openMetricModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
+                <button onclick="openMetricModal()" class="card-bg border border-slate-700/80 hover:border-cyan-500/50 text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow">
                     ⚙️ Manage Metrics
                 </button>
                 
-                <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
-                    <span class="text-xs text-emerald-400 font-bold flex items-center gap-1">
-                        👤 <span id="userDisplayName">Loading...</span>
+                <div class="flex items-center gap-2 inner-bg border border-slate-700/80 px-3 py-1.5 rounded-xl">
+                    <span class="text-xs text-cyan-400 font-semibold flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="userDisplayName">Loading...</span>
                     </span>
-                    <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-md shadow-rose-600/20 transition ml-1">
-                        🚪 Logout
+                    <button onclick="handleLogout()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-semibold px-2.5 py-1 rounded-lg text-xs transition border border-rose-500/20 ml-1">
+                        Logout
                     </button>
                 </div>
             </div>
         </div>
 
-        <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg">
-            <div class="space-y-3">
-                <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎙️</div>
-                <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav, .m4a)</p>
+        <!-- UPLOAD BATCH SECTION -->
+        <div class="card-bg rounded-3xl p-8 text-center shadow-xl relative overflow-hidden group border border-slate-800">
+            <div class="max-w-xl mx-auto space-y-4 relative z-10">
+                <div class="w-16 h-16 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-inner">
+                    🎙️
+                </div>
+                <div>
+                    <h3 class="text-lg font-bold text-slate-100">Upload Call Audio Files</h3>
+                    <p id="fileName" class="text-xs text-sub mt-1">Select MP3, WAV, or M4A audio files for automated auditing</p>
+                </div>
                 <input type="file" id="audioInput" accept="audio/*" multiple class="hidden" onchange="fileSelected(event)">
-                <div class="flex justify-center gap-3">
-                    <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-600 font-medium px-4 py-2 rounded-xl text-sm">Browse Files</button>
-                    <button type="button" onclick="uploadAudioBatch()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2 rounded-xl text-sm shadow-lg shadow-blue-500/20">🚀 Start Bulk Batch Analysis</button>
+                <div class="flex justify-center gap-3 pt-2">
+                    <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-700 hover:border-slate-500 font-semibold px-5 py-2.5 rounded-xl text-xs transition text-slate-200">
+                        📁 Browse Files
+                    </button>
+                    <button type="button" onclick="uploadAudioBatch()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold px-6 py-2.5 rounded-xl text-xs shadow-lg shadow-cyan-500/25 transition">
+                        🚀 Start Bulk Analysis
+                    </button>
                 </div>
             </div>
-            <div id="progressContainer" class="hidden mt-4 space-y-2">
-                <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-                    <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+
+            <!-- Progress Bar -->
+            <div id="progressContainer" class="hidden mt-6 max-w-md mx-auto space-y-2">
+                <div class="w-full bg-slate-800 rounded-full h-2 overflow-hidden p-0.5 border border-slate-700">
+                    <div id="progressBar" class="bg-gradient-to-r from-cyan-400 to-emerald-400 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
-                <div id="loaderText" class="text-xs text-blue-400 font-medium">⚡ Auditing... 0 / 0 Completed</div>
+                <div id="loaderText" class="text-xs text-cyan-400 font-semibold">⚡ Auditing... 0 / 0 Completed</div>
             </div>
         </div>
 
+        <!-- BATCH RESULTS DISPLAY -->
         <div id="batchResultsContainer" class="hidden space-y-6">
-            <div class="flex justify-between items-center font-semibold border-b border-slate-700/60 pb-2 flex-wrap gap-2">
-                <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
+            <div class="flex justify-between items-center font-semibold border-b border-slate-800 pb-3 flex-wrap gap-2">
+                <span class="text-base text-cyan-400 font-bold flex items-center gap-2">
+                    📊 Batch Analysis Report
+                </span>
                 <div class="flex gap-2">
-                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">📊 Export Detailed Excel (.xlsx)</button>
-                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">📥 Export PDF Report</button>
+                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600 hover:text-white text-emerald-400 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+                        📊 Export Excel (.xlsx)
+                    </button>
+                    <button type="button" onclick="downloadPDF()" class="inner-bg border border-slate-700 hover:border-slate-500 text-slate-300 text-xs font-bold px-4 py-2 rounded-xl transition">
+                        📥 Export PDF
+                    </button>
                 </div>
             </div>
-            <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
-                <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+
+            <div id="summaryTableContainer" class="card-bg rounded-2xl p-6 shadow-xl space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-800 pb-4">
                     <div>
-                        <h3 class="text-base font-bold text-blue-400">💊 Aggregate Metrics Summary</h3>
+                        <h3 class="text-sm font-bold text-cyan-400 uppercase tracking-wider">Aggregate Batch KPI Summary</h3>
                         <p class="text-xs text-sub" id="summaryTimeSlot">Batch Analytics</p>
                     </div>
-                    <span id="totalCallsBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-3 py-1 rounded-full border border-blue-500/30">Total Calls: 0</span>
+                    <span id="totalCallsBadge" class="bg-cyan-500/10 text-cyan-400 text-xs font-bold px-3 py-1 rounded-full border border-cyan-500/20">Total Calls: 0</span>
                 </div>
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm border-collapse">
+                    <table class="w-full text-left text-xs border-collapse">
                         <thead>
-                            <tr class="inner-bg uppercase text-xs border-b border-slate-700">
+                            <tr class="inner-bg uppercase text-[10px] font-bold tracking-wider text-slate-400 border-b border-slate-800">
                                 <th class="p-3">Metric</th>
-                                <th class="p-3 text-center">Count</th>
-                                <th class="p-3 text-center">%</th>
+                                <th class="p-3 text-center">Positive Count</th>
+                                <th class="p-3 text-center">Compliance %</th>
                             </tr>
                         </thead>
-                        <tbody id="summaryTableBody" class="divide-y divide-slate-700/50 text-xs md:text-sm"></tbody>
+                        <tbody id="summaryTableBody" class="divide-y divide-slate-800/60 text-xs"></tbody>
                     </table>
                 </div>
             </div>
-            <h3 class="text-md font-bold pt-2 border-b border-slate-700/60 pb-2">📁 Individual Call Breakdowns</h3>
+
+            <h3 class="text-sm font-bold text-slate-300 uppercase tracking-wider pt-4 border-b border-slate-800 pb-2">📁 Individual Call Audits</h3>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
         <!-- FIREBASE CLOUD HISTORY TABLE -->
-        <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
-                <div class="flex items-center gap-2 flex-wrap">
-                    <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
-                    <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total Records</span>
-                    <span id="selectedCountBadge" class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition">
+        <div class="card-bg rounded-2xl p-6 space-y-6 shadow-xl border border-slate-800">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-4 flex-wrap gap-3">
+                <div class="flex items-center gap-3 flex-wrap">
+                    <h3 class="text-sm font-bold text-slate-200 uppercase tracking-wider">🔥 Cloud Audits History</h3>
+                    <span id="totalHistoryBadge" class="bg-cyan-500/10 text-cyan-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-cyan-500/20">0 Records</span>
+                    <span id="selectedCountBadge" class="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/20 transition">
                         Selected: 0
                     </span>
                 </div>
                 <div class="flex gap-2 flex-wrap items-center">
-                    <button type="button" id="exportAllBtn" onclick="exportHistoryExcel(event)" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
-                        📊 Export ALL Data to Excel
+                    <button type="button" id="exportAllBtn" onclick="exportHistoryExcel(event)" class="text-xs bg-emerald-600/20 border border-emerald-500/30 hover:bg-emerald-600 text-emerald-300 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition">
+                        📊 Export ALL Excel
                     </button>
-                    <button type="button" onclick="exportSelectedExcel()" class="text-xs bg-teal-700 hover:bg-teal-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-teal-700/20">
+                    <button type="button" onclick="exportSelectedExcel()" class="text-xs inner-bg border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-lg text-slate-300 font-semibold transition">
                         📋 Export Marked
                     </button>
-                    <button type="button" onclick="deleteSelectedAudits()" class="text-xs bg-amber-700 hover:bg-amber-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-amber-700/20">
+                    <button type="button" onclick="deleteSelectedAudits()" class="text-xs bg-amber-500/10 border border-amber-500/20 hover:bg-amber-600 text-amber-400 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition">
                         🗑️ Delete Marked
                     </button>
-                    <button type="button" onclick="deleteAllHistoryData()" class="text-xs bg-rose-700 hover:bg-rose-600 px-3 py-1.5 rounded-lg text-white font-bold flex items-center gap-1 shadow-lg shadow-rose-700/20">
-                        🔥 Delete ALL Data
+                    <button type="button" onclick="deleteAllHistoryData()" class="text-xs bg-rose-500/10 border border-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition">
+                        🔥 Delete ALL
                     </button>
-                    <button type="button" onclick="loadHistory(true)" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">
+                    <button type="button" onclick="loadHistory(true)" class="text-xs inner-bg border border-slate-700 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition">
                         Refresh
                     </button>
                 </div>
             </div>
 
-            <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex items-center gap-3 flex-wrap text-xs">
-                <span class="font-bold text-blue-400 flex items-center gap-1">🔍 Filter By Metric:</span>
+            <!-- Filter Controls -->
+            <div class="inner-bg p-3.5 rounded-xl border border-slate-800 flex items-center gap-3 flex-wrap text-xs">
+                <span class="font-bold text-cyan-400 flex items-center gap-1">🔍 Filter Metric:</span>
                 
-                <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 max-w-xs">
+                <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 max-w-xs">
                     <option value="ALL">-- Select Metric --</option>
                 </select>
 
-                <select id="metricFilterValue" onchange="applyMetricFilter()" class="card-bg border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                <select id="metricFilterValue" onchange="applyMetricFilter()" class="card-bg border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
                     <option value="ALL">Status: ALL</option>
                     <option value="YES">YES ✅</option>
                     <option value="NO">NO ❌</option>
                 </select>
 
-                <button onclick="resetMetricFilter()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg transition font-medium">
+                <button onclick="resetMetricFilter()" class="inner-bg border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg hover:text-white transition">
                     Reset Filter
                 </button>
 
-                <button type="button" onclick="exportFilteredExcel()" class="bg-indigo-700 hover:bg-indigo-600 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-lg shadow-indigo-700/20">
-                    📥 Export Filtered Data
+                <button type="button" onclick="exportFilteredExcel()" class="bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600 hover:text-white font-semibold px-3 py-1.5 rounded-lg transition">
+                    📥 Export Filtered
                 </button>
 
                 <span id="filterCountBadge" class="text-sub font-medium ml-auto"></span>
             </div>
 
-            <div class="overflow-x-auto">
-                <table class="w-full text-left text-xs text-sub">
-                    <thead class="inner-bg uppercase font-semibold">
+            <!-- Table -->
+            <div class="overflow-x-auto rounded-xl border border-slate-800">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="inner-bg uppercase text-[10px] font-bold text-slate-400 tracking-wider border-b border-slate-800">
                         <tr>
-                            <th class="p-2 text-center w-8">
-                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer">
+                            <th class="p-3 text-center w-10">
+                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer">
                             </th>
-                            <th class="p-2">File</th>
-                            <th class="p-2">Uploaded By</th>
-                            <th class="p-2">Score</th>
-                            <th class="p-2">Summary</th>
-                            <th class="p-2">Date & Time (IST)</th>
-                            <th class="p-2 text-center">Action</th>
+                            <th class="p-3">File Name</th>
+                            <th class="p-3">Uploaded By</th>
+                            <th class="p-3">Score</th>
+                            <th class="p-3">Summary</th>
+                            <th class="p-3">Date (IST)</th>
+                            <th class="p-3 text-center">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="historyTable">
-                        <tr><td colspan="7" class="p-3 text-center text-slate-500">Loading full history...</td></tr>
+                    <tbody id="historyTable" class="divide-y divide-slate-800/50">
+                        <tr><td colspan="7" class="p-4 text-center text-slate-500">Loading audit history...</td></tr>
                     </tbody>
                 </table>
             </div>
 
-            <div class="flex justify-between items-center pt-2 text-xs border-t border-slate-700/60">
+            <!-- Pagination -->
+            <div class="flex justify-between items-center pt-2 text-xs">
                 <span id="pageInfoText" class="text-sub font-medium">Page 1 of 1</span>
                 <div class="flex gap-2">
-                    <button id="prevPageBtn" onclick="changePage(-1)" disabled class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">← Prev</button>
-                    <button id="nextPageBtn" onclick="changePage(1)" disabled class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">Next →</button>
+                    <button id="prevPageBtn" onclick="changePage(-1)" disabled class="inner-bg border border-slate-700 px-3 py-1.5 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">← Prev</button>
+                    <button id="nextPageBtn" onclick="changePage(1)" disabled class="inner-bg border border-slate-700 px-3 py-1.5 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">Next →</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- METRICS MODAL -->
-    <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                <h3 class="text-lg font-bold">⚙️ Configure Dynamic Metrics</h3>
-                <button onclick="closeMetricModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
+    <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="card-bg rounded-3xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto border border-slate-800">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                <h3 class="text-base font-bold text-slate-100 flex items-center gap-2">⚙️ Dynamic QA Metrics Config</h3>
+                <button onclick="closeMetricModal()" class="text-sub hover:text-white font-bold text-xl px-2">&times;</button>
             </div>
-            <form id="metricForm" onsubmit="saveMetric(event)" class="inner-bg p-4 rounded-xl border border-slate-700 space-y-3">
+            <form id="metricForm" onsubmit="saveMetric(event)" class="inner-bg p-4 rounded-2xl border border-slate-800 space-y-3">
                 <input type="hidden" id="metricId" value="">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-sub mb-1">Metric Key (Unique slug)</label>
-                        <input type="text" id="metricKey" required placeholder="e.g. discount_offered" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                        <label class="block text-[11px] font-semibold text-sub mb-1 uppercase tracking-wider">Metric Key (Slug)</label>
+                        <input type="text" id="metricKey" required placeholder="e.g. discount_offered" class="w-full card-bg border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-sub mb-1">Display Label</label>
-                        <input type="text" id="metricLabel" required placeholder="e.g. Discount Offered" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                        <label class="block text-[11px] font-semibold text-sub mb-1 uppercase tracking-wider">Display Label</label>
+                        <input type="text" id="metricLabel" required placeholder="e.g. Discount Offered" class="w-full card-bg border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
                     </div>
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-sub mb-1">Description (Guides AI Evaluation)</label>
-                    <input type="text" id="metricDesc" required placeholder="e.g. Did agent offer any promotional discount?" class="w-full card-bg border border-slate-600 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-blue-500">
+                    <label class="block text-[11px] font-semibold text-sub mb-1 uppercase tracking-wider">Evaluation Prompt Description</label>
+                    <input type="text" id="metricDesc" required placeholder="e.g. Did agent offer any promotional discount?" class="w-full card-bg border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="resetMetricForm()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-3 py-1.5 rounded-lg">Clear</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded-lg font-bold">Save Metric</button>
+                    <button type="button" onclick="resetMetricForm()" class="inner-bg border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg">Clear</button>
+                    <button type="submit" class="bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs px-4 py-1.5 rounded-lg transition">Save Metric</button>
                 </div>
             </form>
             <div class="space-y-3">
-                <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
+                <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Configured QA Metrics</h4>
                 <div id="metricsListContainer" class="space-y-2"></div>
             </div>
         </div>
     </div>
 
-    <!-- VIEW AUDIT DETAILS CUSTOM SCROLLABLE MODAL -->
-    <div id="viewDetailsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
-        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-shrink-0">
+    <!-- VIEW AUDIT DETAILS CUSTOM MODAL -->
+    <div id="viewDetailsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="card-bg rounded-3xl w-full max-w-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col border border-slate-800">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-3 flex-shrink-0">
                 <div>
-                    <h3 id="viewModalFileName" class="text-lg font-bold text-blue-400">📁 Audit Details</h3>
+                    <h3 id="viewModalFileName" class="text-base font-bold text-cyan-400">📁 Audit Details</h3>
                     <p id="viewModalMeta" class="text-xs text-sub mt-0.5"></p>
                 </div>
                 <button onclick="closeViewDetailsModal()" class="text-sub hover:text-white font-bold text-xl px-2">&times;</button>
             </div>
             
             <div class="space-y-4 overflow-y-auto pr-2 flex-grow">
-                <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">PACE</span><span id="viewModalWPM" class="font-bold text-blue-400">0 WPM</span></div>
-                    <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">DURATION</span><span id="viewModalDuration" class="font-bold text-indigo-400">0s</span></div>
-                    <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">WORDS</span><span id="viewModalWords" class="font-bold text-amber-400">0</span></div>
+                <div class="grid grid-cols-3 gap-3 text-center text-xs">
+                    <div class="inner-bg p-3 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase tracking-wider">Pace</span><span id="viewModalWPM" class="font-bold text-cyan-400 text-sm">0 WPM</span></div>
+                    <div class="inner-bg p-3 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase tracking-wider">Duration</span><span id="viewModalDuration" class="font-bold text-indigo-400 text-sm">0s</span></div>
+                    <div class="inner-bg p-3 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase tracking-wider">Total Words</span><span id="viewModalWords" class="font-bold text-amber-400 text-sm">0</span></div>
                 </div>
 
-                <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-3">
+                <div class="inner-bg p-4 rounded-2xl border border-slate-800 space-y-3">
                     <div class="font-bold text-emerald-400 text-xs uppercase tracking-wider flex justify-between items-center">
                         <span>💊 Call Metrics Evaluation</span>
                         <span id="viewMetricsCount" class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20"></span>
@@ -410,33 +486,29 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    <div class="inner-bg p-3.5 rounded-xl border border-emerald-500/30 space-y-2">
-                        <div class="font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <span>💪 Agent Strengths</span>
-                        </div>
+                    <div class="inner-bg p-4 rounded-2xl border border-emerald-500/20 space-y-2">
+                        <div class="font-bold text-emerald-400 uppercase tracking-wider">💪 Agent Strengths</div>
                         <ul id="viewModalStrengths" class="list-disc list-inside text-sub space-y-1"></ul>
                     </div>
-                    <div class="inner-bg p-3.5 rounded-xl border border-amber-500/30 space-y-2">
-                        <div class="font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <span>🎯 Areas for Improvement</span>
-                        </div>
+                    <div class="inner-bg p-4 rounded-2xl border border-amber-500/20 space-y-2">
+                        <div class="font-bold text-amber-400 uppercase tracking-wider">🎯 Areas for Improvement</div>
                         <ul id="viewModalImprovements" class="list-disc list-inside text-sub space-y-1"></ul>
                     </div>
                 </div>
 
-                <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-2">
-                    <div class="font-bold text-blue-300 text-xs uppercase tracking-wider">Detailed Call Summary</div>
+                <div class="inner-bg p-4 rounded-2xl border border-slate-800 space-y-2">
+                    <div class="font-bold text-slate-200 text-xs uppercase tracking-wider">Executive Call Summary</div>
                     <p id="viewModalSummary" class="text-xs text-sub leading-relaxed whitespace-pre-wrap"></p>
                 </div>
 
-                <details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs" open>
-                    <summary class="font-bold text-sub cursor-pointer">📄 Full Diarized Transcript</summary>
+                <details class="inner-bg p-4 rounded-2xl border border-slate-800 text-xs" open>
+                    <summary class="font-bold text-slate-300 cursor-pointer">📄 Full Diarized Transcript</summary>
                     <div id="viewModalTranscript" class="mt-3 space-y-2 max-h-60 overflow-y-auto pr-2 pt-2 border-t border-slate-800"></div>
                 </details>
             </div>
 
-            <div class="flex justify-end pt-2 border-t border-slate-700/60 flex-shrink-0">
-                <button onclick="closeViewDetailsModal()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs px-5 py-2 rounded-xl">Close</button>
+            <div class="flex justify-end pt-2 border-t border-slate-800 flex-shrink-0">
+                <button onclick="closeViewDetailsModal()" class="inner-bg border border-slate-700 hover:border-slate-500 text-white font-bold text-xs px-5 py-2 rounded-xl transition">Close</button>
             </div>
         </div>
     </div>
@@ -683,13 +755,13 @@ HTML_CONTENT = """<!DOCTYPE html>
             
             try {
                 errorDiv.classList.add('hidden');
-                loginBtn.innerText = "Signing in...";
+                loginBtn.innerText = "Authenticating...";
                 await auth.signInWithEmailAndPassword(email, password);
             } catch (error) {
                 errorDiv.innerText = error.message;
                 errorDiv.classList.remove('hidden');
             } finally {
-                loginBtn.innerText = "Sign In";
+                loginBtn.innerText = "Authenticate Account";
             }
         }
 
@@ -710,12 +782,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                 html.classList.remove('dark');
                 html.classList.add('light');
                 document.getElementById('themeIcon').innerText = "☀️";
-                document.getElementById('themeText').innerText = "Light Mode";
+                document.getElementById('themeText').innerText = "Light";
             } else {
                 html.classList.remove('light');
                 html.classList.add('dark');
                 document.getElementById('themeIcon').innerText = "🌙";
-                document.getElementById('themeText').innerText = "Dark Mode";
+                document.getElementById('themeText').innerText = "Dark";
             }
         }
 
@@ -755,15 +827,15 @@ HTML_CONTENT = """<!DOCTYPE html>
             var html = '';
             activeMetrics.forEach(function(m) {
                 html += `
-                <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex justify-between items-center text-xs">
+                <div class="inner-bg p-3.5 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
                     <div>
-                        <span class="font-bold text-blue-400">${m.label}</span>
+                        <span class="font-bold text-cyan-400">${m.label}</span>
                         <span class="text-sub text-[10px] ml-2">(${m.key})</span>
                         <p class="text-sub text-[11px] mt-0.5">${m.description}</p>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="editMetric('${m.id}')" class="text-blue-400 hover:text-blue-300 bg-blue-500/10 px-2 py-1 rounded">Edit</button>
-                        <button onclick="deleteMetric('${m.id}')" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2 py-1 rounded">Delete</button>
+                        <button onclick="editMetric('${m.id}')" class="text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded-md transition">Edit</button>
+                        <button onclick="deleteMetric('${m.id}')" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2.5 py-1 rounded-md transition">Delete</button>
                     </div>
                 </div>`;
             });
@@ -831,7 +903,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         function fileSelected(e) {
             selectedFiles = Array.from(e.target.files);
             if(selectedFiles.length > 0) {
-                document.getElementById('fileName').innerText = selectedFiles.length + " file(s) selected";
+                document.getElementById('fileName').innerText = selectedFiles.length + " file(s) ready for analysis";
             }
         }
 
@@ -889,16 +961,16 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('totalCallsBadge').innerText = "Total Calls: " + totalCalls;
             document.getElementById('summaryTimeSlot').innerText = "Audit Generated: " + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-            var summaryHtml = `<tr class="hover:bg-slate-700/20"><td class="p-2.5 font-medium">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">${totalCalls}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>`;
+            var summaryHtml = `<tr class="hover:bg-slate-800/40"><td class="p-3 font-semibold text-slate-200">Total Calls Reviewed</td><td class="p-3 text-center font-bold text-cyan-400">${totalCalls}</td><td class="p-3 text-center font-extrabold text-emerald-400">100%</td></tr>`;
             activeMetrics.forEach(m => {
                 var cnt = metricCounts[m.key] || 0;
-                summaryHtml += `<tr class="hover:bg-slate-700/20"><td class="p-2.5 font-medium">${m.label}</td><td class="p-2.5 text-center font-bold text-blue-400">${cnt}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">${calcPct(cnt)}</td></tr>`;
+                summaryHtml += `<tr class="hover:bg-slate-800/40"><td class="p-3 font-medium text-slate-300">${m.label}</td><td class="p-3 text-center font-bold text-cyan-400">${cnt}</td><td class="p-3 text-center font-bold text-emerald-400">${calcPct(cnt)}</td></tr>`;
             });
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
             results.forEach(item => {
                 if(item.status !== "success") {
-                    container.innerHTML += `<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed: ${item.filename}</div>`;
+                    container.innerHTML += `<div class="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl text-rose-300 text-xs">❌ Failed to audit: ${item.filename}</div>`;
                     return;
                 }
                 var data = item.data || {};
@@ -909,55 +981,55 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var improvements = evalData.improvements || [];
                 
                 var card = document.createElement('div');
-                card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
+                card.className = "card-bg rounded-2xl p-6 shadow-xl space-y-4 border border-slate-800";
                 
                 var transcriptHtml = "";
                 transcript.forEach(t => {
-                    var colorClass = t.speaker === 'Agent' ? 'text-blue-400' : 'text-emerald-400';
-                    transcriptHtml += `<div class="mb-1"><b class="${colorClass}">${t.speaker}:</b> ${t.text}</div>`;
+                    var colorClass = t.speaker === 'Agent' ? 'text-cyan-400 font-semibold' : 'text-emerald-400 font-semibold';
+                    transcriptHtml += `<div class="mb-1.5"><b class="${colorClass}">${t.speaker}:</b> ${t.text}</div>`;
                 });
 
                 var dynamicCardsHtml = '';
                 activeMetrics.forEach(m => {
-                    var fmt = evalMetrics[m.key] ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
-                    dynamicCardsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}:${fmt}</div>`;
+                    var fmt = evalMetrics[m.key] ? '<span class="text-emerald-400 font-bold ml-1">YES</span>' : '<span class="text-rose-400 font-bold ml-1">NO</span>';
+                    dynamicCardsHtml += `<div class="inner-bg p-2 rounded-lg border border-slate-800">${m.label}:${fmt}</div>`;
                 });
 
                 var strengthsHtml = strengths.length > 0 ? strengths.map(s => `<li>${s}</li>`).join('') : '<li class="italic">None listed</li>';
                 var improvementsHtml = improvements.length > 0 ? improvements.map(i => `<li>${i}</li>`).join('') : '<li class="italic">None listed</li>';
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-center border-b border-slate-700 pb-3">
-                        <h3 class="font-bold text-blue-400 text-sm">📁 ${item.filename}</h3>
-                        <span class="text-emerald-400 font-extrabold text-lg">${evalData.overall_score || 0}/100</span>
+                    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+                        <h3 class="font-bold text-cyan-400 text-sm flex items-center gap-2">📁 ${item.filename}</h3>
+                        <span class="text-emerald-400 font-extrabold text-lg bg-emerald-500/10 px-3 py-0.5 rounded-full border border-emerald-500/20">${evalData.overall_score || 0}/100</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">PACE</span><span class="font-bold text-blue-400">${extractWPM(item)} WPM</span></div>
-                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">DURATION</span><span class="font-bold text-indigo-400">${extractDuration(item)}s</span></div>
-                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">WORDS</span><span class="font-bold text-amber-400">${extractTotalWords(item)}</span></div>
+                        <div class="inner-bg p-2.5 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase">PACE</span><span class="font-bold text-cyan-400">${extractWPM(item)} WPM</span></div>
+                        <div class="inner-bg p-2.5 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase">DURATION</span><span class="font-bold text-indigo-400">${extractDuration(item)}s</span></div>
+                        <div class="inner-bg p-2.5 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase">WORDS</span><span class="font-bold text-amber-400">${extractTotalWords(item)}</span></div>
                     </div>
-                    <div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">
-                        <div class="font-bold text-emerald-400 text-[11px] uppercase">💊 Call Metrics Evaluation</div>
+                    <div class="inner-bg p-4 rounded-2xl border border-slate-800 space-y-2">
+                        <div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wider">💊 Call Metrics Evaluation</div>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">${dynamicCardsHtml}</div>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        <div class="inner-bg p-3 rounded-xl border border-emerald-500/30 space-y-1.5">
-                            <div class="font-bold text-emerald-400 text-[11px] uppercase">💪 Agent Strengths</div>
+                        <div class="inner-bg p-4 rounded-2xl border border-emerald-500/20 space-y-1.5">
+                            <div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wider">💪 Agent Strengths</div>
                             <ul class="list-disc list-inside text-sub space-y-0.5">${strengthsHtml}</ul>
                         </div>
-                        <div class="inner-bg p-3 rounded-xl border border-amber-500/30 space-y-1.5">
-                            <div class="font-bold text-amber-400 text-[11px] uppercase">🎯 Areas for Improvement</div>
+                        <div class="inner-bg p-4 rounded-2xl border border-amber-500/20 space-y-1.5">
+                            <div class="font-bold text-amber-400 text-[11px] uppercase tracking-wider">🎯 Areas for Improvement</div>
                             <ul class="list-disc list-inside text-sub space-y-0.5">${improvementsHtml}</ul>
                         </div>
                     </div>
 
-                    <div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">
-                        <div class="font-bold text-blue-300 text-[11px] uppercase">Detailed Call Summary</div>
+                    <div class="text-xs inner-bg p-4 rounded-2xl border border-slate-800 space-y-1">
+                        <div class="font-bold text-slate-200 text-[11px] uppercase tracking-wider">Executive Call Summary</div>
                         <p class="text-sub leading-relaxed">${evalData.summary || "N/A"}</p>
                     </div>
-                    <details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">
-                        <summary class="font-bold text-sub cursor-pointer">📄 Full Diarized Transcript</summary>
+                    <details class="inner-bg p-4 rounded-2xl border border-slate-800 text-xs">
+                        <summary class="font-bold text-slate-300 cursor-pointer">📄 Full Diarized Transcript</summary>
                         <div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">${transcriptHtml}</div>
                     </details>`;
                 container.appendChild(card);
@@ -984,12 +1056,12 @@ HTML_CONTENT = """<!DOCTYPE html>
                 
                 selectedAuditIds.clear();
                 document.getElementById('selectAllCheckbox').checked = false;
-                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
+                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Records";
                 
                 updateSelectedCounter();
                 applyMetricFilter();
             } catch(e) {
-                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-rose-400">Failed to load history records.</td></tr>';
             }
         }
 
@@ -1028,7 +1100,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var dataToRender = filteredHistoryList || [];
 
             if(!dataToRender || dataToRender.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No audits found for selected filter.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No audits found for selected filter.</td></tr>';
                 document.getElementById('pageInfoText').innerText = "Page 0 of 0";
                 document.getElementById('prevPageBtn').disabled = true;
                 document.getElementById('nextPageBtn').disabled = true;
@@ -1053,24 +1125,24 @@ HTML_CONTENT = """<!DOCTYPE html>
                 }
                 
                 hTable.innerHTML += `
-                    <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
-                        <td class="p-2 text-center">
-                            <input type="checkbox" value="${item.id}" ${isChecked} onchange="toggleAuditSelect('${item.id}', this)" class="row-checkbox rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer">
+                    <tr class="hover:bg-slate-800/40 transition">
+                        <td class="p-3 text-center">
+                            <input type="checkbox" value="${item.id}" ${isChecked} onchange="toggleAuditSelect('${item.id}', this)" class="row-checkbox rounded border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer">
                         </td>
-                        <td class="p-2 font-medium">${item.filename || 'N/A'}</td>
-                        <td class="p-2 font-semibold text-indigo-300">👤 ${uploadedUser}</td>
-                        <td class="p-2 text-emerald-400 font-bold">${item.score || 0}/100</td>
-                        <td class="p-2 text-sub max-w-xs truncate">${item.summary || 'N/A'}</td>
-                        <td class="p-2 text-sub">${formatDateDisplay(item.created_at)}</td>
-                        <td class="p-2 text-center">
+                        <td class="p-3 font-semibold text-slate-200">${item.filename || 'N/A'}</td>
+                        <td class="p-3 font-medium text-indigo-300">👤 ${uploadedUser}</td>
+                        <td class="p-3"><span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-extrabold px-2 py-0.5 rounded-full">${item.score || 0}/100</span></td>
+                        <td class="p-3 text-sub max-w-xs truncate">${item.summary || 'N/A'}</td>
+                        <td class="p-3 text-sub">${formatDateDisplay(item.created_at)}</td>
+                        <td class="p-3 text-center">
                             <div class="flex items-center justify-center gap-1.5">
-                                <button onclick="viewHistoryDetails(${globalIndex})" title="View Details" class="bg-blue-600/20 text-blue-400 hover:bg-blue-600 hover:text-white px-2 py-1 rounded text-[11px] font-medium transition">
+                                <button onclick="viewHistoryDetails(${globalIndex})" title="View Details" class="bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-slate-950 px-2.5 py-1 rounded-md font-semibold transition">
                                     👁️ View
                                 </button>
-                                <button onclick="downloadSingleHistoryExcel(${globalIndex})" title="Export Excel" class="bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600 hover:text-white px-2 py-1 rounded text-[11px] font-medium transition">
+                                <button onclick="downloadSingleHistoryExcel(${globalIndex})" title="Export Excel" class="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-slate-950 px-2.5 py-1 rounded-md font-semibold transition">
                                     📊 Excel
                                 </button>
-                                <button onclick="deleteHistoryItem('${item.id}', ${globalIndex})" title="Delete Audit" class="bg-rose-600/20 text-rose-400 hover:bg-rose-600 hover:text-white px-2 py-1 rounded text-[11px] font-medium transition">
+                                <button onclick="deleteHistoryItem('${item.id}', ${globalIndex})" title="Delete Audit" class="bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white px-2.5 py-1 rounded-md font-semibold transition">
                                     🗑️ Delete
                                 </button>
                             </div>
@@ -1091,11 +1163,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(badge) {
                 badge.innerText = "Selected: " + count;
                 if(count > 0) {
-                    badge.classList.remove('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
-                    badge.classList.add('bg-blue-500', 'text-white', 'border-blue-400');
+                    badge.classList.remove('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20');
+                    badge.classList.add('bg-cyan-500', 'text-slate-950', 'border-cyan-400');
                 } else {
-                    badge.classList.remove('bg-blue-500', 'text-white', 'border-blue-400');
-                    badge.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+                    badge.classList.remove('bg-cyan-500', 'text-slate-950', 'border-cyan-400');
+                    badge.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/20');
                 }
             }
         }
@@ -1123,7 +1195,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             updateSelectedCounter();
         }
 
-        // ================= FULL DATABASE EXPORT (NO LIMIT) =================
+        // ================= FULL DATABASE EXPORT =================
         async function exportHistoryExcel(evt) {
             var btn = evt ? (evt.target || document.getElementById('exportAllBtn')) : document.getElementById('exportAllBtn');
             var originalText = btn ? btn.innerText : "📊 Export ALL Data to Excel";
@@ -1259,13 +1331,13 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var fmt = "";
                 if (evalMetrics.hasOwnProperty(key)) {
                     fmt = (evalMetrics[key] === true) 
-                        ? '<span class="text-emerald-400 font-bold">YES</span>' 
-                        : '<span class="text-rose-400 font-bold">NO</span>';
+                        ? '<span class="text-emerald-400 font-bold ml-1">YES</span>' 
+                        : '<span class="text-rose-400 font-bold ml-1">NO</span>';
                 } else {
-                    fmt = '<span class="text-slate-400 font-bold">N/A</span>';
+                    fmt = '<span class="text-slate-400 font-bold ml-1">N/A</span>';
                 }
 
-                gridContainer.innerHTML += `<div class="inner-bg p-2 rounded border border-slate-700/40">${label}:${fmt}</div>`;
+                gridContainer.innerHTML += `<div class="inner-bg p-2 rounded-lg border border-slate-800">${label}:${fmt}</div>`;
                 metricsCount++;
             });
 
@@ -1279,8 +1351,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                 transcriptContainer.innerHTML = '<div class="text-sub italic">No transcript recorded or stored for this call.</div>';
             } else {
                 transcriptList.forEach(t => {
-                    var colorClass = t.speaker === 'Agent' ? 'text-blue-400' : 'text-emerald-400';
-                    transcriptContainer.innerHTML += `<div class="mb-1"><b class="${colorClass}">${t.speaker}:</b> ${t.text}</div>`;
+                    var colorClass = t.speaker === 'Agent' ? 'text-cyan-400 font-semibold' : 'text-emerald-400 font-semibold';
+                    transcriptContainer.innerHTML += `<div class="mb-1.5"><b class="${colorClass}">${t.speaker}:</b> ${t.text}</div>`;
                 });
             }
 
@@ -1739,7 +1811,6 @@ async def get_history(limit: Optional[int] = 50, refresh: Optional[bool] = False
         def fetch_db():
             query = db.collection("audits").order_by("created_at", direction=firestore.Query.DESCENDING)
             
-            # Jab limit=0 maanga ho to hard limit bypass hokar SAARA DATA aayega
             if limit and limit > 0:
                 query = query.limit(limit)
                 
