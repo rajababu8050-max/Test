@@ -465,7 +465,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             return item.wpm ?? item.data?.metrics?.wpm ?? 0;
         }
 
-        // DYNAMIC HELPER TO BUILD EXCEL ROWS AUTOMATICALLY
+        // DYNAMIC HELPER TO BUILD EXCEL ROWS AUTOMATICALLY (WITH SAFE N/A LOGIC)
         function buildExcelRow(item, isBatchResult = false) {
             var fileName = isBatchResult ? item.filename : (item.filename || "N/A");
             var uName = isBatchResult ? currentUserName : (item.uploaded_by || currentUserName || "Admin");
@@ -491,9 +491,13 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var evalMetrics = isBatchResult ? (item.data?.evaluation?.evaluated_metrics || {}) : (item.evaluated_metrics || {});
 
-            // DYNAMICALLY ADD ALL ACTIVE METRICS AS EXCEL COLUMNS
+            // DYNAMICALLY ADD ACTIVE METRICS; USE 'N/A' IF NOT EVALUATED IN OLD AUDITS
             activeMetrics.forEach(m => {
-                row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
+                if (evalMetrics.hasOwnProperty(m.key)) {
+                    row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
+                } else {
+                    row[m.label] = "N/A";
+                }
             });
 
             return row;
@@ -828,7 +832,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        // ================= METRIC FILTER LOGIC =================
+        // ================= METRIC FILTER LOGIC (EXCLUDES N/A FROM NO FILTER) =================
 
         function applyMetricFilter() {
             var selectedMetricKey = document.getElementById('metricFilterSelect').value;
@@ -840,12 +844,18 @@ HTML_CONTENT = """<!DOCTYPE html>
             } else {
                 filteredHistoryList = historyDataList.filter(item => {
                     var evalMetrics = item.evaluated_metrics || {};
+                    
+                    // IF METRIC WAS NOT EVALUATED IN AN OLD CALL, DO NOT COUNT IT AS 'NO'
+                    if (!evalMetrics.hasOwnProperty(selectedMetricKey)) {
+                        return false;
+                    }
+
                     var metricVal = evalMetrics[selectedMetricKey];
 
                     if (selectedValue === "YES") {
                         return metricVal === true;
                     } else if (selectedValue === "NO") {
-                        return metricVal === false || metricVal === undefined;
+                        return metricVal === false; // STRICT NO MATCH
                     } else {
                         return true; // Status ALL chosen
                     }
@@ -1055,7 +1065,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        // VIEW DETAILS MODAL OPEN & CLOSE LOGIC (EXACTLY MATCHING BATCH RESULT CARD DETAILS)
+        // VIEW DETAILS MODAL OPEN & CLOSE LOGIC (WITH N/A DISPLAY FOR UN-EVALUATED METRICS)
         function viewHistoryDetails(index) {
             var item = filteredHistoryList[index];
             if(!item) return;
@@ -1088,7 +1098,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 ? improvementsList.map(i => `<li>${i}</li>`).join('') 
                 : '<li class="italic">None listed</li>';
 
-            // Dynamic Metrics Rendering (Matches Card Layout)
+            // Dynamic Metrics Rendering (Shows N/A for Metrics Not Evaluated in Older Calls)
             var gridContainer = document.getElementById('viewModalMetricsGrid');
             gridContainer.innerHTML = "";
 
@@ -1101,11 +1111,15 @@ HTML_CONTENT = """<!DOCTYPE html>
             metricKeysSet.forEach(key => {
                 var metricDef = activeMetrics.find(m => m.key === key);
                 var label = metricDef ? metricDef.label : key;
-                var val = evalMetrics[key];
 
-                var fmt = (val === true) 
-                    ? '<span class="text-emerald-400 font-bold">YES</span>' 
-                    : '<span class="text-rose-400 font-bold">NO</span>';
+                var fmt = "";
+                if (evalMetrics.hasOwnProperty(key)) {
+                    fmt = (evalMetrics[key] === true) 
+                        ? '<span class="text-emerald-400 font-bold">YES</span>' 
+                        : '<span class="text-rose-400 font-bold">NO</span>';
+                } else {
+                    fmt = '<span class="text-slate-400 font-bold">N/A</span>';
+                }
 
                 gridContainer.innerHTML += `<div class="inner-bg p-2 rounded border border-slate-700/40">${label}:${fmt}</div>`;
                 metricsCount++;
