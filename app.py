@@ -8,12 +8,23 @@ import httpx
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 
+# Fix for Python 3.13+ missing audioop / pyaudioop issue in pydub
+try:
+    import audioop
+except ImportError:
+    try:
+        import pyaudioop as audioop
+        import sys
+        sys.modules["audioop"] = audioop
+    except ImportError:
+        pass
+
+from pydub import AudioSegment
+
 from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Depends, status
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-
-from pydub import AudioSegment
 
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
@@ -727,9 +738,6 @@ async def groq_transcribe_eval(
     file: UploadFile = File(...),
     user: dict = Depends(verify_firebase_token)
 ):
-    """
-    Dedicated endpoint ONLY for ai.html - Converts unsupported formats (.awb, etc) to MP3 and uses Groq API.
-    """
     if not GROQ_API_KEY:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -741,10 +749,8 @@ async def groq_transcribe_eval(
         filename = file.filename.lower()
         content_type = file.content_type or "audio/mpeg"
 
-        # Allowed formats by Groq API
         allowed_extensions = ('.flac', '.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.ogg', '.opus', '.wav', '.webm')
 
-        # Auto-Convert Unsupported Formats (Like .awb, .amr, etc.) to .mp3 using pydub
         if not filename.endswith(allowed_extensions):
             try:
                 audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
@@ -756,7 +762,6 @@ async def groq_transcribe_eval(
             except Exception as conv_err:
                 raise HTTPException(status_code=400, detail=f"Audio conversion failed for '{file.filename}': {str(conv_err)}")
 
-        # Direct Groq Whisper Audio Transcription Call
         async with httpx.AsyncClient(timeout=300.0) as client:
             files_payload = {"file": (filename, audio_bytes, content_type)}
             data_payload = {
@@ -779,7 +784,6 @@ async def groq_transcribe_eval(
 
             raw_transcript = whisper_res.json().get("text", "").strip()
 
-            # Direct Groq LLaMA-3 Diarization Call
             llm_prompt = f"""
 You are an expert Call Center QA Auditor.
 Below is a full raw transcript of a customer service call in Hindi/Hinglish/English:
