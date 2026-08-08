@@ -232,20 +232,26 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- FIREBASE CLOUD HISTORY TABLE WITH BULK ACTIONS & TOTAL UNLIMITED DATA -->
+        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                     <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
                     <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total Records</span>
                 </div>
-                <!-- BULK ACTIONS CONTROL -->
+                <!-- GLOBAL BULK ACTIONS CONTROL -->
                 <div class="flex gap-2 flex-wrap items-center">
-                    <button type="button" onclick="exportSelectedExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
-                        📊 Export Marked to Excel
+                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
+                        📊 Export ALL Data to Excel
                     </button>
-                    <button type="button" onclick="deleteSelectedAudits()" class="text-xs bg-rose-700 hover:bg-rose-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-rose-700/20">
+                    <button type="button" onclick="exportSelectedExcel()" class="text-xs bg-teal-700 hover:bg-teal-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-teal-700/20">
+                        📋 Export Marked
+                    </button>
+                    <button type="button" onclick="deleteSelectedAudits()" class="text-xs bg-amber-700 hover:bg-amber-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-amber-700/20">
                         🗑️ Delete Marked
+                    </button>
+                    <button type="button" onclick="deleteAllHistoryData()" class="text-xs bg-rose-700 hover:bg-rose-600 px-3 py-1.5 rounded-lg text-white font-bold flex items-center gap-1 shadow-lg shadow-rose-700/20">
+                        🔥 Delete ALL Data
                     </button>
                     <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">
                         Refresh
@@ -625,7 +631,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 if (!auth.currentUser) return;
                 idToken = await auth.currentUser.getIdToken(true);
-                // Limit query removed to load ALL database documents
                 var res = await fetchAuth("/api/history");
                 if(!res.ok) throw new Error("HTTP error " + res.status);
                 var list = await res.json();
@@ -742,7 +747,31 @@ HTML_CONTENT = """<!DOCTYPE html>
             XLSX.writeFile(workbook, `Selected_Audits_Export_${targetItems.length}.xlsx`);
         }
 
-        // Bulk Delete Selected Audits from Firebase
+        // Export ALL History Data to Excel
+        function exportHistoryExcel() {
+            if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
+            var exportData = historyDataList.map(item => {
+                var row = {
+                    "File Name": item.filename || "N/A",
+                    "QA Score": item.score || 0,
+                    "WPM": item.wpm || 0,
+                    "Duration (sec)": Math.round(item.duration || 0),
+                    "Total Words": item.total_words || 0,
+                    "Date & Time (IST)": formatDateDisplay(item.created_at),
+                    "Summary": item.summary || ""
+                };
+                var evalMetrics = item.evaluated_metrics || {};
+                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
+                return row;
+            });
+
+            var workbook = XLSX.utils.book_new();
+            var sheet = XLSX.utils.json_to_sheet(exportData);
+            XLSX.utils.book_append_sheet(workbook, sheet, "All Cloud Audit History");
+            XLSX.writeFile(workbook, `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`);
+        }
+
+        // Bulk Delete Selected Audits
         async function deleteSelectedAudits() {
             if(selectedAuditIds.size === 0) {
                 return alert("Pehle delete karne ke liye records select karein!");
@@ -764,6 +793,27 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             alert(`${successCount} / ${idsToDelete.length} records successfully delete ho gaye!`);
             await loadHistory();
+        }
+
+        // DELETE ALL DATA IN FIRESTORE
+        async function deleteAllHistoryData() {
+            if(!historyDataList || historyDataList.length === 0) {
+                return alert("Pehle se hi koi record nahi hai!");
+            }
+
+            if(!confirm(`⚠️ WARNING: Kya aap SACH ME POORA DATABASE DELETE karna chahte hain?\n\nTotal Records: ${historyDataList.length}\n\nYeh action undo nahi ho sakta!`)) {
+                return;
+            }
+
+            try {
+                var res = await fetchAuth("/api/history/delete-all", { method: 'DELETE' });
+                if(!res.ok) throw new Error("Failed to delete all data");
+                var resData = await res.json();
+                alert(`🔥 Success: ${resData.deleted_count} records permanently delete ho gaye!`);
+                await loadHistory();
+            } catch(err) {
+                alert("Error deleting all data: " + err.message);
+            }
         }
 
         function viewHistoryDetails(index) {
@@ -829,29 +879,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             } catch(err) {
                 alert("Error deleting record: " + err.message);
             }
-        }
-
-        function exportHistoryExcel() {
-            if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
-            var exportData = historyDataList.map(item => {
-                var row = {
-                    "File Name": item.filename || "N/A",
-                    "QA Score": item.score || 0,
-                    "WPM": item.wpm || 0,
-                    "Duration (sec)": Math.round(item.duration || 0),
-                    "Total Words": item.total_words || 0,
-                    "Date & Time (IST)": formatDateDisplay(item.created_at),
-                    "Summary": item.summary || ""
-                };
-                var evalMetrics = item.evaluated_metrics || {};
-                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
-                return row;
-            });
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Cloud Audit History");
-            XLSX.writeFile(workbook, "Complete_Cloud_Audit_History.xlsx");
         }
 
         function downloadExcel() {
@@ -1251,6 +1278,26 @@ async def get_history(limit: Optional[int] = None, user: dict = Depends(verify_f
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
         return []
+
+@app.delete("/api/history/delete-all")
+async def delete_all_history_data(user: dict = Depends(verify_firebase_token)):
+    if not db:
+        raise HTTPException(status_code=500, detail="Database not configured")
+    
+    try:
+        loop = asyncio.get_running_loop()
+        def wipe_collection():
+            docs = db.collection("audits").stream()
+            count = 0
+            for doc in docs:
+                doc.reference.delete()
+                count += 1
+            return count
+
+        deleted_count = await loop.run_in_executor(None, wipe_collection)
+        return {"status": "success", "message": "All audits deleted successfully", "deleted_count": deleted_count}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/history/{audit_id}")
 async def delete_audit_history(
