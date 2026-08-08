@@ -362,6 +362,40 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
     </div>
 
+    <!-- VIEW AUDIT DETAILS CUSTOM SCROLLABLE MODAL -->
+    <div id="viewDetailsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+        <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-shrink-0">
+                <div>
+                    <h3 id="viewModalFileName" class="text-lg font-bold text-blue-400">📁 Audit Details</h3>
+                    <p id="viewModalMeta" class="text-xs text-sub mt-0.5"></p>
+                </div>
+                <button onclick="closeViewDetailsModal()" class="text-sub hover:text-white font-bold text-xl px-2">&times;</button>
+            </div>
+            
+            <div class="space-y-4 overflow-y-auto pr-2 flex-grow">
+                <!-- METRICS GRID CONTAINER -->
+                <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-3">
+                    <div class="font-bold text-emerald-400 text-xs uppercase tracking-wider flex justify-between items-center">
+                        <span>💊 All Evaluated Metrics</span>
+                        <span id="viewMetricsCount" class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20"></span>
+                    </div>
+                    <div id="viewModalMetricsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs"></div>
+                </div>
+
+                <!-- CALL SUMMARY -->
+                <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-2">
+                    <div class="font-bold text-blue-300 text-xs uppercase tracking-wider">📝 Detailed Call Summary</div>
+                    <p id="viewModalSummary" class="text-xs text-sub leading-relaxed whitespace-pre-wrap"></p>
+                </div>
+            </div>
+
+            <div class="flex justify-end pt-2 border-t border-slate-700/60 flex-shrink-0">
+                <button onclick="closeViewDetailsModal()" class="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs px-5 py-2 rounded-xl">Close</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         const firebaseConfig = {
           apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
@@ -980,21 +1014,60 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
+        // VIEW DETAILS MODAL OPEN & CLOSE LOGIC
         function viewHistoryDetails(index) {
             var item = filteredHistoryList[index];
             if(!item) return;
 
-            var metricsInfo = "";
             var evalMetrics = item.evaluated_metrics || {};
-            
-            activeMetrics.forEach(m => {
-                var statusStr = evalMetrics[m.key] ? "YES ✅" : "NO ❌";
-                metricsInfo += `\n• ${m.label}: ${statusStr}`;
+            var uName = item.uploaded_by || currentUserName || 'Admin';
+
+            // Populate Modal Header Meta Info
+            document.getElementById('viewModalFileName').innerText = "📁 " + (item.filename || "Audit Details");
+            document.getElementById('viewModalMeta').innerText = `👤 Uploaded By: ${uName} | ⭐ Score: ${item.score}/100 | ⏱️ Duration: ${extractDuration(item)}s | Pace: ${extractWPM(item)} WPM | Words: ${extractTotalWords(item)}`;
+            document.getElementById('viewModalSummary').innerText = item.summary || "No summary available.";
+
+            // Render ALL Evaluated Metrics Dynamically
+            var gridContainer = document.getElementById('viewModalMetricsGrid');
+            gridContainer.innerHTML = "";
+
+            // Collect all available keys from both activeMetrics and item's evaluated_metrics
+            var metricKeysSet = new Set([
+                ...activeMetrics.map(m => m.key),
+                ...Object.keys(evalMetrics)
+            ]);
+
+            var metricsCount = 0;
+            metricKeysSet.forEach(key => {
+                var metricDef = activeMetrics.find(m => m.key === key);
+                var label = metricDef ? metricDef.label : key;
+                var val = evalMetrics[key];
+
+                var statusBadge = val === true 
+                    ? '<span class="bg-emerald-500/20 text-emerald-400 font-bold px-2 py-0.5 rounded text-[11px] border border-emerald-500/30">YES ✅</span>'
+                    : '<span class="bg-rose-500/20 text-rose-400 font-bold px-2 py-0.5 rounded text-[11px] border border-rose-500/30">NO ❌</span>';
+
+                gridContainer.innerHTML += `
+                    <div class="card-bg p-2.5 rounded-lg border border-slate-700/80 flex justify-between items-center">
+                        <span class="font-medium text-slate-200 text-xs">${label}</span>
+                        <div>${statusBadge}</div>
+                    </div>
+                `;
+                metricsCount++;
             });
 
-            var uName = item.uploaded_by || currentUserName || 'Admin';
-            var detailText = `📁 File: ${item.filename}\n👤 Uploaded By: ${uName}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${extractDuration(item)}s | WPM: ${extractWPM(item)}\n💬 Words: ${extractTotalWords(item)}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
-            alert(detailText);
+            document.getElementById('viewMetricsCount').innerText = `${metricsCount} Total Metrics`;
+
+            // Open Modal
+            var modal = document.getElementById('viewDetailsModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeViewDetailsModal() {
+            var modal = document.getElementById('viewDetailsModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         }
 
         function downloadSingleHistoryExcel(index) {
