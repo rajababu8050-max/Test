@@ -449,7 +449,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         var itemsPerPage = 10;
         var selectedAuditIds = new Set();
 
-        // SMART NAV FUNCTION TO RESET DASHBOARD WITHOUT PAGE RELOAD / LOGIN FLICKER
         function goToHome() {
             if (auth.currentUser) {
                 document.getElementById('batchResultsContainer').classList.add('hidden');
@@ -513,7 +512,123 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
-        // PERFECT HORIZONTAL & VERTICAL CENTER ALIGNMENT VIA HTML TABLE CONVERSION
+        // GENERATE GRAPHICAL DASHBOARD ANALYTICS SHEET ALONGSIDE RAW DATA SHEET
+        function exportMultiSheetExcel(rawItemsList, fileName, isBatchResult = false) {
+            if (!rawItemsList || rawItemsList.length === 0) return alert("No data to export!");
+
+            var totalCalls = rawItemsList.length;
+            var validItems = isBatchResult ? rawItemsList.filter(i => i.status === "success") : rawItemsList;
+            
+            // Build Metric Aggregates
+            var metricStats = [];
+            var avgScore = 0;
+            var totalScore = 0;
+
+            validItems.forEach(i => {
+                var score = isBatchResult ? (i.data?.evaluation?.overall_score || 0) : (i.score || 0);
+                totalScore += score;
+            });
+
+            avgScore = totalCalls > 0 ? Math.round(totalScore / totalCalls) : 0;
+
+            activeMetrics.forEach(m => {
+                var yesCount = 0;
+                validItems.forEach(i => {
+                    var evalMetrics = isBatchResult ? (i.data?.evaluation?.evaluated_metrics || {}) : (i.evaluated_metrics || {});
+                    if (evalMetrics[m.key] === true) yesCount++;
+                });
+
+                var pct = totalCalls > 0 ? Math.round((yesCount / totalCalls) * 100) : 0;
+                
+                // Graphical Visual Bar Generator (HTML & Unicode Bar Chart)
+                var filledBars = Math.round(pct / 10);
+                var emptyBars = 10 - filledBars;
+                var visualChart = "█".repeat(filledBars) + "░".repeat(emptyBars) + ` ${pct}%`;
+
+                metricStats.push({
+                    "Evaluated Metric": m.label,
+                    "Total Yes / Positive": yesCount,
+                    "Total Calls Analyzed": totalCalls,
+                    "Success %": pct + "%",
+                    "Visual Performance Graph": visualChart
+                });
+            });
+
+            // 1. DASHBOARD ANALYTICS HTML TABLE
+            var dashboardHtml = `<table border="1">
+                <thead>
+                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0f172a; color:#38bdf8; font-weight:bold; font-size:16px; padding:10px;">📊 AI AUDIT BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
+                    <tr>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">KPI Metric Name</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Positive Count</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Total Calls</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Conversion %</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Visual Graph Bar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td style="text-align:center; font-weight:bold; background-color:#0284c7; color:#ffffff;">Average Call Quality Score</td>
+                        <td style="text-align:center; font-weight:bold; background-color:#0284c7; color:#ffffff;" colspan="2">${avgScore} / 100</td>
+                        <td style="text-align:center; font-weight:bold; background-color:#0284c7; color:#ffffff;" colspan="2">${avgScore}% Overall Quality Index</td>
+                    </tr>`;
+
+            metricStats.forEach(stat => {
+                dashboardHtml += `<tr>
+                    <td style="text-align:center; vertical-align:middle; font-weight:bold;">${stat["Evaluated Metric"]}</td>
+                    <td style="text-align:center; vertical-align:middle;">${stat["Total Yes / Positive"]}</td>
+                    <td style="text-align:center; vertical-align:middle;">${stat["Total Calls Analyzed"]}</td>
+                    <td style="text-align:center; vertical-align:middle; font-weight:bold; color:#10b981;">${stat["Success %"]}</td>
+                    <td style="text-align:center; vertical-align:middle; font-weight:bold; font-family:monospace; color:#0284c7;">${stat["Visual Performance Graph"]}</td>
+                </tr>`;
+            });
+
+            dashboardHtml += '</tbody></table>';
+
+            // 2. DETAILED RAW DATA TABLE
+            var rawRows = rawItemsList.map(item => buildExcelRow(item, isBatchResult));
+            var rawKeys = Object.keys(rawRows[0]);
+
+            var detailsHtml = '<table border="1"><thead><tr>';
+            rawKeys.forEach(k => {
+                detailsHtml += `<th style="text-align: center; vertical-align: middle; background-color: #1e293b; color: #ffffff; font-weight: bold; padding: 8px;">${k}</th>`;
+            });
+            detailsHtml += '</tr></thead><tbody>';
+
+            rawRows.forEach(row => {
+                detailsHtml += '<tr>';
+                rawKeys.forEach(k => {
+                    var val = row[k] !== undefined && row[k] !== null ? row[k] : "";
+                    detailsHtml += `<td style="text-align: center; vertical-align: middle; padding: 6px; mso-number-format:'\@';">${val}</td>`;
+                });
+                html += '</tr>';
+            });
+            detailsHtml += '</tbody></table>';
+
+            var parser = new DOMParser();
+            var workbook = XLSX.utils.book_new();
+
+            // Create Dashboard Sheet
+            var dashSheet = XLSX.utils.table_to_sheet(parser.parseFromString(dashboardHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
+            dashSheet["!cols"] = [{ wch: 32 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 32 }];
+            XLSX.utils.book_append_sheet(workbook, dashSheet, "📌 Dashboard Analytics");
+
+            // Create Raw Details Sheet
+            var detailSheet = XLSX.utils.table_to_sheet(parser.parseFromString(detailsHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
+            var detailWidths = rawKeys.map(key => {
+                var maxLen = key.length;
+                rawRows.forEach(r => {
+                    var v = r[key] ? r[key].toString() : "";
+                    if (v.length > maxLen) maxLen = v.length;
+                });
+                return { wch: Math.min(Math.max(maxLen + 4, 14), 30) };
+            });
+            detailSheet["!cols"] = detailWidths;
+            XLSX.utils.book_append_sheet(workbook, detailSheet, "📁 Individual Call Details");
+
+            XLSX.writeFile(workbook, fileName);
+        }
+
         function exportStyledWorkbook(exportData, sheetName, fileName) {
             if (!exportData || exportData.length === 0) return;
 
@@ -570,7 +685,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 if (authModal) authModal.classList.add('hidden');
                 if (dashContent) dashContent.classList.remove('hidden');
                 
-                // Hide Loader Screen Smoothly
                 if (loader) loader.classList.add('hidden');
                 
                 await fetchMetrics();
@@ -580,7 +694,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 if (dashContent) dashContent.classList.add('hidden');
                 if (authModal) authModal.classList.remove('hidden');
                 
-                // Hide Loader Screen Smoothly
                 if (loader) loader.classList.add('hidden');
             }
         });
@@ -1041,8 +1154,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var targetItems = historyDataList.filter(item => selectedAuditIds.has(item.id));
             if(targetItems.length === 0) return;
 
-            var exportData = targetItems.map(item => buildExcelRow(item, false));
-            exportStyledWorkbook(exportData, "Selected Cloud Audits", `Selected_Audits_Export_${targetItems.length}.xlsx`);
+            exportMultiSheetExcel(targetItems, `Selected_Audits_Export_${targetItems.length}.xlsx`, false);
         }
 
         async function deleteSelectedAudits() {
@@ -1074,15 +1186,13 @@ HTML_CONTENT = """<!DOCTYPE html>
                 return alert("Export karne ke liye koi filtered data nahi mila!");
             }
 
-            var exportData = targetItems.map(item => buildExcelRow(item, false));
-            exportStyledWorkbook(exportData, "Filtered Audits", `Filtered_Audits_Export_${targetItems.length}.xlsx`);
+            exportMultiSheetExcel(targetItems, `Filtered_Audits_Export_${targetItems.length}.xlsx`, false);
         }
 
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
             
-            var exportData = historyDataList.map(item => buildExcelRow(item, false));
-            exportStyledWorkbook(exportData, "All Cloud Audit History", `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`);
+            exportMultiSheetExcel(historyDataList, `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`, false);
         }
 
         async function deleteAllHistoryData() {
@@ -1191,8 +1301,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var item = filteredHistoryList[index];
             if(!item) return;
 
-            var row = buildExcelRow(item, false);
-            exportStyledWorkbook([row], "Audit Details", `${item.filename || 'Single'}_Audit.xlsx`);
+            exportMultiSheetExcel([item], `${item.filename || 'Single'}_Audit.xlsx`, false);
         }
 
         async function deleteHistoryItem(auditId, index) {
@@ -1219,8 +1328,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data!");
             
-            var exportData = currentBatchResults.map(i => buildExcelRow(i, true));
-            exportStyledWorkbook(exportData, "Batch Summary", "Detailed_Call_Audit_Report.xlsx");
+            exportMultiSheetExcel(currentBatchResults, "Detailed_Call_Audit_Report.xlsx", true);
         }
 
         function downloadPDF() {
