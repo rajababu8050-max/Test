@@ -15,7 +15,7 @@ import uvicorn
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
 
-app = FastAPI(title="AI Call Quality Auditor Pro Engine")
+app = FastAPI(title="Owlbrain.AI Call Quality Auditor Pro Engine")
 
 app.add_middleware(
     CORSMiddleware,
@@ -119,14 +119,14 @@ async def verify_firebase_token(request: Request):
             detail=f"Unauthorized: Invalid or expired token ({str(e)})"
         )
 
-# ================= HTML Content (Professional Light Theme) =================
+# ================= HTML Content (Owlbrain AI Light Gradient Theme) =================
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro | Enterprise Light Edition</title>
+    <title>Owlbrain.AI Pro | Call Quality Auditor</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -153,15 +153,21 @@ HTML_CONTENT = """<!DOCTYPE html>
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #eef2ff 100%);
+            color: #0f172a; 
+            min-height: 100vh;
+        }
         
         .card-bg { 
-            background: #ffffff; 
-            border: 1px solid #e2e8f0; 
-            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+            background: rgba(255, 255, 255, 0.85); 
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(226, 232, 240, 0.9); 
+            box-shadow: 0 10px 30px -4px rgba(0, 0, 0, 0.05);
         }
 
-        .inner-bg { background-color: #f1f5f9; color: #0f172a; }
+        .inner-bg { background-color: rgba(241, 245, 249, 0.8); color: #0f172a; }
 
         .text-sub { color: #64748b; }
 
@@ -170,43 +176,43 @@ HTML_CONTENT = """<!DOCTYPE html>
             transition: all 0.25s ease;
         }
         .pro-btn:hover {
-            box-shadow: 0 4px 14px 0 rgba(2, 132, 199, 0.35);
+            box-shadow: 0 6px 20px 0 rgba(2, 132, 199, 0.35);
             transform: translateY(-1px);
         }
 
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
         ::-webkit-scrollbar-thumb:hover { background: #0284c7; }
     </style>
 </head>
-<body class="min-h-screen antialiased selection:bg-sky-500 selection:text-white">
+<body class="antialiased selection:bg-sky-500 selection:text-white">
 
     <!-- INITIAL FULLSCREEN APP LOADER -->
-    <div id="initialAppLoader" class="fixed inset-0 bg-slate-50 flex flex-col items-center justify-center space-y-4 z-[200]">
+    <div id="initialAppLoader" class="fixed inset-0 bg-gradient-to-br from-slate-50 via-sky-50 to-indigo-50 flex flex-col items-center justify-center space-y-4 z-[200]">
         <div class="relative flex items-center justify-center">
             <div class="w-16 h-16 border-4 border-sky-200 border-t-sky-600 rounded-full animate-spin"></div>
-            <div class="absolute text-sky-700 font-extrabold text-xs tracking-widest">AI</div>
+            <div class="absolute text-sky-700 font-extrabold text-xs tracking-widest">🦉</div>
         </div>
-        <p class="text-xs font-semibold text-sky-700 uppercase tracking-widest animate-pulse">Auditor Engine Initializing...</p>
+        <p class="text-xs font-semibold text-sky-800 uppercase tracking-widest animate-pulse">Owlbrain Engine Initializing...</p>
     </div>
 
     <!-- ADMIN LOGIN MODAL -->
     <div id="authModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
         <div class="card-bg rounded-3xl w-full max-w-md p-8 space-y-6 relative overflow-hidden shadow-2xl">
             <div class="text-center space-y-2 relative z-10">
-                <div class="w-14 h-14 bg-gradient-to-tr from-sky-600 to-blue-700 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-md">
-                    ▲
+                <div class="w-14 h-14 bg-gradient-to-tr from-sky-600 to-blue-700 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-lg">
+                    🦉
                 </div>
                 <h2 class="text-2xl font-black tracking-tight text-slate-900">
-                    Admin Portal
+                    Owlbrain Portal
                 </h2>
                 <p class="text-xs text-sub">Sign in with authorized admin credentials</p>
             </div>
             <form onsubmit="handleLogin(event)" class="space-y-4 relative z-10">
                 <div>
                     <label class="block text-[10px] font-bold text-sub mb-1.5 uppercase tracking-wider">Admin Email</label>
-                    <input type="email" id="adminEmail" required placeholder="admin@enterprise.com" class="w-full card-bg border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-sky-600 transition">
+                    <input type="email" id="adminEmail" required placeholder="admin@owlbrain.ai" class="w-full card-bg border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-sky-600 transition">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-sub mb-1.5 uppercase tracking-wider">Password</label>
@@ -224,17 +230,17 @@ HTML_CONTENT = """<!DOCTYPE html>
     <div id="dashboardContent" class="hidden max-w-7xl mx-auto p-4 md:p-8 space-y-8">
         
         <!-- HEADER NAVBAR -->
-        <div class="flex justify-between items-center border-b border-slate-200 pb-6 flex-wrap gap-4">
+        <div class="flex justify-between items-center border-b border-slate-200/80 pb-6 flex-wrap gap-4">
             <div>
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-gradient-to-tr from-sky-600 to-blue-700 rounded-xl flex items-center justify-center text-lg font-black text-white shadow-md">
-                        ▲
+                    <div class="w-11 h-11 bg-gradient-to-tr from-sky-600 to-blue-700 rounded-2xl flex items-center justify-center text-xl font-black text-white shadow-md">
+                        🦉
                     </div>
                     <div>
                         <h1 onclick="goToHome()" class="text-2xl md:text-3xl font-black tracking-tight cursor-pointer text-slate-900 hover:text-sky-700 transition">
-                            Auditor.AI <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 border border-sky-200 text-sky-800 align-middle">PRO</span>
+                            Owlbrain.AI <span class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-sky-100 border border-sky-300 text-sky-800 align-middle">PRO</span>
                         </h1>
-                        <p class="text-xs text-sub font-medium">Enterprise Audio Quality Intelligence & Bulk Auditor</p>
+                        <p class="text-xs text-sub font-medium">Enterprise Audio Quality Intelligence & Bulk Auditor Engine</p>
                     </div>
                 </div>
             </div>
@@ -247,7 +253,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     ⚙️ Manage Metrics
                 </button>
                 
-                <div class="flex items-center gap-2 inner-bg border border-slate-200 px-3 py-1.5 rounded-xl">
+                <div class="flex items-center gap-2 inner-bg border border-slate-200/80 px-3 py-1.5 rounded-xl">
                     <span class="text-xs text-sky-800 font-semibold flex items-center gap-1.5">
                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <span id="userDisplayName">Loading...</span>
@@ -260,9 +266,9 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
 
         <!-- UPLOAD BATCH SECTION -->
-        <div class="card-bg rounded-3xl p-8 text-center shadow-lg relative overflow-hidden group border border-slate-200">
+        <div class="card-bg rounded-3xl p-8 text-center shadow-lg relative overflow-hidden group border border-slate-200/80">
             <div class="max-w-xl mx-auto space-y-4 relative z-10">
-                <div class="w-16 h-16 bg-sky-50 border border-sky-100 text-sky-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-inner">
+                <div class="w-16 h-16 bg-gradient-to-tr from-sky-100 to-indigo-100 border border-sky-200 text-sky-700 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-inner">
                     🎙️
                 </div>
                 <div>
@@ -291,7 +297,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         <!-- BATCH RESULTS DISPLAY -->
         <div id="batchResultsContainer" class="hidden space-y-6">
-            <div class="flex justify-between items-center font-semibold border-b border-slate-200 pb-3 flex-wrap gap-2">
+            <div class="flex justify-between items-center font-semibold border-b border-slate-200/80 pb-3 flex-wrap gap-2">
                 <span class="text-base text-sky-800 font-bold flex items-center gap-2">
                     📊 Batch Intelligence Report
                 </span>
@@ -332,7 +338,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
 
         <!-- FIREBASE CLOUD HISTORY TABLE -->
-        <div class="card-bg rounded-2xl p-6 space-y-6 shadow-md border border-slate-200">
+        <div class="card-bg rounded-2xl p-6 space-y-6 shadow-md border border-slate-200/80">
             <div class="flex justify-between items-center border-b border-slate-200 pb-4 flex-wrap gap-3">
                 <div class="flex items-center gap-3 flex-wrap">
                     <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-widest">🔥 Cloud Audits History</h3>
@@ -361,7 +367,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
 
             <!-- Filter Controls -->
-            <div class="inner-bg p-3.5 rounded-xl border border-slate-200 flex items-center gap-3 flex-wrap text-xs">
+            <div class="inner-bg p-3.5 rounded-xl border border-slate-200/80 flex items-center gap-3 flex-wrap text-xs">
                 <span class="font-bold text-sky-800 flex items-center gap-1">🔍 Filter Metric:</span>
                 
                 <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-sky-600 max-w-xs">
@@ -639,7 +645,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var dashboardHtml = `<table border="1">
                 <thead>
-                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0284c7; color:#ffffff; font-weight:bold; font-size:16px; padding:10px;">📊 AI AUDIT BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
+                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0284c7; color:#ffffff; font-weight:bold; font-size:16px; padding:10px;">📊 OWLBRAIN AI BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
                     <tr>
                         <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">KPI Metric Name</th>
                         <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Positive Count</th>
@@ -754,8 +760,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             } catch (error) {
                 errorDiv.innerText = error.message;
                 errorDiv.classList.remove('hidden');
-            } finally {
-                loginBtn.innerText = "AUTHENTICATE";
+            } font-bold text-xs px-5 py-2 rounded-xl transition">Close</button>
             }
         }
 
