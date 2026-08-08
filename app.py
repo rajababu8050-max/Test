@@ -493,20 +493,37 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
-        // FIXED EXCEL EXPORT WITH CONTROLLED COLUMN WIDTHS TO PREVENT HORIZONTAL BAR OVERFLOW
+        // FIXED CENTER ALIGNMENT & CONTROLLED COLUMN WIDTHS IN EXCEL WORKSHEET
         function exportStyledWorkbook(exportData, sheetName, fileName) {
             var workbook = XLSX.utils.book_new();
             var worksheet = XLSX.utils.json_to_sheet(exportData);
 
             if (exportData.length > 0) {
+                var range = XLSX.utils.decode_range(worksheet['!ref']);
+                
+                // Iterate through every cell in sheet and apply CENTER alignment
+                for (var R = range.s.r; R <= range.e.r; ++R) {
+                    for (var C = range.s.c; C <= range.e.c; ++C) {
+                        var cell_address = XLSX.utils.encode_cell({ r: R, c: C });
+                        if (!worksheet[cell_address]) continue;
+                        
+                        if (!worksheet[cell_address].s) worksheet[cell_address].s = {};
+                        worksheet[cell_address].s.alignment = {
+                            horizontal: "center",
+                            vertical: "center",
+                            wrapText: true
+                        };
+                    }
+                }
+
+                // Strict Column Width Limit so the Excel layout stays clean without horizontal bar overflow
                 var colWidths = Object.keys(exportData[0]).map(key => {
                     var maxLen = key.length;
                     exportData.forEach(row => {
                         var val = row[key] ? row[key].toString() : "";
                         if (val.length > maxLen) maxLen = val.length;
                     });
-                    // Strict Cap on Column Widths (Min: 12, Max: 32) so Excel Table remains fit & clean
-                    return { wch: Math.min(Math.max(maxLen + 3, 12), 32) };
+                    return { wch: Math.min(Math.max(maxLen + 3, 14), 30) };
                 });
 
                 worksheet["!cols"] = colWidths;
