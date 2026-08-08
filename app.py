@@ -388,6 +388,19 @@ HTML_CONTENT = """<!DOCTYPE html>
         var itemsPerPage = 10;
         var selectedAuditIds = new Set();
 
+        // Safe Data Helpers for Audio Metrics
+        function extractDuration(item) {
+            return Math.round(item.duration ?? item.data?.metrics?.duration ?? 0);
+        }
+
+        function extractTotalWords(item) {
+            return item.total_words ?? item.data?.metrics?.total_words ?? 0;
+        }
+
+        function extractWPM(item) {
+            return item.wpm ?? item.data?.metrics?.wpm ?? 0;
+        }
+
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 idToken = await user.getIdToken(true);
@@ -636,7 +649,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var data = item.data || {};
                 var evalData = data.evaluation || {};
                 var evalMetrics = evalData.evaluated_metrics || {};
-                var metrics = data.metrics || {};
                 var transcript = data.transcript || [];
                 
                 var card = document.createElement('div');
@@ -660,9 +672,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <span class="text-emerald-400 font-extrabold text-lg">${evalData.overall_score || 0}/100</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">PACE</span><span class="font-bold text-blue-400">${metrics.wpm || 0} WPM</span></div>
-                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">DURATION</span><span class="font-bold text-indigo-400">${Math.round(metrics.duration || 0)}s</span></div>
-                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">WORDS</span><span class="font-bold text-amber-400">${metrics.total_words || 0}</span></div>
+                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">PACE</span><span class="font-bold text-blue-400">${extractWPM(item)} WPM</span></div>
+                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">DURATION</span><span class="font-bold text-indigo-400">${extractDuration(item)}s</span></div>
+                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">WORDS</span><span class="font-bold text-amber-400">${extractTotalWords(item)}</span></div>
                     </div>
                     <div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">
                         <div class="font-bold text-emerald-400 text-[11px] uppercase">💊 Call Metrics Evaluation</div>
@@ -852,9 +864,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "File Name": item.filename || "N/A",
                     "Uploaded By": item.uploaded_by || currentUserName || "Admin",
                     "QA Score": item.score || 0,
-                    "WPM": item.wpm || 0,
-                    "Duration (sec)": Math.round(item.duration || 0),
-                    "Total Words": item.total_words || 0,
+                    "WPM": extractWPM(item),
+                    "Duration (sec)": extractDuration(item),
+                    "Total Words": extractTotalWords(item),
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
                     "Summary": item.summary || ""
                 };
@@ -905,9 +917,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "File Name": item.filename || "N/A",
                     "Uploaded By": item.uploaded_by || currentUserName || "Admin",
                     "QA Score": item.score || 0,
-                    "WPM": item.wpm || 0,
-                    "Duration (sec)": Math.round(item.duration || 0),
-                    "Total Words": item.total_words || 0,
+                    "WPM": extractWPM(item),
+                    "Duration (sec)": extractDuration(item),
+                    "Total Words": extractTotalWords(item),
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
                     "Summary": item.summary || ""
                 };
@@ -930,9 +942,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "File Name": item.filename || "N/A",
                     "Uploaded By": item.uploaded_by || currentUserName || "Admin",
                     "QA Score": item.score || 0,
-                    "WPM": item.wpm || 0,
-                    "Duration (sec)": Math.round(item.duration || 0),
-                    "Total Words": item.total_words || 0,
+                    "WPM": extractWPM(item),
+                    "Duration (sec)": extractDuration(item),
+                    "Total Words": extractTotalWords(item),
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
                     "Summary": item.summary || ""
                 };
@@ -981,7 +993,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
 
             var uName = item.uploaded_by || currentUserName || 'Admin';
-            var detailText = `📁 File: ${item.filename}\n👤 Uploaded By: ${uName}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
+            var detailText = `📁 File: ${item.filename}\n👤 Uploaded By: ${uName}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${extractDuration(item)}s | WPM: ${extractWPM(item)}\n💬 Words: ${extractTotalWords(item)}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
             alert(detailText);
         }
 
@@ -993,9 +1005,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "File Name": item.filename || "N/A",
                 "Uploaded By": item.uploaded_by || currentUserName || "Admin",
                 "QA Score": item.score || 0,
-                "WPM": item.wpm || 0,
-                "Duration (sec)": Math.round(item.duration || 0),
-                "Total Words": item.total_words || 0,
+                "WPM": extractWPM(item),
+                "Duration (sec)": extractDuration(item),
+                "Total Words": extractTotalWords(item),
                 "Date & Time (IST)": formatDateDisplay(item.created_at),
                 "Summary": item.summary || ""
             };
@@ -1038,9 +1050,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var row = {
                     "File Name": i.filename,
                     "QA Score": i.data?.evaluation?.overall_score || 0,
-                    "WPM": i.data?.metrics?.wpm || 0,
-                    "Duration (sec)": Math.round(i.data?.metrics?.duration || 0),
-                    "Total Words": i.data?.metrics?.total_words || 0,
+                    "WPM": extractWPM(i),
+                    "Duration (sec)": extractDuration(i),
+                    "Total Words": extractTotalWords(i),
                     "Summary": i.data?.evaluation?.summary || ""
                 };
                 var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
@@ -1253,7 +1265,7 @@ async def transcribe_bytes_async(audio_bytes: bytes):
             raise Exception(f"Deepgram Error ({response.status_code}): {response.text}")
             
         data = response.json()
-        duration = data.get("metadata", {}).get("duration", 1)
+        duration = float(data.get("metadata", {}).get("duration", 0.0))
         utterances = data.get("results", {}).get("utterances", [])
         
         formatted_transcript = []
@@ -1368,6 +1380,11 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict], user
             elif email:
                 uploader_name = email.split("@")[0]
 
+        # Explicit numeric extraction
+        calc_duration = round(float(metrics.get("duration", 0.0)), 2)
+        calc_total_words = int(metrics.get("total_words", 0))
+        calc_wpm = int(metrics.get("wpm", 0))
+
         if db:
             try:
                 audit_data = {
@@ -1378,9 +1395,9 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict], user
                     "evaluated_metrics": evaluation.get("evaluated_metrics", {}),
                     "strengths": evaluation.get("strengths", []),
                     "improvements": evaluation.get("improvements", []),
-                    "wpm": metrics.get("wpm", 0),
-                    "duration": metrics.get("duration", 0),
-                    "total_words": metrics.get("total_words", 0),
+                    "wpm": calc_wpm,
+                    "duration": calc_duration,
+                    "total_words": calc_total_words,
                     "created_at": created_time
                 }
                 loop = asyncio.get_running_loop()
@@ -1388,7 +1405,19 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict], user
             except Exception as fe:
                 print("❌ Firebase Write Error:", fe)
 
-        return {"status": "success", "filename": file.filename, "data": {"metrics": metrics, "transcript": transcript, "evaluation": evaluation}}
+        return {
+            "status": "success", 
+            "filename": file.filename, 
+            "data": {
+                "metrics": {
+                    "duration": calc_duration,
+                    "total_words": calc_total_words,
+                    "wpm": calc_wpm
+                }, 
+                "transcript": transcript, 
+                "evaluation": evaluation
+            }
+        }
     except Exception as e:
         return {"status": "error", "filename": file.filename, "error": str(e)}
 
