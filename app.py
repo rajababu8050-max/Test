@@ -242,9 +242,13 @@ HTML_CONTENT = """<!DOCTYPE html>
         <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS & METRIC FILTER -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                     <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
                     <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total Records</span>
+                    <!-- SELECTION BADGE -->
+                    <span id="selectedCountHeaderBadge" class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition">
+                        Selected: 0
+                    </span>
                 </div>
                 <!-- GLOBAL BULK ACTIONS CONTROL -->
                 <div class="flex gap-2 flex-wrap items-center">
@@ -683,6 +687,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 document.getElementById('selectAllCheckbox').checked = false;
                 document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
                 
+                updateSelectedCounter();
                 applyMetricFilter();
             } catch(e) {
                 hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
@@ -787,7 +792,22 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         function changePage(direction) { currentPage += direction; renderHistoryTable(); }
 
-        // ================= Checkbox Multi-Select Logic =================
+        // ================= Checkbox Multi-Select & Counter Logic =================
+
+        function updateSelectedCounter() {
+            var count = selectedAuditIds.size;
+            var badge = document.getElementById('selectedCountHeaderBadge');
+            if(badge) {
+                badge.innerText = "Selected: " + count;
+                if(count > 0) {
+                    badge.classList.remove('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+                    badge.classList.add('bg-blue-500', 'text-white', 'border-blue-400');
+                } else {
+                    badge.classList.remove('bg-blue-500', 'text-white', 'border-blue-400');
+                    badge.classList.add('bg-emerald-500/20', 'text-emerald-400', 'border-emerald-500/30');
+                }
+            }
+        }
 
         function toggleSelectAll(masterCheckbox) {
             var checkboxes = document.querySelectorAll('.row-checkbox');
@@ -799,6 +819,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     selectedAuditIds.delete(cb.value);
                 }
             });
+            updateSelectedCounter();
         }
 
         function toggleAuditSelect(id, checkbox) {
@@ -808,6 +829,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 selectedAuditIds.delete(id);
                 document.getElementById('selectAllCheckbox').checked = false;
             }
+            updateSelectedCounter();
         }
 
         // Export Selected Items to Excel
