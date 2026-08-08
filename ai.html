@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AI Quality Score - LLM Diarized System</title>
+  <title>AI Quality Score - Groq Diarized System</title>
   
   <!-- Firebase Compatibility SDKs -->
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-database-compat.js"></script>
   
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -80,7 +81,6 @@
     .btn-primary { background: var(--primary); color: white; }
     .btn-secondary { background: var(--border); color: var(--text-main); }
 
-    /* Scoreboard Professional Display */
     .score-banner {
       display: flex; justify-content: space-between; align-items: center;
       background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
@@ -100,7 +100,6 @@
     .breakdown-card small { color: var(--text-muted); font-size: 0.8rem; }
     .breakdown-card h4 { font-size: 1.5rem; margin-top: 4px; }
 
-    /* Tables & Transcript */
     .data-table { width: 100%; border-collapse: collapse; text-align: left; }
     .data-table th, .data-table td { padding: 14px 16px; border-bottom: 1px solid var(--border); font-size: 0.9rem; }
     .data-table th { background: rgba(0,0,0,0.02); color: var(--text-muted); font-weight: 600; }
@@ -132,19 +131,20 @@
   <!-- Login Modal -->
   <div id="authModal" class="auth-overlay">
     <div class="auth-card">
-      <h2 style="color: var(--primary); margin-bottom: 8px;">AI Quality Score</h2>
-      <p style="color: var(--text-muted); margin-bottom: 20px;">Whisper STT + Groq LLaMA-3 Diarization Engine</p>
+      <h2 style="color: var(--primary); margin-bottom: 8px;">Groq AI Quality Score</h2>
+      <p style="color: var(--text-muted); margin-bottom: 20px;">Groq Powered Engine Access</p>
       
       <form id="loginForm">
         <div class="form-group">
           <label>Email Address</label>
-          <input type="email" id="loginEmail" class="form-control" value="admin@bpo.com" required>
+          <input type="email" id="loginEmail" class="form-control" required placeholder="admin@example.com">
         </div>
         <div class="form-group">
           <label>Password</label>
-          <input type="password" id="loginPassword" class="form-control" value="123456" required>
+          <input type="password" id="loginPassword" class="form-control" required placeholder="••••••••">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 100%;">Sign In</button>
+        <div id="authError" style="color:red; font-size:0.8rem; margin-bottom:10px;" class="hidden"></div>
+        <button type="submit" id="loginBtn" class="btn btn-primary" style="width: 100%;">Sign In</button>
       </form>
     </div>
   </div>
@@ -154,7 +154,7 @@
       <div>
         <div class="brand">
           <span style="font-size: 1.5rem;">🎙️</span>
-          <h2>QualityScore AI</h2>
+          <h2>Groq QA System</h2>
         </div>
         <ul class="nav-list">
           <li class="nav-item active" onclick="switchTab('dashboard')">📈 Dashboard</li>
@@ -164,16 +164,17 @@
         </ul>
       </div>
       <div>
-        <button onclick="logout()" class="btn btn-secondary" style="width: 100%;">Logout</button>
+        <a href="/" class="btn btn-secondary" style="width: 100%; margin-bottom:10px; justify-content:center; text-decoration:none;">← Admin Panel</a>
+        <button onclick="logout()" class="btn btn-secondary" style="width: 100%; justify-content:center;">Logout</button>
       </div>
     </aside>
 
     <main class="content-area">
       <header class="top-bar">
-        <h1 id="pageTitle">LLM Diarized Call Analytics</h1>
+        <h1 id="pageTitle">Groq AI Call Analytics</h1>
         <div>
           <span id="roleBadge" class="btn btn-secondary" style="padding: 4px 12px; font-size: 0.8rem;">Admin</span>
-          <span id="userEmailText" style="font-size: 0.9rem; margin-left: 8px;">admin@bpo.com</span>
+          <span id="userEmailText" style="font-size: 0.9rem; margin-left: 8px;"></span>
         </div>
       </header>
 
@@ -185,20 +186,14 @@
           <div class="card"><div class="kpi-title">Passed Calls (>=75%)</div><div class="kpi-value text-success" id="kpiPass">0</div></div>
           <div class="card"><div class="kpi-title">Failed Calls (&lt;75%)</div><div class="kpi-value text-danger" id="kpiFail">0</div></div>
         </div>
-        <div class="card">
-          <h3>Quality Performance Trend</h3>
-          <div style="height: 250px; margin-top: 16px;">
-            <canvas id="trendChart"></canvas>
-          </div>
-        </div>
       </section>
 
-      <!-- Section: Upload Audio & Detailed Score Board -->
+      <!-- Section: Upload Audio -->
       <section id="upload" class="tab-section">
         <div class="card">
           <h3>Upload Call Recording File</h3>
           <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 20px;">
-            Call recording upload karein. LLM Whisper transcript me se Agent aur Customer ki aawaz alag karke scoring karega.
+            Audio file upload karein. Groq API (Whisper + LLaMA-3) speaker diarization & quality score evaluate karega.
           </p>
 
           <form id="fileUploadForm">
@@ -219,20 +214,20 @@
             </div>
 
             <button type="submit" id="processBtn" class="btn btn-primary" style="margin-top: 8px;">
-              🚀 Transcribe, Separate Speakers & Evaluate Agent Score
+              ⚡ Process strictly with Groq AI API
             </button>
             <div id="loaderStatus" class="hidden" style="margin-top: 12px; color: var(--primary);">
-              <span class="loader"></span> <span id="loaderText">Whisper AI audio transcribe kar raha hai...</span>
+              <span class="loader"></span> <span id="loaderText">Groq Server Processing Audio...</span>
             </div>
           </form>
 
           <div style="margin-top: 20px;">
-            <label style="font-weight: 600; font-size: 0.9rem;">LLM Diarized Transcript (Agent vs Customer):</label>
+            <label style="font-weight: 600; font-size: 0.9rem;">Groq Diarized Transcript (Agent vs Customer):</label>
             <div id="autoConvertedText" class="transcript-box">Audio file upload karke Process karein...</div>
           </div>
         </div>
 
-        <!-- DETAILED AGENT QUALITY SCORE BOARD -->
+        <!-- DETAILED SCORE BOARD -->
         <div id="analysisResult" class="card hidden">
           <div class="score-banner">
             <div>
@@ -245,7 +240,6 @@
             <span id="resStatus" class="score-status-badge">PASS</span>
           </div>
 
-          <!-- Score Breakdown Grid -->
           <div class="score-breakdown-grid">
             <div class="breakdown-card">
               <small>Base Score</small>
@@ -279,7 +273,7 @@
             <tbody id="resRuleTable"></tbody>
           </table>
 
-          <h3>LLM AI Feedback for Agent</h3>
+          <h3>Groq AI Feedback for Agent</h3>
           <ul id="resSuggestions" style="margin-left: 20px; margin-top: 12px; font-size: 0.95rem; line-height: 1.6; color: var(--text-main);"></ul>
         </div>
       </section>
@@ -287,19 +281,19 @@
       <!-- Section: Rules Engine -->
       <section id="rules" class="tab-section">
         <div class="card">
-          <h3>Add Quality Scoring Rule (Firebase Saved)</h3>
+          <h3>Add Quality Scoring Rule</h3>
           <form id="ruleForm" style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; margin-top: 16px;">
             <div class="form-group" style="margin: 0;">
-              <label>Keyword / Phrase (e.g. नमस्ते / Good Morning)</label>
-              <input type="text" id="ruleKeyword" class="form-control" placeholder="उदा. आपका स्वागत है / Welcome" required>
+              <label>Keyword / Phrase</label>
+              <input type="text" id="ruleKeyword" class="form-control" placeholder="उदा. आपका स्वागत है" required>
             </div>
             <div class="form-group" style="margin: 0;">
               <label>Category</label>
               <select id="ruleCategory" class="form-control">
-                <option value="Greeting">Greeting (अभिवादन)</option>
-                <option value="Closing">Closing (समापन)</option>
-                <option value="Politeness">Politeness (विनम्रता)</option>
-                <option value="Conduct">Conduct (व्यवहार)</option>
+                <option value="Greeting">Greeting</option>
+                <option value="Closing">Closing</option>
+                <option value="Politeness">Politeness</option>
+                <option value="Conduct">Conduct</option>
               </select>
             </div>
             <div class="form-group" style="margin: 0;">
@@ -309,16 +303,16 @@
             <div class="form-group" style="margin: 0;">
               <label>Required</label>
               <select id="ruleRequired" class="form-control">
-                <option value="Yes">Yes (अनिवार्य)</option>
-                <option value="No">No (ऐच्छिक)</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
               </select>
             </div>
-            <button type="submit" class="btn btn-primary">Save to Firebase</button>
+            <button type="submit" class="btn btn-primary">Save Rule</button>
           </form>
         </div>
 
         <div class="card">
-          <h3>Configured Rules Engine (Synced Realtime)</h3>
+          <h3>Configured Rules Engine</h3>
           <table class="data-table" style="margin-top: 16px;">
             <thead>
               <tr><th>Keyword/Phrase</th><th>Category</th><th>Score</th><th>Required</th><th>Action</th></tr>
@@ -345,36 +339,58 @@
   </div>
 
   <script>
-    // -------------------------------------------------------------
-    // GROQ API KEY & FIREBASE CONFIGURATION
-    // -------------------------------------------------------------
-    const GROQ_API_KEY = "";
-
     const firebaseConfig = {
-      apiKey: "AIzaSyA-X-5ifk7q9suZzDuUzScnGIMgKKXlQ5U",
-      authDomain: "ai-quality-score.firebaseapp.com",
-      databaseURL: "https://ai-quality-score-default-rtdb.firebaseio.com",
-      projectId: "ai-quality-score",
-      storageBucket: "ai-quality-score.firebasestorage.app",
-      messagingSenderId: "134946949167",
-      appId: "1:134946949167:web:8776c0d36c09aabe6bdeda",
-      measurementId: "G-CV3K37N462"
+      apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
+      authDomain: "ai-call-quality-auditor-pro.firebaseapp.com",
+      databaseURL: "https://ai-call-quality-auditor-pro-default-rtdb.firebaseio.com",
+      projectId: "ai-call-quality-auditor-pro",
+      storageBucket: "ai-call-quality-auditor-pro.firebasestorage.app",
+      messagingSenderId: "788716678382",
+      appId: "1:788716678382:web:778853207b4fa11e0517ff"
     };
 
     firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
     const db = firebase.database();
 
     let rules = [];
     let callEvaluations = [];
+    let idToken = "";
 
-    document.getElementById('loginForm').addEventListener('submit', (e) => {
-      e.preventDefault();
-      document.getElementById('authModal').classList.add('hidden');
-      document.getElementById('app').classList.remove('hidden');
-      initFirebaseSync();
+    auth.onAuthStateChanged(async (user) => {
+      if (user) {
+        idToken = await user.getIdToken(true);
+        document.getElementById('userEmailText').innerText = user.email;
+        document.getElementById('authModal').classList.add('hidden');
+        document.getElementById('app').classList.remove('hidden');
+        initFirebaseSync();
+      } else {
+        idToken = "";
+        document.getElementById('authModal').classList.remove('hidden');
+        document.getElementById('app').classList.add('hidden');
+      }
     });
 
-    function logout() { location.reload(); }
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value.trim();
+      const errDiv = document.getElementById('authError');
+      const btn = document.getElementById('loginBtn');
+
+      try {
+        errDiv.classList.add('hidden');
+        btn.innerText = "Signing in...";
+        await auth.signInWithEmailAndPassword(email, password);
+      } catch(err) {
+        errDiv.innerText = err.message;
+        errDiv.classList.remove('hidden');
+      } finally {
+        btn.innerText = "Sign In";
+      }
+    });
+
+    function logout() { auth.signOut(); }
 
     function switchTab(tabId) {
       document.querySelectorAll('.tab-section').forEach(el => el.classList.remove('active'));
@@ -387,15 +403,12 @@
       db.ref('rules').on('value', snapshot => {
         const data = snapshot.val();
         rules = [];
-
         if (data) {
-          Object.keys(data).forEach(key => {
-            rules.push({ firebaseId: key, ...data[key] });
-          });
+          Object.keys(data).forEach(key => rules.push({ firebaseId: key, ...data[key] }));
         } else {
           const defaultRules = [
             { keyword: "Good Morning / शुभ प्रभात / नमस्ते", category: "Greeting", score: 5, required: "Yes" },
-            { keyword: "Welcome to ABC Company / स्वागत है", category: "Greeting", score: 5, required: "Yes" },
+            { keyword: "Welcome / स्वागत है", category: "Greeting", score: 5, required: "Yes" },
             { keyword: "Thank You / धन्यवाद / शुक्रिया", category: "Closing", score: 5, required: "Yes" },
             { keyword: "Sorry / असुविधा के लिए खेद", category: "Politeness", score: 5, required: "No" },
             { keyword: "Rude language / बदतमीजी", category: "Conduct", score: -20, required: "No" }
@@ -409,9 +422,7 @@
         const data = snapshot.val();
         callEvaluations = [];
         if (data) {
-          Object.keys(data).forEach(key => {
-            callEvaluations.push(data[key]);
-          });
+          Object.keys(data).forEach(key => callEvaluations.push(data[key]));
         }
         updateDashboard();
         renderReportsUI();
@@ -430,9 +441,7 @@
     });
 
     function deleteRuleFromFirebase(firebaseId) {
-      if (confirm("Delete this rule from Firebase?")) {
-        db.ref(`rules/${firebaseId}`).remove();
-      }
+      if (confirm("Delete rule?")) db.ref(`rules/${firebaseId}`).remove();
     }
 
     function renderRulesUI() {
@@ -447,7 +456,7 @@
       `).join('');
     }
 
-    // 2-STEP AUDIO & LLM DIARIZATION PIPELINE (FULL AUDIO CONVERSION)
+    // EXCLUSIVE GROQ SERVER API CALL
     document.getElementById('fileUploadForm').addEventListener('submit', async (e) => {
       e.preventDefault();
 
@@ -455,85 +464,33 @@
       if (!fileInput.files.length) return;
 
       const loader = document.getElementById('loaderStatus');
-      const loaderText = document.getElementById('loaderText');
       loader.classList.remove('hidden');
       document.getElementById('processBtn').disabled = true;
 
       try {
-        const audioFile = fileInput.files[0];
-        
-        // --- STEP 1: FULL WHISPER SPEECH-TO-TEXT (Start to End) ---
-        loaderText.innerText = "Step 1/2: Whisper AI audio ko shuru se aakhir tak transcribe kar raha hai...";
-
         const formData = new FormData();
-        formData.append("file", audioFile);
-        formData.append("model", "whisper-large-v3");
-        formData.append("language", "hi"); // Hindi & Hinglish support
-        formData.append("temperature", "0"); // Low temperature accurate full transcription ke liye
-        formData.append("response_format", "json");
-        formData.append("prompt", "यह एक कॉल सेंटर सपोर्ट कॉल है। Agent aur Customer ke shuruat se ant tak ki saari baat ko bina kisi shabd ko chhode poora transcribe karein.");
+        formData.append("file", fileInput.files[0]);
 
-        const whisperRes = await fetch("https://api.groq.com/openai/v1/audio/transcriptions", {
+        if (auth.currentUser) idToken = await auth.currentUser.getIdToken(true);
+
+        // Strict endpoint calling backend Groq handler only
+        const res = await fetch("/api/groq-transcribe-eval", {
           method: "POST",
-          headers: { "Authorization": `Bearer ${GROQ_API_KEY}` },
+          headers: { "Authorization": `Bearer ${idToken}` },
           body: formData
         });
 
-        const whisperData = await whisperRes.json();
-        if (!whisperRes.ok || !whisperData.text) throw new Error(whisperData.error?.message || "Whisper STT failed");
+        if (!res.ok) {
+          const errData = await res.json();
+          throw new Error(errData.detail || "Groq processing failed");
+        }
 
-        const rawTranscript = whisperData.text.trim();
-
-        // --- STEP 2: GROQ LLM SPEAKER DIARIZATION (AGENT vs CUSTOMER) ---
-        loaderText.innerText = "Step 2/2: Groq LLaMA-3 Agent aur Customer ke dialogues alag kar raha hai...";
-
-        const llmPrompt = `
-You are an expert Call Center QA Auditor.
-Below is a full raw transcript of a customer service call in Hindi/Hinglish/English:
-
-"${rawTranscript}"
-
-TASKS:
-1. Parse the transcript from START TO END and divide it into chronological dialogue turns between "Agent:" and "Customer:".
-2. Make sure NO PART of the conversation from start to end is omitted or summarized.
-3. Output ONLY a JSON object with this exact structure:
-{
-  "full_diarized_transcript": "Agent: [dialogue]\\nCustomer: [dialogue]\\nAgent: [dialogue]",
-  "agent_only_speech": "Combined string of everything the Agent said from start to end"
-}
-Do not include markdown or explanations outside the valid JSON.
-`;
-
-        const llmRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${GROQ_API_KEY}`,
-            "Content-Type": "application/json"
-          },
-          body: JSON.stringify({
-            model: "llama-3.3-70b-versatile",
-            messages: [{ role: "user", content: llmPrompt }],
-            response_format: { type: "json_object" },
-            temperature: 0.1
-          })
-        });
-
-        const llmData = await llmRes.json();
+        const data = await res.json();
         loader.classList.add('hidden');
         document.getElementById('processBtn').disabled = false;
 
-        if (llmRes.ok && llmData.choices && llmData.choices[0].message.content) {
-          const parsedLLM = JSON.parse(llmData.choices[0].message.content);
-          
-          document.getElementById('autoConvertedText').innerText = parsedLLM.full_diarized_transcript;
-
-          // EVALUATE RULES STRICTLY ON AGENT SPEECH ONLY
-          evaluateScoreBoard(parsedLLM.agent_only_speech);
-        } else {
-          // Fallback if LLM fails
-          document.getElementById('autoConvertedText').innerText = rawTranscript;
-          evaluateScoreBoard(rawTranscript);
-        }
+        document.getElementById('autoConvertedText').innerText = data.full_diarized_transcript || "";
+        evaluateScoreBoard(data.agent_only_speech || "");
 
       } catch (error) {
         alert("Error: " + error.message);
@@ -542,7 +499,6 @@ Do not include markdown or explanations outside the valid JSON.
       }
     });
 
-    // EVALUATION ENGINE (STRICTLY AGENT TEXT)
     function evaluateScoreBoard(agentText) {
       let negativeScore = 0;
       let positiveScore = 0;
@@ -591,7 +547,6 @@ Do not include markdown or explanations outside the valid JSON.
       const finalScore = Math.max(0, Math.min(100, 100 - negativeScore));
       const status = finalScore >= 75 ? 'PASS' : 'FAIL';
 
-      // UI Update
       document.getElementById('resScore').innerText = `${finalScore}%`;
       document.getElementById('resStatus').innerText = status;
       document.getElementById('resStatus').style.background = status === 'PASS' ? '#dcfce7' : '#fee2e2';
@@ -614,7 +569,6 @@ Do not include markdown or explanations outside the valid JSON.
       document.getElementById('resSuggestions').innerHTML = (suggestions.length ? suggestions : ['🎉 Perfect call quality! All agent guidelines met.']).map(s => `<li>${s}</li>`).join('');
       document.getElementById('analysisResult').classList.remove('hidden');
 
-      // Save to Firebase Realtime Database
       const evaluationRecord = {
         callId: document.getElementById('callId').value || `CALL-${Math.floor(1000 + Math.random() * 9000)}`,
         agentName: document.getElementById('agentName').value,
