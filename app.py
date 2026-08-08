@@ -119,14 +119,14 @@ async def verify_firebase_token(request: Request):
             detail=f"Unauthorized: Invalid or expired token ({str(e)})"
         )
 
-# ================= HTML Content (Owlbrain AI Pro Theme) =================
+# ================= HTML Content (Professional Light Theme) =================
 
 HTML_CONTENT = """<!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro | Owlbrain AI Edition</title>
+    <title>AI Call Quality Auditor Pro | Enterprise Light Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -134,12 +134,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             theme: {
                 extend: {
                     colors: {
-                        Owlbrain: {
-                            bg: '#060913',
-                            surface: '#0d1322',
-                            border: '#1a243b',
-                            accent: '#06b6d4',
-                            glow: '#3b82f6'
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            900: '#0c4a6e'
                         }
                     }
                 }
@@ -153,81 +153,67 @@ HTML_CONTENT = """<!DOCTYPE html>
     <link rel="stylesheet" href="https://rsms.me/inter/inter.css">
 
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #060913; color: #f8fafc; }
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
         
         .card-bg { 
-            background: rgba(13, 19, 34, 0.75); 
-            backdrop-filter: blur(16px); 
-            border: 1px solid rgba(30, 41, 59, 0.8); 
-            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-        }
-        .light .card-bg { 
-            background: rgba(255, 255, 255, 0.95); 
+            background: #ffffff; 
             border: 1px solid #e2e8f0; 
-            color: #0f172a; 
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
         }
 
-        .inner-bg { background-color: rgba(22, 30, 49, 0.7); }
-        .light .inner-bg { background-color: #f1f5f9; color: #0f172a; }
+        .inner-bg { background-color: #f1f5f9; color: #0f172a; }
 
-        .text-sub { color: #94a3b8; }
-        .light .text-sub { color: #64748b; }
+        .text-sub { color: #64748b; }
 
-        /* Custom Cyan & Electric Glow Effects */
-        .glow-cyan {
-            box-shadow: 0 0 20px -5px rgba(6, 182, 212, 0.4);
-        }
-        
-        .Owlbrain-btn {
-            background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
+        .pro-btn {
+            background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%);
             transition: all 0.25s ease;
         }
-        .Owlbrain-btn:hover {
-            box-shadow: 0 0 20px 2px rgba(6, 182, 212, 0.5);
+        .pro-btn:hover {
+            box-shadow: 0 4px 14px 0 rgba(2, 132, 199, 0.35);
             transform: translateY(-1px);
         }
 
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #060913; }
-        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
-        ::-webkit-scrollbar-thumb:hover { background: #06b6d4; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #0284c7; }
     </style>
 </head>
-<body class="min-h-screen antialiased selection:bg-cyan-500 selection:text-black">
+<body class="min-h-screen antialiased selection:bg-sky-500 selection:text-white">
 
     <!-- INITIAL FULLSCREEN APP LOADER -->
-    <div id="initialAppLoader" class="fixed inset-0 bg-[#060913] flex flex-col items-center justify-center space-y-4 z-[200]">
+    <div id="initialAppLoader" class="fixed inset-0 bg-slate-50 flex flex-col items-center justify-center space-y-4 z-[200]">
         <div class="relative flex items-center justify-center">
-            <div class="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
-            <div class="absolute text-cyan-400 font-extrabold text-xs tracking-widest">AI</div>
+            <div class="w-16 h-16 border-4 border-sky-200 border-t-sky-600 rounded-full animate-spin"></div>
+            <div class="absolute text-sky-700 font-extrabold text-xs tracking-widest">AI</div>
         </div>
-        <p class="text-xs font-semibold text-cyan-500/80 uppercase tracking-widest animate-pulse">Owlbrain AI ENGINE INITIALIZING...</p>
+        <p class="text-xs font-semibold text-sky-700 uppercase tracking-widest animate-pulse">Auditor Engine Initializing...</p>
     </div>
 
     <!-- ADMIN LOGIN MODAL -->
-    <div id="authModal" class="hidden fixed inset-0 bg-[#060913]/90 backdrop-blur-xl flex items-center justify-center p-4 z-[100]">
-        <div class="card-bg rounded-3xl w-full max-w-md p-8 space-y-6 relative overflow-hidden">
-            <div class="absolute -top-12 -left-12 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+    <div id="authModal" class="hidden fixed inset-0 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
+        <div class="card-bg rounded-3xl w-full max-w-md p-8 space-y-6 relative overflow-hidden shadow-2xl">
             <div class="text-center space-y-2 relative z-10">
-                <div class="w-14 h-14 bg-gradient-to-tr from-cyan-500 to-blue-600 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-lg glow-cyan">
+                <div class="w-14 h-14 bg-gradient-to-tr from-sky-600 to-blue-700 text-white rounded-2xl flex items-center justify-center mx-auto text-2xl font-black shadow-md">
                     ▲
                 </div>
-                <h2 class="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400">
-                    Owlbrain Portal
+                <h2 class="text-2xl font-black tracking-tight text-slate-900">
+                    Admin Portal
                 </h2>
                 <p class="text-xs text-sub">Sign in with authorized admin credentials</p>
             </div>
             <form onsubmit="handleLogin(event)" class="space-y-4 relative z-10">
                 <div>
                     <label class="block text-[10px] font-bold text-sub mb-1.5 uppercase tracking-wider">Admin Email</label>
-                    <input type="email" id="adminEmail" required placeholder="admin@Owlbrain.ai" class="w-full inner-bg border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition">
+                    <input type="email" id="adminEmail" required placeholder="admin@enterprise.com" class="w-full card-bg border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-sky-600 transition">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-sub mb-1.5 uppercase tracking-wider">Password</label>
-                    <input type="password" id="adminPassword" required placeholder="••••••••" class="w-full inner-bg border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition">
+                    <input type="password" id="adminPassword" required placeholder="••••••••" class="w-full card-bg border border-slate-300 rounded-xl px-4 py-2.5 text-xs text-slate-900 focus:outline-none focus:border-sky-600 transition">
                 </div>
-                <div id="authError" class="text-rose-400 text-xs text-center hidden font-medium p-2 bg-rose-500/10 rounded-lg border border-rose-500/20"></div>
-                <button type="submit" id="loginBtn" class="w-full Owlbrain-btn text-white font-bold py-3 rounded-xl text-xs transition shadow-lg tracking-wider">
+                <div id="authError" class="text-rose-600 text-xs text-center hidden font-medium p-2 bg-rose-50 rounded-lg border border-rose-200"></div>
+                <button type="submit" id="loginBtn" class="w-full pro-btn text-white font-bold py-3 rounded-xl text-xs transition shadow-md tracking-wider">
                     AUTHENTICATE
                 </button>
             </form>
@@ -238,15 +224,15 @@ HTML_CONTENT = """<!DOCTYPE html>
     <div id="dashboardContent" class="hidden max-w-7xl mx-auto p-4 md:p-8 space-y-8">
         
         <!-- HEADER NAVBAR -->
-        <div class="flex justify-between items-center border-b border-slate-800/80 pb-6 flex-wrap gap-4">
+        <div class="flex justify-between items-center border-b border-slate-200 pb-6 flex-wrap gap-4">
             <div>
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 bg-gradient-to-tr from-cyan-500 to-blue-600 rounded-xl flex items-center justify-center text-lg font-black text-white shadow-lg glow-cyan">
+                    <div class="w-10 h-10 bg-gradient-to-tr from-sky-600 to-blue-700 rounded-xl flex items-center justify-center text-lg font-black text-white shadow-md">
                         ▲
                     </div>
                     <div>
-                        <h1 onclick="goToHome()" class="text-2xl md:text-3xl font-black tracking-tight cursor-pointer text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-500 hover:opacity-90 transition">
-                            Owlbrain.AI <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 align-middle">PRO</span>
+                        <h1 onclick="goToHome()" class="text-2xl md:text-3xl font-black tracking-tight cursor-pointer text-slate-900 hover:text-sky-700 transition">
+                            Auditor.AI <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-sky-100 border border-sky-200 text-sky-800 align-middle">PRO</span>
                         </h1>
                         <p class="text-xs text-sub font-medium">Enterprise Audio Quality Intelligence & Bulk Auditor</p>
                     </div>
@@ -254,22 +240,19 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
 
             <div class="flex items-center gap-3 flex-wrap">
-                <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-lg shadow-purple-500/20 flex items-center gap-2 border border-purple-400/30 transition transform hover:-translate-y-0.5">
+                <a href="/ai.html" class="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold px-4 py-2.5 rounded-xl text-xs shadow-md flex items-center gap-2 transition transform hover:-translate-y-0.5">
                     ✨ AI Quality Score
                 </a>
-                <button onclick="toggleTheme()" class="card-bg border border-slate-700/80 px-3.5 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 shadow hover:border-slate-500 transition">
-                    <span id="themeIcon">🌙</span> <span id="themeText">Dark</span>
-                </button>
-                <button onclick="openMetricModal()" class="card-bg border border-slate-700/80 hover:border-cyan-500/50 text-slate-200 font-semibold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow">
+                <button onclick="openMetricModal()" class="card-bg border border-slate-300 hover:border-sky-500 text-slate-700 font-semibold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow-sm">
                     ⚙️ Manage Metrics
                 </button>
                 
-                <div class="flex items-center gap-2 inner-bg border border-slate-700/80 px-3 py-1.5 rounded-xl">
-                    <span class="text-xs text-cyan-400 font-semibold flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
+                <div class="flex items-center gap-2 inner-bg border border-slate-200 px-3 py-1.5 rounded-xl">
+                    <span class="text-xs text-sky-800 font-semibold flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                         <span id="userDisplayName">Loading...</span>
                     </span>
-                    <button onclick="handleLogout()" class="bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 font-semibold px-2.5 py-1 rounded-lg text-xs transition border border-rose-500/20 ml-1">
+                    <button onclick="handleLogout()" class="bg-rose-50 hover:bg-rose-100 text-rose-600 font-semibold px-2.5 py-1 rounded-lg text-xs transition border border-rose-200 ml-1">
                         Logout
                     </button>
                 </div>
@@ -277,21 +260,21 @@ HTML_CONTENT = """<!DOCTYPE html>
         </div>
 
         <!-- UPLOAD BATCH SECTION -->
-        <div class="card-bg rounded-3xl p-8 text-center shadow-2xl relative overflow-hidden group border border-slate-800/80">
+        <div class="card-bg rounded-3xl p-8 text-center shadow-lg relative overflow-hidden group border border-slate-200">
             <div class="max-w-xl mx-auto space-y-4 relative z-10">
-                <div class="w-16 h-16 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-inner glow-cyan">
+                <div class="w-16 h-16 bg-sky-50 border border-sky-100 text-sky-600 rounded-2xl flex items-center justify-center mx-auto text-2xl font-bold shadow-inner">
                     🎙️
                 </div>
                 <div>
-                    <h3 class="text-lg font-bold text-slate-100">Upload Call Audio Batches</h3>
+                    <h3 class="text-lg font-bold text-slate-900">Upload Call Audio Batches</h3>
                     <p id="fileName" class="text-xs text-sub mt-1">Select MP3, WAV, or M4A audio files for automated intelligence auditing</p>
                 </div>
                 <input type="file" id="audioInput" accept="audio/*" multiple class="hidden" onchange="fileSelected(event)">
                 <div class="flex justify-center gap-3 pt-2">
-                    <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-700 hover:border-cyan-500/50 font-semibold px-5 py-2.5 rounded-xl text-xs transition text-slate-200">
+                    <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-300 hover:border-sky-500 font-semibold px-5 py-2.5 rounded-xl text-xs transition text-slate-700">
                         📁 Browse Audio
                     </button>
-                    <button type="button" onclick="uploadAudioBatch()" class="Owlbrain-btn text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-lg tracking-wide">
+                    <button type="button" onclick="uploadAudioBatch()" class="pro-btn text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-md tracking-wide">
                         🚀 Start Bulk Analysis
                     </button>
                 </div>
@@ -299,103 +282,103 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             <!-- Progress Bar -->
             <div id="progressContainer" class="hidden mt-6 max-w-md mx-auto space-y-2">
-                <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden p-0.5 border border-slate-800">
-                    <div id="progressBar" class="bg-gradient-to-r from-cyan-400 to-blue-500 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+                <div class="w-full bg-slate-200 rounded-full h-2 overflow-hidden p-0.5 border border-slate-300">
+                    <div id="progressBar" class="bg-gradient-to-r from-sky-500 to-blue-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
-                <div id="loaderText" class="text-xs text-cyan-400 font-semibold">⚡ Auditing... 0 / 0 Completed</div>
+                <div id="loaderText" class="text-xs text-sky-700 font-semibold">⚡ Auditing... 0 / 0 Completed</div>
             </div>
         </div>
 
         <!-- BATCH RESULTS DISPLAY -->
         <div id="batchResultsContainer" class="hidden space-y-6">
-            <div class="flex justify-between items-center font-semibold border-b border-slate-800 pb-3 flex-wrap gap-2">
-                <span class="text-base text-cyan-400 font-bold flex items-center gap-2">
+            <div class="flex justify-between items-center font-semibold border-b border-slate-200 pb-3 flex-wrap gap-2">
+                <span class="text-base text-sky-800 font-bold flex items-center gap-2">
                     📊 Batch Intelligence Report
                 </span>
                 <div class="flex gap-2">
-                    <button type="button" onclick="downloadExcel()" class="bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500 hover:text-black text-emerald-400 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+                    <button type="button" onclick="downloadExcel()" class="bg-emerald-50 border border-emerald-200 hover:bg-emerald-600 hover:text-white text-emerald-700 text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
                         📊 Export Excel (.xlsx)
                     </button>
-                    <button type="button" onclick="downloadPDF()" class="inner-bg border border-slate-700 hover:border-slate-500 text-slate-300 text-xs font-bold px-4 py-2 rounded-xl transition">
+                    <button type="button" onclick="downloadPDF()" class="inner-bg border border-slate-300 hover:border-slate-400 text-slate-700 text-xs font-bold px-4 py-2 rounded-xl transition">
                         📥 Export PDF
                     </button>
                 </div>
             </div>
 
-            <div id="summaryTableContainer" class="card-bg rounded-2xl p-6 shadow-xl space-y-4">
-                <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+            <div id="summaryTableContainer" class="card-bg rounded-2xl p-6 shadow-md space-y-4">
+                <div class="flex justify-between items-center border-b border-slate-200 pb-4">
                     <div>
-                        <h3 class="text-xs font-extrabold text-cyan-400 uppercase tracking-widest">Aggregate Batch KPI Summary</h3>
+                        <h3 class="text-xs font-extrabold text-sky-800 uppercase tracking-widest">Aggregate Batch KPI Summary</h3>
                         <p class="text-xs text-sub" id="summaryTimeSlot">Batch Analytics</p>
                     </div>
-                    <span id="totalCallsBadge" class="bg-cyan-500/10 text-cyan-400 text-xs font-bold px-3 py-1 rounded-full border border-cyan-500/30">Total Calls: 0</span>
+                    <span id="totalCallsBadge" class="bg-sky-50 text-sky-700 text-xs font-bold px-3 py-1 rounded-full border border-sky-200">Total Calls: 0</span>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full text-left text-xs border-collapse">
                         <thead>
-                            <tr class="inner-bg uppercase text-[10px] font-bold tracking-wider text-slate-400 border-b border-slate-800">
+                            <tr class="inner-bg uppercase text-[10px] font-bold tracking-wider text-slate-600 border-b border-slate-200">
                                 <th class="p-3">Metric</th>
                                 <th class="p-3 text-center">Positive Count</th>
                                 <th class="p-3 text-center">Compliance %</th>
                             </tr>
                         </thead>
-                        <tbody id="summaryTableBody" class="divide-y divide-slate-800/60 text-xs"></tbody>
+                        <tbody id="summaryTableBody" class="divide-y divide-slate-100 text-xs"></tbody>
                     </table>
                 </div>
             </div>
 
-            <h3 class="text-xs font-extrabold text-slate-400 uppercase tracking-widest pt-4 border-b border-slate-800 pb-2">📁 Individual Call Audits</h3>
+            <h3 class="text-xs font-extrabold text-slate-500 uppercase tracking-widest pt-4 border-b border-slate-200 pb-2">📁 Individual Call Audits</h3>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
         <!-- FIREBASE CLOUD HISTORY TABLE -->
-        <div class="card-bg rounded-2xl p-6 space-y-6 shadow-2xl border border-slate-800/80">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-4 flex-wrap gap-3">
+        <div class="card-bg rounded-2xl p-6 space-y-6 shadow-md border border-slate-200">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-4 flex-wrap gap-3">
                 <div class="flex items-center gap-3 flex-wrap">
-                    <h3 class="text-xs font-extrabold text-slate-300 uppercase tracking-widest">🔥 Owlbrain Cloud Audits History</h3>
-                    <span id="totalHistoryBadge" class="bg-cyan-500/10 text-cyan-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-cyan-500/30">0 Records</span>
-                    <span id="selectedCountBadge" class="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition">
+                    <h3 class="text-xs font-extrabold text-slate-800 uppercase tracking-widest">🔥 Cloud Audits History</h3>
+                    <span id="totalHistoryBadge" class="bg-sky-50 text-sky-700 text-xs font-bold px-2.5 py-0.5 rounded-full border border-sky-200">0 Records</span>
+                    <span id="selectedCountBadge" class="bg-emerald-50 text-emerald-700 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-200 transition">
                         Selected: 0
                     </span>
                 </div>
                 <div class="flex gap-2 flex-wrap items-center">
-                    <button type="button" id="exportAllBtn" onclick="exportHistoryExcel(event)" class="text-xs bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500 text-emerald-400 hover:text-black px-3 py-1.5 rounded-lg font-semibold transition">
+                    <button type="button" id="exportAllBtn" onclick="exportHistoryExcel(event)" class="text-xs bg-emerald-50 border border-emerald-200 hover:bg-emerald-600 text-emerald-700 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition shadow-sm">
                         📊 Export ALL Excel
                     </button>
-                    <button type="button" onclick="exportSelectedExcel()" class="text-xs inner-bg border border-slate-700 hover:border-slate-500 px-3 py-1.5 rounded-lg text-slate-300 font-semibold transition">
+                    <button type="button" onclick="exportSelectedExcel()" class="text-xs inner-bg border border-slate-300 hover:border-slate-400 px-3 py-1.5 rounded-lg text-slate-700 font-semibold transition">
                         📋 Export Marked
                     </button>
-                    <button type="button" onclick="deleteSelectedAudits()" class="text-xs bg-amber-500/10 border border-amber-500/20 hover:bg-amber-600 text-amber-400 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition">
+                    <button type="button" onclick="deleteSelectedAudits()" class="text-xs bg-amber-50 border border-amber-200 hover:bg-amber-600 text-amber-700 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition">
                         🗑️ Delete Marked
                     </button>
-                    <button type="button" onclick="deleteAllHistoryData()" class="text-xs bg-rose-500/10 border border-rose-500/20 hover:bg-rose-600 text-rose-400 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition">
+                    <button type="button" onclick="deleteAllHistoryData()" class="text-xs bg-rose-50 border border-rose-200 hover:bg-rose-600 text-rose-700 hover:text-white px-3 py-1.5 rounded-lg font-semibold transition">
                         🔥 Delete ALL
                     </button>
-                    <button type="button" onclick="loadHistory(true)" class="text-xs inner-bg border border-slate-700 px-3 py-1.5 rounded-lg text-slate-300 hover:text-white transition">
+                    <button type="button" onclick="loadHistory(true)" class="text-xs inner-bg border border-slate-300 px-3 py-1.5 rounded-lg text-slate-700 hover:text-slate-900 transition">
                         Refresh
                     </button>
                 </div>
             </div>
 
             <!-- Filter Controls -->
-            <div class="inner-bg p-3.5 rounded-xl border border-slate-800 flex items-center gap-3 flex-wrap text-xs">
-                <span class="font-bold text-cyan-400 flex items-center gap-1">🔍 Filter Metric:</span>
+            <div class="inner-bg p-3.5 rounded-xl border border-slate-200 flex items-center gap-3 flex-wrap text-xs">
+                <span class="font-bold text-sky-800 flex items-center gap-1">🔍 Filter Metric:</span>
                 
-                <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 max-w-xs">
+                <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-sky-600 max-w-xs">
                     <option value="ALL">-- Select Metric --</option>
                 </select>
 
-                <select id="metricFilterValue" onchange="applyMetricFilter()" class="card-bg border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-cyan-500">
+                <select id="metricFilterValue" onchange="applyMetricFilter()" class="card-bg border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:border-sky-600">
                     <option value="ALL">Status: ALL</option>
                     <option value="YES">YES ✅</option>
                     <option value="NO">NO ❌</option>
                 </select>
 
-                <button onclick="resetMetricFilter()" class="inner-bg border border-slate-700 text-slate-300 px-3 py-1.5 rounded-lg hover:text-white transition">
+                <button onclick="resetMetricFilter()" class="card-bg border border-slate-300 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-100 transition">
                     Reset Filter
                 </button>
 
-                <button type="button" onclick="exportFilteredExcel()" class="bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-600 hover:text-white font-semibold px-3 py-1.5 rounded-lg transition">
+                <button type="button" onclick="exportFilteredExcel()" class="bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white font-semibold px-3 py-1.5 rounded-lg transition shadow-sm">
                     📥 Export Filtered
                 </button>
 
@@ -403,12 +386,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
 
             <!-- Table -->
-            <div class="overflow-x-auto rounded-xl border border-slate-800">
-                <table class="w-full text-left text-xs text-slate-300">
-                    <thead class="inner-bg uppercase text-[10px] font-bold text-slate-400 tracking-wider border-b border-slate-800">
+            <div class="overflow-x-auto rounded-xl border border-slate-200">
+                <table class="w-full text-left text-xs text-slate-800">
+                    <thead class="inner-bg uppercase text-[10px] font-bold text-slate-600 tracking-wider border-b border-slate-200">
                         <tr>
                             <th class="p-3 text-center w-10">
-                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer">
+                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded border-slate-300 text-sky-600 focus:ring-0 cursor-pointer">
                             </th>
                             <th class="p-3">File Name</th>
                             <th class="p-3">Uploaded By</th>
@@ -418,8 +401,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                             <th class="p-3 text-center">Actions</th>
                         </tr>
                     </thead>
-                    <tbody id="historyTable" class="divide-y divide-slate-800/50">
-                        <tr><td colspan="7" class="p-4 text-center text-slate-500">Loading audit history...</td></tr>
+                    <tbody id="historyTable" class="divide-y divide-slate-100">
+                        <tr><td colspan="7" class="p-4 text-center text-slate-400">Loading audit history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -428,39 +411,39 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="flex justify-between items-center pt-2 text-xs">
                 <span id="pageInfoText" class="text-sub font-medium">Page 1 of 1</span>
                 <div class="flex gap-2">
-                    <button id="prevPageBtn" onclick="changePage(-1)" disabled class="inner-bg border border-slate-700 px-3 py-1.5 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">← Prev</button>
-                    <button id="nextPageBtn" onclick="changePage(1)" disabled class="inner-bg border border-slate-700 px-3 py-1.5 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">Next →</button>
+                    <button id="prevPageBtn" onclick="changePage(-1)" disabled class="inner-bg border border-slate-300 px-3 py-1.5 rounded-lg text-sub hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition">← Prev</button>
+                    <button id="nextPageBtn" onclick="changePage(1)" disabled class="inner-bg border border-slate-300 px-3 py-1.5 rounded-lg text-sub hover:text-slate-900 disabled:opacity-40 disabled:cursor-not-allowed transition">Next →</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- METRICS MODAL -->
-    <div id="metricsModal" class="fixed inset-0 bg-[#060913]/90 backdrop-blur-xl hidden items-center justify-center p-4 z-50">
-        <div class="card-bg rounded-3xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto border border-slate-800">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                <h3 class="text-sm font-extrabold text-cyan-400 uppercase tracking-widest flex items-center gap-2">⚙️ Dynamic QA Metrics Config</h3>
-                <button onclick="closeMetricModal()" class="text-sub hover:text-white font-bold text-xl px-2">&times;</button>
+    <div id="metricsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="card-bg rounded-3xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto border border-slate-200">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+                <h3 class="text-sm font-extrabold text-sky-800 uppercase tracking-widest flex items-center gap-2">⚙️ Dynamic QA Metrics Config</h3>
+                <button onclick="closeMetricModal()" class="text-sub hover:text-slate-900 font-bold text-xl px-2">&times;</button>
             </div>
-            <form id="metricForm" onsubmit="saveMetric(event)" class="inner-bg p-4 rounded-2xl border border-slate-800 space-y-3">
+            <form id="metricForm" onsubmit="saveMetric(event)" class="inner-bg p-4 rounded-2xl border border-slate-200 space-y-3">
                 <input type="hidden" id="metricId" value="">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div>
                         <label class="block text-[10px] font-bold text-sub mb-1 uppercase tracking-wider">Metric Key (Slug)</label>
-                        <input type="text" id="metricKey" required placeholder="e.g. discount_offered" class="w-full card-bg border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
+                        <input type="text" id="metricKey" required placeholder="e.g. discount_offered" class="w-full card-bg border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-sky-600">
                     </div>
                     <div>
                         <label class="block text-[10px] font-bold text-sub mb-1 uppercase tracking-wider">Display Label</label>
-                        <input type="text" id="metricLabel" required placeholder="e.g. Discount Offered" class="w-full card-bg border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
+                        <input type="text" id="metricLabel" required placeholder="e.g. Discount Offered" class="w-full card-bg border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-sky-600">
                     </div>
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-sub mb-1 uppercase tracking-wider">Evaluation Prompt Description</label>
-                    <input type="text" id="metricDesc" required placeholder="e.g. Did agent offer any promotional discount?" class="w-full card-bg border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500">
+                    <input type="text" id="metricDesc" required placeholder="e.g. Did agent offer any promotional discount?" class="w-full card-bg border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:border-sky-600">
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
-                    <button type="button" onclick="resetMetricForm()" class="inner-bg border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg">Clear</button>
-                    <button type="submit" class="Owlbrain-btn text-white font-bold text-xs px-4 py-1.5 rounded-lg transition">Save Metric</button>
+                    <button type="button" onclick="resetMetricForm()" class="card-bg border border-slate-300 text-slate-700 text-xs px-3 py-1.5 rounded-lg">Clear</button>
+                    <button type="submit" class="pro-btn text-white font-bold text-xs px-4 py-1.5 rounded-lg transition">Save Metric</button>
                 </div>
             </form>
             <div class="space-y-3">
@@ -471,55 +454,55 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <!-- VIEW AUDIT DETAILS CUSTOM MODAL -->
-    <div id="viewDetailsModal" class="fixed inset-0 bg-[#060913]/90 backdrop-blur-xl hidden items-center justify-center p-4 z-50">
-        <div class="card-bg rounded-3xl w-full max-w-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col border border-slate-800">
-            <div class="flex justify-between items-center border-b border-slate-800 pb-3 flex-shrink-0">
+    <div id="viewDetailsModal" class="fixed inset-0 bg-slate-900/40 backdrop-blur-md hidden items-center justify-center p-4 z-50">
+        <div class="card-bg rounded-3xl w-full max-w-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col border border-slate-200">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3 flex-shrink-0">
                 <div>
-                    <h3 id="viewModalFileName" class="text-base font-bold text-cyan-400">📁 Audit Details</h3>
+                    <h3 id="viewModalFileName" class="text-base font-bold text-sky-800">📁 Audit Details</h3>
                     <p id="viewModalMeta" class="text-xs text-sub mt-0.5"></p>
                 </div>
-                <button onclick="closeViewDetailsModal()" class="text-sub hover:text-white font-bold text-xl px-2">&times;</button>
+                <button onclick="closeViewDetailsModal()" class="text-sub hover:text-slate-900 font-bold text-xl px-2">&times;</button>
             </div>
             
             <div class="space-y-4 overflow-y-auto pr-2 flex-grow">
                 <div class="grid grid-cols-3 gap-3 text-center text-xs">
-                    <div class="inner-bg p-3 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase tracking-wider">Pace</span><span id="viewModalWPM" class="font-bold text-cyan-400 text-sm">0 WPM</span></div>
-                    <div class="inner-bg p-3 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase tracking-wider">Duration</span><span id="viewModalDuration" class="font-bold text-indigo-400 text-sm">0s</span></div>
-                    <div class="inner-bg p-3 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase tracking-wider">Total Words</span><span id="viewModalWords" class="font-bold text-amber-400 text-sm">0</span></div>
+                    <div class="inner-bg p-3 rounded-xl border border-slate-200"><span class="text-sub block text-[10px] uppercase tracking-wider">Pace</span><span id="viewModalWPM" class="font-bold text-sky-700 text-sm">0 WPM</span></div>
+                    <div class="inner-bg p-3 rounded-xl border border-slate-200"><span class="text-sub block text-[10px] uppercase tracking-wider">Duration</span><span id="viewModalDuration" class="font-bold text-indigo-700 text-sm">0s</span></div>
+                    <div class="inner-bg p-3 rounded-xl border border-slate-200"><span class="text-sub block text-[10px] uppercase tracking-wider">Total Words</span><span id="viewModalWords" class="font-bold text-amber-700 text-sm">0</span></div>
                 </div>
 
-                <div class="inner-bg p-4 rounded-2xl border border-slate-800 space-y-3">
-                    <div class="font-bold text-emerald-400 text-xs uppercase tracking-wider flex justify-between items-center">
+                <div class="inner-bg p-4 rounded-2xl border border-slate-200 space-y-3">
+                    <div class="font-bold text-emerald-700 text-xs uppercase tracking-wider flex justify-between items-center">
                         <span>💊 Call Metrics Evaluation</span>
-                        <span id="viewMetricsCount" class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20"></span>
+                        <span id="viewMetricsCount" class="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded border border-emerald-200"></span>
                     </div>
                     <div id="viewModalMetricsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs"></div>
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                    <div class="inner-bg p-4 rounded-2xl border border-emerald-500/20 space-y-2">
-                        <div class="font-bold text-emerald-400 uppercase tracking-wider">💪 Agent Strengths</div>
+                    <div class="inner-bg p-4 rounded-2xl border border-emerald-200 space-y-2">
+                        <div class="font-bold text-emerald-700 uppercase tracking-wider">💪 Agent Strengths</div>
                         <ul id="viewModalStrengths" class="list-disc list-inside text-sub space-y-1"></ul>
                     </div>
-                    <div class="inner-bg p-4 rounded-2xl border border-amber-500/20 space-y-2">
-                        <div class="font-bold text-amber-400 uppercase tracking-wider">🎯 Areas for Improvement</div>
+                    <div class="inner-bg p-4 rounded-2xl border border-amber-200 space-y-2">
+                        <div class="font-bold text-amber-700 uppercase tracking-wider">🎯 Areas for Improvement</div>
                         <ul id="viewModalImprovements" class="list-disc list-inside text-sub space-y-1"></ul>
                     </div>
                 </div>
 
-                <div class="inner-bg p-4 rounded-2xl border border-slate-800 space-y-2">
-                    <div class="font-bold text-slate-200 text-xs uppercase tracking-wider">Executive Call Summary</div>
+                <div class="inner-bg p-4 rounded-2xl border border-slate-200 space-y-2">
+                    <div class="font-bold text-slate-900 text-xs uppercase tracking-wider">Executive Call Summary</div>
                     <p id="viewModalSummary" class="text-xs text-sub leading-relaxed whitespace-pre-wrap"></p>
                 </div>
 
-                <details class="inner-bg p-4 rounded-2xl border border-slate-800 text-xs" open>
-                    <summary class="font-bold text-slate-300 cursor-pointer">📄 Full Diarized Transcript</summary>
-                    <div id="viewModalTranscript" class="mt-3 space-y-2 max-h-60 overflow-y-auto pr-2 pt-2 border-t border-slate-800"></div>
+                <details class="inner-bg p-4 rounded-2xl border border-slate-200 text-xs" open>
+                    <summary class="font-bold text-slate-800 cursor-pointer">📄 Full Diarized Transcript</summary>
+                    <div id="viewModalTranscript" class="mt-3 space-y-2 max-h-60 overflow-y-auto pr-2 pt-2 border-t border-slate-200"></div>
                 </details>
             </div>
 
-            <div class="flex justify-end pt-2 border-t border-slate-800 flex-shrink-0">
-                <button onclick="closeViewDetailsModal()" class="inner-bg border border-slate-700 hover:border-slate-500 text-white font-bold text-xs px-5 py-2 rounded-xl transition">Close</button>
+            <div class="flex justify-end pt-2 border-t border-slate-200 flex-shrink-0">
+                <button onclick="closeViewDetailsModal()" class="card-bg border border-slate-300 hover:bg-slate-100 text-slate-800 font-bold text-xs px-5 py-2 rounded-xl transition">Close</button>
             </div>
         </div>
     </div>
@@ -656,13 +639,13 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var dashboardHtml = `<table border="1">
                 <thead>
-                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#060913; color:#06b6d4; font-weight:bold; font-size:16px; padding:10px;">📊 Owlbrain AI BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
+                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0284c7; color:#ffffff; font-weight:bold; font-size:16px; padding:10px;">📊 AI AUDIT BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
                     <tr>
-                        <th style="text-align:center; background-color:#0d1322; color:#ffffff;">KPI Metric Name</th>
-                        <th style="text-align:center; background-color:#0d1322; color:#ffffff;">Positive Count</th>
-                        <th style="text-align:center; background-color:#0d1322; color:#ffffff;">Total Calls</th>
-                        <th style="text-align:center; background-color:#0d1322; color:#ffffff;">Conversion %</th>
-                        <th style="text-align:center; background-color:#0d1322; color:#ffffff;">Visual Graph Bar</th>
+                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">KPI Metric Name</th>
+                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Positive Count</th>
+                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Total Calls</th>
+                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Conversion %</th>
+                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Visual Graph Bar</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -678,7 +661,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     <td style="text-align:center; vertical-align:middle;">${stat["Total Yes / Positive"]}</td>
                     <td style="text-align:center; vertical-align:middle;">${stat["Total Calls Analyzed"]}</td>
                     <td style="text-align:center; vertical-align:middle; font-weight:bold; color:#10b981;">${stat["Success %"]}</td>
-                    <td style="text-align:center; vertical-align:middle; font-weight:bold; font-family:monospace; color:#06b6d4;">${stat["Visual Performance Graph"]}</td>
+                    <td style="text-align:center; vertical-align:middle; font-weight:bold; font-family:monospace; color:#0284c7;">${stat["Visual Performance Graph"]}</td>
                 </tr>`;
             });
 
@@ -689,7 +672,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var detailsHtml = '<table border="1"><thead><tr>';
             rawKeys.forEach(k => {
-                detailsHtml += `<th style="text-align: center; vertical-align: middle; background-color: #0d1322; color: #ffffff; font-weight: bold; padding: 8px;">${k}</th>`;
+                detailsHtml += `<th style="text-align: center; vertical-align: middle; background-color: #f1f5f9; color: #0f172a; font-weight: bold; padding: 8px;">${k}</th>`;
             });
             detailsHtml += '</tr></thead><tbody>';
 
@@ -787,21 +770,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             return fetch(url, options);
         }
 
-        function toggleTheme() {
-            var html = document.documentElement;
-            if(html.classList.contains('dark')) {
-                html.classList.remove('dark');
-                html.classList.add('light');
-                document.getElementById('themeIcon').innerText = "☀️";
-                document.getElementById('themeText').innerText = "Light";
-            } else {
-                html.classList.remove('light');
-                html.classList.add('dark');
-                document.getElementById('themeIcon').innerText = "🌙";
-                document.getElementById('themeText').innerText = "Dark";
-            }
-        }
-
         function formatDateDisplay(dateStr) {
             if(!dateStr) return "N/A";
             try {
@@ -838,15 +806,15 @@ HTML_CONTENT = """<!DOCTYPE html>
             var html = '';
             activeMetrics.forEach(function(m) {
                 html += `
-                <div class="inner-bg p-3.5 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
+                <div class="inner-bg p-3.5 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
                     <div>
-                        <span class="font-bold text-cyan-400">${m.label}</span>
+                        <span class="font-bold text-sky-800">${m.label}</span>
                         <span class="text-sub text-[10px] ml-2">(${m.key})</span>
                         <p class="text-sub text-[11px] mt-0.5">${m.description}</p>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="editMetric('${m.id}')" class="text-cyan-400 hover:text-cyan-300 bg-cyan-500/10 px-2.5 py-1 rounded-md transition">Edit</button>
-                        <button onclick="deleteMetric('${m.id}')" class="text-rose-400 hover:text-rose-300 bg-rose-500/10 px-2.5 py-1 rounded-md transition">Delete</button>
+                        <button onclick="editMetric('${m.id}')" class="text-sky-700 hover:text-sky-900 bg-sky-100 px-2.5 py-1 rounded-md transition font-semibold">Edit</button>
+                        <button onclick="deleteMetric('${m.id}')" class="text-rose-700 hover:text-rose-900 bg-rose-100 px-2.5 py-1 rounded-md transition font-semibold">Delete</button>
                     </div>
                 </div>`;
             });
@@ -972,16 +940,16 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('totalCallsBadge').innerText = "Total Calls: " + totalCalls;
             document.getElementById('summaryTimeSlot').innerText = "Audit Generated: " + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-            var summaryHtml = `<tr class="hover:bg-slate-800/40"><td class="p-3 font-semibold text-slate-200">Total Calls Reviewed</td><td class="p-3 text-center font-bold text-cyan-400">${totalCalls}</td><td class="p-3 text-center font-extrabold text-emerald-400">100%</td></tr>`;
+            var summaryHtml = `<tr class="hover:bg-slate-50"><td class="p-3 font-semibold text-slate-800">Total Calls Reviewed</td><td class="p-3 text-center font-bold text-sky-700">${totalCalls}</td><td class="p-3 text-center font-extrabold text-emerald-600">100%</td></tr>`;
             activeMetrics.forEach(m => {
                 var cnt = metricCounts[m.key] || 0;
-                summaryHtml += `<tr class="hover:bg-slate-800/40"><td class="p-3 font-medium text-slate-300">${m.label}</td><td class="p-3 text-center font-bold text-cyan-400">${cnt}</td><td class="p-3 text-center font-bold text-emerald-400">${calcPct(cnt)}</td></tr>`;
+                summaryHtml += `<tr class="hover:bg-slate-50"><td class="p-3 font-medium text-slate-700">${m.label}</td><td class="p-3 text-center font-bold text-sky-700">${cnt}</td><td class="p-3 text-center font-bold text-emerald-600">${calcPct(cnt)}</td></tr>`;
             });
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
             results.forEach(item => {
                 if(item.status !== "success") {
-                    container.innerHTML += `<div class="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl text-rose-300 text-xs">❌ Failed to audit: ${item.filename}</div>`;
+                    container.innerHTML += `<div class="bg-rose-50 border border-rose-200 p-4 rounded-xl text-rose-700 text-xs">❌ Failed to audit: ${item.filename}</div>`;
                     return;
                 }
                 var data = item.data || {};
@@ -992,56 +960,56 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var improvements = evalData.improvements || [];
                 
                 var card = document.createElement('div');
-                card.className = "card-bg rounded-2xl p-6 shadow-2xl space-y-4 border border-slate-800/80";
+                card.className = "card-bg rounded-2xl p-6 shadow-md space-y-4 border border-slate-200";
                 
                 var transcriptHtml = "";
                 transcript.forEach(t => {
-                    var colorClass = t.speaker === 'Agent' ? 'text-cyan-400 font-semibold' : 'text-emerald-400 font-semibold';
+                    var colorClass = t.speaker === 'Agent' ? 'text-sky-700 font-semibold' : 'text-emerald-700 font-semibold';
                     transcriptHtml += `<div class="mb-1.5"><b class="${colorClass}">${t.speaker}:</b> ${t.text}</div>`;
                 });
 
                 var dynamicCardsHtml = '';
                 activeMetrics.forEach(m => {
-                    var fmt = evalMetrics[m.key] ? '<span class="text-emerald-400 font-bold ml-1">YES</span>' : '<span class="text-rose-400 font-bold ml-1">NO</span>';
-                    dynamicCardsHtml += `<div class="inner-bg p-2 rounded-lg border border-slate-800">${m.label}:${fmt}</div>`;
+                    var fmt = evalMetrics[m.key] ? '<span class="text-emerald-700 font-bold ml-1">YES</span>' : '<span class="text-rose-600 font-bold ml-1">NO</span>';
+                    dynamicCardsHtml += `<div class="inner-bg p-2 rounded-lg border border-slate-200">${m.label}:${fmt}</div>`;
                 });
 
                 var strengthsHtml = strengths.length > 0 ? strengths.map(s => `<li>${s}</li>`).join('') : '<li class="italic">None listed</li>';
                 var improvementsHtml = improvements.length > 0 ? improvements.map(i => `<li>${i}</li>`).join('') : '<li class="italic">None listed</li>';
 
                 card.innerHTML = `
-                    <div class="flex justify-between items-center border-b border-slate-800 pb-3">
-                        <h3 class="font-bold text-cyan-400 text-sm flex items-center gap-2">📁 ${item.filename}</h3>
-                        <span class="text-emerald-400 font-extrabold text-lg bg-emerald-500/10 px-3 py-0.5 rounded-full border border-emerald-500/30">${evalData.overall_score || 0}/100</span>
+                    <div class="flex justify-between items-center border-b border-slate-200 pb-3">
+                        <h3 class="font-bold text-sky-800 text-sm flex items-center gap-2">📁 ${item.filename}</h3>
+                        <span class="text-emerald-700 font-extrabold text-lg bg-emerald-50 px-3 py-0.5 rounded-full border border-emerald-200">${evalData.overall_score || 0}/100</span>
                     </div>
                     <div class="grid grid-cols-3 gap-2 text-center text-xs">
-                        <div class="inner-bg p-2.5 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase">PACE</span><span class="font-bold text-cyan-400">${extractWPM(item)} WPM</span></div>
-                        <div class="inner-bg p-2.5 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase">DURATION</span><span class="font-bold text-indigo-400">${extractDuration(item)}s</span></div>
-                        <div class="inner-bg p-2.5 rounded-xl border border-slate-800"><span class="text-sub block text-[10px] uppercase">WORDS</span><span class="font-bold text-amber-400">${extractTotalWords(item)}</span></div>
+                        <div class="inner-bg p-2.5 rounded-xl border border-slate-200"><span class="text-sub block text-[10px] uppercase">PACE</span><span class="font-bold text-sky-700">${extractWPM(item)} WPM</span></div>
+                        <div class="inner-bg p-2.5 rounded-xl border border-slate-200"><span class="text-sub block text-[10px] uppercase">DURATION</span><span class="font-bold text-indigo-700">${extractDuration(item)}s</span></div>
+                        <div class="inner-bg p-2.5 rounded-xl border border-slate-200"><span class="text-sub block text-[10px] uppercase">WORDS</span><span class="font-bold text-amber-700">${extractTotalWords(item)}</span></div>
                     </div>
-                    <div class="inner-bg p-4 rounded-2xl border border-slate-800 space-y-2">
-                        <div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wider">💊 Call Metrics Evaluation</div>
+                    <div class="inner-bg p-4 rounded-2xl border border-slate-200 space-y-2">
+                        <div class="font-bold text-emerald-700 text-[11px] uppercase tracking-wider">💊 Call Metrics Evaluation</div>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">${dynamicCardsHtml}</div>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        <div class="inner-bg p-4 rounded-2xl border border-emerald-500/20 space-y-1.5">
-                            <div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wider">💪 Agent Strengths</div>
+                        <div class="inner-bg p-4 rounded-2xl border border-emerald-200 space-y-1.5">
+                            <div class="font-bold text-emerald-700 text-[11px] uppercase tracking-wider">💪 Agent Strengths</div>
                             <ul class="list-disc list-inside text-sub space-y-0.5">${strengthsHtml}</ul>
                         </div>
-                        <div class="inner-bg p-4 rounded-2xl border border-amber-500/20 space-y-1.5">
-                            <div class="font-bold text-amber-400 text-[11px] uppercase tracking-wider">🎯 Areas for Improvement</div>
+                        <div class="inner-bg p-4 rounded-2xl border border-amber-200 space-y-1.5">
+                            <div class="font-bold text-amber-700 text-[11px] uppercase tracking-wider">🎯 Areas for Improvement</div>
                             <ul class="list-disc list-inside text-sub space-y-0.5">${improvementsHtml}</ul>
                         </div>
                     </div>
 
-                    <div class="text-xs inner-bg p-4 rounded-2xl border border-slate-800 space-y-1">
-                        <div class="font-bold text-slate-200 text-[11px] uppercase tracking-wider">Executive Call Summary</div>
+                    <div class="text-xs inner-bg p-4 rounded-2xl border border-slate-200 space-y-1">
+                        <div class="font-bold text-slate-800 text-[11px] uppercase tracking-wider">Executive Call Summary</div>
                         <p class="text-sub leading-relaxed">${evalData.summary || "N/A"}</p>
                     </div>
-                    <details class="inner-bg p-4 rounded-2xl border border-slate-800 text-xs">
-                        <summary class="font-bold text-slate-300 cursor-pointer">📄 Full Diarized Transcript</summary>
-                        <div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">${transcriptHtml}</div>
+                    <details class="inner-bg p-4 rounded-2xl border border-slate-200 text-xs">
+                        <summary class="font-bold text-slate-800 cursor-pointer">📄 Full Diarized Transcript</summary>
+                        <div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-200">${transcriptHtml}</div>
                     </details>`;
                 container.appendChild(card);
             });
@@ -1072,7 +1040,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 updateSelectedCounter();
                 applyMetricFilter();
             } catch(e) {
-                hTable.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-rose-400">Failed to load history records.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-rose-600">Failed to load history records.</td></tr>';
             }
         }
 
@@ -1111,7 +1079,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var dataToRender = filteredHistoryList || [];
 
             if(!dataToRender || dataToRender.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-500">No audits found for selected filter.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-slate-400">No audits found for selected filter.</td></tr>';
                 document.getElementById('pageInfoText').innerText = "Page 0 of 0";
                 document.getElementById('prevPageBtn').disabled = true;
                 document.getElementById('nextPageBtn').disabled = true;
@@ -1136,24 +1104,24 @@ HTML_CONTENT = """<!DOCTYPE html>
                 }
                 
                 hTable.innerHTML += `
-                    <tr class="hover:bg-slate-800/40 transition">
+                    <tr class="hover:bg-slate-50 transition">
                         <td class="p-3 text-center">
-                            <input type="checkbox" value="${item.id}" ${isChecked} onchange="toggleAuditSelect('${item.id}', this)" class="row-checkbox rounded border-slate-700 text-cyan-500 focus:ring-0 cursor-pointer">
+                            <input type="checkbox" value="${item.id}" ${isChecked} onchange="toggleAuditSelect('${item.id}', this)" class="row-checkbox rounded border-slate-300 text-sky-600 focus:ring-0 cursor-pointer">
                         </td>
-                        <td class="p-3 font-semibold text-slate-200">${item.filename || 'N/A'}</td>
-                        <td class="p-3 font-medium text-indigo-300">👤 ${uploadedUser}</td>
-                        <td class="p-3"><span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-extrabold px-2.5 py-0.5 rounded-full">${item.score || 0}/100</span></td>
+                        <td class="p-3 font-semibold text-slate-800">${item.filename || 'N/A'}</td>
+                        <td class="p-3 font-medium text-indigo-700">👤 ${uploadedUser}</td>
+                        <td class="p-3"><span class="bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold px-2.5 py-0.5 rounded-full">${item.score || 0}/100</span></td>
                         <td class="p-3 text-sub max-w-xs truncate">${item.summary || 'N/A'}</td>
                         <td class="p-3 text-sub">${formatDateDisplay(item.created_at)}</td>
                         <td class="p-3 text-center">
                             <div class="flex items-center justify-center gap-1.5">
-                                <button onclick="viewHistoryDetails(${globalIndex})" title="View Details" class="bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500 hover:text-black px-2.5 py-1 rounded-md font-semibold transition">
+                                <button onclick="viewHistoryDetails(${globalIndex})" title="View Details" class="bg-sky-50 text-sky-700 border border-sky-200 hover:bg-sky-600 hover:text-white px-2.5 py-1 rounded-md font-semibold transition">
                                     👁️ View
                                 </button>
-                                <button onclick="downloadSingleHistoryExcel(${globalIndex})" title="Export Excel" class="bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-black px-2.5 py-1 rounded-md font-semibold transition">
+                                <button onclick="downloadSingleHistoryExcel(${globalIndex})" title="Export Excel" class="bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-600 hover:text-white px-2.5 py-1 rounded-md font-semibold transition">
                                     📊 Excel
                                 </button>
-                                <button onclick="deleteHistoryItem('${item.id}', ${globalIndex})" title="Delete Audit" class="bg-rose-500/10 text-rose-400 hover:bg-rose-500 hover:text-white px-2.5 py-1 rounded-md font-semibold transition">
+                                <button onclick="deleteHistoryItem('${item.id}', ${globalIndex})" title="Delete Audit" class="bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-600 hover:text-white px-2.5 py-1 rounded-md font-semibold transition">
                                     🗑️ Delete
                                 </button>
                             </div>
@@ -1174,11 +1142,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(badge) {
                 badge.innerText = "Selected: " + count;
                 if(count > 0) {
-                    badge.classList.remove('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/30');
-                    badge.classList.add('bg-cyan-500', 'text-black', 'border-cyan-400');
+                    badge.classList.remove('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+                    badge.classList.add('bg-sky-600', 'text-white', 'border-sky-600');
                 } else {
-                    badge.classList.remove('bg-cyan-500', 'text-black', 'border-cyan-400');
-                    badge.classList.add('bg-emerald-500/10', 'text-emerald-400', 'border-emerald-500/30');
+                    badge.classList.remove('bg-sky-600', 'text-white', 'border-sky-600');
+                    badge.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
                 }
             }
         }
@@ -1342,13 +1310,13 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var fmt = "";
                 if (evalMetrics.hasOwnProperty(key)) {
                     fmt = (evalMetrics[key] === true) 
-                        ? '<span class="text-emerald-400 font-bold ml-1">YES</span>' 
-                        : '<span class="text-rose-400 font-bold ml-1">NO</span>';
+                        ? '<span class="text-emerald-700 font-bold ml-1">YES</span>' 
+                        : '<span class="text-rose-600 font-bold ml-1">NO</span>';
                 } else {
-                    fmt = '<span class="text-slate-400 font-bold ml-1">N/A</span>';
+                    fmt = '<span class="text-slate-500 font-bold ml-1">N/A</span>';
                 }
 
-                gridContainer.innerHTML += `<div class="inner-bg p-2 rounded-lg border border-slate-800">${label}:${fmt}</div>`;
+                gridContainer.innerHTML += `<div class="inner-bg p-2 rounded-lg border border-slate-200">${label}:${fmt}</div>`;
                 metricsCount++;
             });
 
@@ -1362,7 +1330,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 transcriptContainer.innerHTML = '<div class="text-sub italic">No transcript recorded or stored for this call.</div>';
             } else {
                 transcriptList.forEach(t => {
-                    var colorClass = t.speaker === 'Agent' ? 'text-cyan-400 font-semibold' : 'text-emerald-400 font-semibold';
+                    var colorClass = t.speaker === 'Agent' ? 'text-sky-700 font-semibold' : 'text-emerald-700 font-semibold';
                     transcriptContainer.innerHTML += `<div class="mb-1.5"><b class="${colorClass}">${t.speaker}:</b> ${t.text}</div>`;
                 });
             }
