@@ -1,4 +1,4 @@
-import os
+Import os
 import json
 import re
 import asyncio
@@ -149,7 +149,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
 
-    <!-- INITIAL FULLSCREEN APP LOADER -->
+    <!-- INITIAL FULLSCREEN APP LOADER (PREVENTS BLANK & LOGIN MODAL FLICKER) -->
     <div id="initialAppLoader" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center space-y-4 z-[200]">
         <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         <p class="text-xs font-semibold text-blue-400 uppercase tracking-widest">Loading Dashboard...</p>
@@ -186,6 +186,7 @@ HTML_CONTENT = """<!DOCTYPE html>
     <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
+                <!-- SMART HOME NAV (SMOOTH RESET WITHOUT LOGIN FLICKER) -->
                 <h1 onclick="goToHome()" class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 cursor-pointer hover:opacity-90 transition" title="Go to Dashboard Home">
                     AI Call Quality Auditor Pro
                 </h1>
@@ -202,6 +203,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     ⚙️ Manage Metrics
                 </button>
                 
+                <!-- USER PROFILE BADGE & LOGOUT -->
                 <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
                     <span class="text-xs text-emerald-400 font-bold flex items-center gap-1">
                         👤 <span id="userDisplayName">Loading...</span>
@@ -442,15 +444,16 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <script>
-        const firebaseConfig = {
-          apiKey: "AIzaSyDRGZaIWz6IJvHsZrbJ1KJHXMWuc4FthV8",
-          authDomain: "call-data-91e5e.firebaseapp.com",
-          projectId: "call-data-91e5e",
-          storageBucket: "call-data-91e5e.firebasestorage.app",
-          messagingSenderId: "978960309837",
-          appId: "1:978960309837:web:88edf5b11cc83c42870604",
-          measurementId: "G-B3P5T684DG"
-        };
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDRGZaIWz6IJvHsZrbJ1KJHXMWuc4FthV8",
+  authDomain: "call-data-91e5e.firebaseapp.com",
+  projectId: "call-data-91e5e",
+  storageBucket: "call-data-91e5e.firebasestorage.app",
+  messagingSenderId: "978960309837",
+  appId: "1:978960309837:web:88edf5b11cc83c42870604",
+  measurementId: "G-B3P5T684DG"
+};
 
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
@@ -466,8 +469,9 @@ HTML_CONTENT = """<!DOCTYPE html>
         var itemsPerPage = 10;
         var selectedAuditIds = new Set();
         
+        // Client-Side Fetch Throttle Timer to protect Firebase Read Quotas
         var lastFetchTime = 0;
-        var FETCH_COOL_DOWN = 30000;
+        var FETCH_COOL_DOWN = 30000; // 30 seconds debounce
 
         function goToHome() {
             if (auth.currentUser) {
@@ -503,36 +507,27 @@ HTML_CONTENT = """<!DOCTYPE html>
             var strengthsList = isBatchResult ? (item.data?.evaluation?.strengths || []) : (item.strengths || []);
             var improvementsList = isBatchResult ? (item.data?.evaluation?.improvements || []) : (item.improvements || []);
 
-            var formattedStrengths = strengthsList.length > 0 ? strengthsList.map(s => "• " + s).join("\n") : "None";
-            var formattedImprovements = improvementsList.length > 0 ? improvementsList.map(i => "• " + i).join("\n") : "None";
-
-            var rawTranscriptList = isBatchResult ? (item.data?.transcript || []) : (item.transcript || []);
-            var formattedTranscript = "None";
-            if (Array.isArray(rawTranscriptList) && rawTranscriptList.length > 0) {
-                formattedTranscript = rawTranscriptList.map(t => `${t.speaker || 'Speaker'}: ${t.text || ''}`).join("\n");
-            } else if (typeof rawTranscriptList === "string") {
-                formattedTranscript = rawTranscriptList;
-            }
+            var formattedStrengths = strengthsList.length > 0 ? strengthsList.map(s => "• " + s).join("<br/>") : "None";
+            var formattedImprovements = improvementsList.length > 0 ? improvementsList.map(i => "• " + i).join("<br/>") : "None";
 
             var row = {
                 "File Name": fileName,
                 "Uploaded By": uName,
                 "QA Score": score,
-                "Pace (WPM)": extractWPM(item),
+                "WPM": extractWPM(item),
                 "Duration (sec)": extractDuration(item),
                 "Total Words": extractTotalWords(item),
                 "Date & Time (IST)": createdAt,
-                "Agent Strengths": formattedStrengths,
+                "Strengths": formattedStrengths,
                 "Areas for Improvement": formattedImprovements,
-                "Detailed Call Summary": summary,
-                "Full Diarized Transcript": formattedTranscript
+                "Summary": summary
             };
 
             var evalMetrics = isBatchResult ? (item.data?.evaluation?.evaluated_metrics || {}) : (item.evaluated_metrics || {});
 
             activeMetrics.forEach(m => {
                 if (evalMetrics.hasOwnProperty(m.key)) {
-                    row[m.label] = (evalMetrics[m.key] === true) ? "YES ✅" : "NO ❌";
+                    row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
                 } else {
                     row[m.label] = "N/A";
                 }
@@ -584,18 +579,18 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <thead>
                     <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0f172a; color:#38bdf8; font-weight:bold; font-size:16px; padding:10px;">📊 AI AUDIT BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
                     <tr>
-                        <th style="text-align:center; vertical-align:middle; background-color:#1e293b; color:#ffffff;">KPI Metric Name</th>
-                        <th style="text-align:center; vertical-align:middle; background-color:#1e293b; color:#ffffff;">Positive Count</th>
-                        <th style="text-align:center; vertical-align:middle; background-color:#1e293b; color:#ffffff;">Total Calls</th>
-                        <th style="text-align:center; vertical-align:middle; background-color:#1e293b; color:#ffffff;">Conversion %</th>
-                        <th style="text-align:center; vertical-align:middle; background-color:#1e293b; color:#ffffff;">Visual Graph Bar</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">KPI Metric Name</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Positive Count</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Total Calls</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Conversion %</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Visual Graph Bar</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td style="text-align:center; vertical-align:middle; font-weight:bold; background-color:#0284c7; color:#ffffff;">Average Call Quality Score</td>
-                        <td style="text-align:center; vertical-align:middle; font-weight:bold; background-color:#0284c7; color:#ffffff;" colspan="2">${avgScore} / 100</td>
-                        <td style="text-align:center; vertical-align:middle; font-weight:bold; background-color:#0284c7; color:#ffffff;" colspan="2">${avgScore}% Overall Quality Index</td>
+                        <td style="text-align:center; font-weight:bold; background-color:#0284c7; color:#ffffff;">Average Call Quality Score</td>
+                        <td style="text-align:center; font-weight:bold; background-color:#0284c7; color:#ffffff;" colspan="2">${avgScore} / 100</td>
+                        <td style="text-align:center; font-weight:bold; background-color:#0284c7; color:#ffffff;" colspan="2">${avgScore}% Overall Quality Index</td>
                     </tr>`;
 
             metricStats.forEach(stat => {
@@ -623,8 +618,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 detailsHtml += '<tr>';
                 rawKeys.forEach(k => {
                     var val = row[k] !== undefined && row[k] !== null ? row[k] : "";
-                    var formattedVal = val.toString().replace(/\n/g, '<br/>');
-                    detailsHtml += `<td style="text-align: center; vertical-align: middle; padding: 6px; mso-number-format:'\@'; white-space: pre-wrap;">${formattedVal}</td>`;
+                    detailsHtml += `<td style="text-align: center; vertical-align: middle; padding: 6px; mso-number-format:'\@';">${val}</td>`;
                 });
                 detailsHtml += '</tr>';
             });
@@ -639,8 +633,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var detailSheet = XLSX.utils.table_to_sheet(parser.parseFromString(detailsHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
             var detailWidths = rawKeys.map(key => {
-                if (key === "Full Diarized Transcript" || key === "Detailed Call Summary") return { wch: 50 };
-                if (key === "Agent Strengths" || key === "Areas for Improvement") return { wch: 35 };
                 var maxLen = key.length;
                 rawRows.forEach(r => {
                     var v = r[key] ? r[key].toString() : "";
@@ -654,6 +646,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             XLSX.writeFile(workbook, fileName);
         }
 
+        // SMOOTH FLICKER-FREE AUTH CHECK LOGIC
         auth.onAuthStateChanged(async (user) => {
             var loader = document.getElementById('initialAppLoader');
             var authModal = document.getElementById('authModal');
@@ -979,6 +972,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadHistory(forceRefresh = false) {
             var now = Date.now();
             
+            // Client-side debounce check to prevent unnecessary requests
             if (!forceRefresh && historyDataList.length > 0 && (now - lastFetchTime < FETCH_COOL_DOWN)) {
                 renderHistoryTable();
                 return;
@@ -1797,3 +1791,8 @@ async def delete_audit_history(
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+
+
+
+Es code me jb mai export to excel kru chaahe single kru ya all ya fir kahi se firebase cloud history se Excel file download kru to sara data usme show ho ekdm acche se jo jo UI ke front pr show hota h.. text center
