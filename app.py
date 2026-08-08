@@ -444,16 +444,16 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <script>
-        const firebaseConfig = {
-          apiKey: "AIzaSyDQfBUENJ87idiFkHUCGXWjjt8o8ZpxX1M",
-          authDomain: "ai-call-quality-auditor-pro.firebaseapp.com",
-          databaseURL: "https://ai-call-quality-auditor-pro-default-rtdb.firebaseio.com",
-          projectId: "ai-call-quality-auditor-pro",
-          storageBucket: "ai-call-quality-auditor-pro.firebasestorage.app",
-          messagingSenderId: "788716678382",
-          appId: "1:788716678382:web:778853207b4fa11e0517ff",
-          measurementId: "G-R4R06JN2SK"
-        };
+        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyDRGZaIWz6IJvHsZrbJ1KJHXMWuc4FthV8",
+  authDomain: "call-data-91e5e.firebaseapp.com",
+  projectId: "call-data-91e5e",
+  storageBucket: "call-data-91e5e.firebasestorage.app",
+  messagingSenderId: "978960309837",
+  appId: "1:978960309837:web:88edf5b11cc83c42870604",
+  measurementId: "G-B3P5T684DG"
+};
 
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
