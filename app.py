@@ -239,7 +239,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS -->
+        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS & METRIC FILTER -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-2">
@@ -264,6 +264,26 @@ HTML_CONTENT = """<!DOCTYPE html>
                         Refresh
                     </button>
                 </div>
+            </div>
+
+            <!-- METRIC FILTER CONTROL BAR -->
+            <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex items-center gap-3 flex-wrap text-xs">
+                <span class="font-bold text-blue-400 flex items-center gap-1">🔍 Filter By Metric:</span>
+                
+                <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500 max-w-xs">
+                    <option value="ALL">-- Select Metric --</option>
+                </select>
+
+                <select id="metricFilterValue" onchange="applyMetricFilter()" class="card-bg border border-slate-600 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-blue-500">
+                    <option value="ALL">Status: ALL</option>
+                    <option value="YES">YES ✅</option>
+                    <option value="NO">NO ❌</option>
+                </select>
+
+                <button onclick="resetMetricFilter()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1.5 rounded-lg transition font-medium">
+                    Reset Filter
+                </button>
+                <span id="filterCountBadge" class="text-sub font-medium ml-auto"></span>
             </div>
 
             <div class="overflow-x-auto">
@@ -348,9 +368,11 @@ HTML_CONTENT = """<!DOCTYPE html>
         const auth = firebase.auth();
 
         var idToken = "";
+        var currentUserName = "Admin";
         var selectedFiles = [];
         var currentBatchResults = [];
         var historyDataList = [];
+        var filteredHistoryList = [];
         var activeMetrics = [];
         var currentPage = 1;
         var itemsPerPage = 10;
@@ -360,13 +382,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             if (user) {
                 idToken = await user.getIdToken(true);
                 
-                // Show Name or Email Prefix on Dashboard UI
-                const userName = user.displayName || (user.email ? user.email.split('@')[0] : "Admin");
-                document.getElementById('userDisplayName').innerText = userName;
+                currentUserName = user.displayName || (user.email ? user.email.split('@')[0] : "Admin");
+                document.getElementById('userDisplayName').innerText = currentUserName;
 
                 document.getElementById('authModal').classList.add('hidden');
                 document.getElementById('dashboardContent').classList.remove('hidden');
-                fetchMetrics();
+                await fetchMetrics();
                 loadHistory();
             } else {
                 idToken = "";
@@ -434,7 +455,17 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetchAuth("/api/metrics");
                 activeMetrics = await res.json();
                 renderMetricsList();
+                populateMetricFilterDropdown();
             } catch(e) { console.error(e); }
+        }
+
+        function populateMetricFilterDropdown() {
+            var select = document.getElementById('metricFilterSelect');
+            if(!select) return;
+            select.innerHTML = '<option value="ALL">-- Select Metric --</option>';
+            activeMetrics.forEach(m => {
+                select.innerHTML += `<option value="${m.key}">${m.label}</option>`;
+            });
         }
 
         function renderMetricsList() {
@@ -651,31 +682,77 @@ HTML_CONTENT = """<!DOCTYPE html>
                 selectedAuditIds.clear();
                 document.getElementById('selectAllCheckbox').checked = false;
                 document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
-                currentPage = 1;
-                renderHistoryTable();
+                
+                applyMetricFilter();
             } catch(e) {
                 hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
             }
         }
 
+        // ================= METRIC FILTER LOGIC =================
+
+        function applyMetricFilter() {
+            var selectedMetricKey = document.getElementById('metricFilterSelect').value;
+            var selectedValue = document.getElementById('metricFilterValue').value;
+
+            if (selectedMetricKey === "ALL") {
+                filteredHistoryList = [...historyDataList];
+                document.getElementById('filterCountBadge').innerText = "";
+            } else {
+                filteredHistoryList = historyDataList.filter(item => {
+                    var evalMetrics = item.evaluated_metrics || {};
+                    var metricVal = evalMetrics[selectedMetricKey];
+
+                    if (selectedValue === "YES") {
+                        return metricVal === true;
+                    } else if (selectedValue === "NO") {
+                        return metricVal === false || metricVal === undefined;
+                    } else {
+                        return true; // Status ALL chosen
+                    }
+                });
+                document.getElementById('filterCountBadge').innerText = `Showing ${filteredHistoryList.length} of ${historyDataList.length} items`;
+            }
+
+            currentPage = 1;
+            renderHistoryTable();
+        }
+
+        function resetMetricFilter() {
+            document.getElementById('metricFilterSelect').value = "ALL";
+            document.getElementById('metricFilterValue').value = "ALL";
+            applyMetricFilter();
+        }
+
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
-            if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
+            var dataToRender = filteredHistoryList || [];
+
+            if(!dataToRender || dataToRender.length === 0) {
+                hTable.innerHTML = '<tr><td colspan="7" class="p-3 text-center text-slate-500">No audits found for selected filter.</td></tr>';
+                document.getElementById('pageInfoText').innerText = "Page 0 of 0";
+                document.getElementById('prevPageBtn').disabled = true;
+                document.getElementById('nextPageBtn').disabled = true;
                 return;
             }
-            var totalPages = Math.ceil(historyDataList.length / itemsPerPage);
+
+            var totalPages = Math.ceil(dataToRender.length / itemsPerPage);
             if(currentPage > totalPages) currentPage = totalPages;
             if(currentPage < 1) currentPage = 1;
 
             var startIndex = (currentPage - 1) * itemsPerPage;
-            var pageItems = historyDataList.slice(startIndex, startIndex + itemsPerPage);
+            var pageItems = dataToRender.slice(startIndex, startIndex + itemsPerPage);
 
             hTable.innerHTML = "";
             pageItems.forEach((item, index) => {
                 var globalIndex = startIndex + index;
                 var isChecked = selectedAuditIds.has(item.id) ? "checked" : "";
-                var uploadedUser = item.uploaded_by || "Unknown";
+                
+                // Fallback Logic for Uploader Name
+                var uploadedUser = item.uploaded_by;
+                if (!uploadedUser || uploadedUser === "Unknown") {
+                    uploadedUser = currentUserName || "Admin";
+                }
                 
                 hTable.innerHTML += `
                     <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
@@ -703,7 +780,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </tr>`;
             });
 
-            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} items)`;
+            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${dataToRender.length} items)`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
         }
@@ -745,7 +822,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var exportData = targetItems.map(item => {
                 var row = {
                     "File Name": item.filename || "N/A",
-                    "Uploaded By": item.uploaded_by || "Unknown",
+                    "Uploaded By": item.uploaded_by || currentUserName || "Admin",
                     "QA Score": item.score || 0,
                     "WPM": item.wpm || 0,
                     "Duration (sec)": Math.round(item.duration || 0),
@@ -770,7 +847,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var exportData = historyDataList.map(item => {
                 var row = {
                     "File Name": item.filename || "N/A",
-                    "Uploaded By": item.uploaded_by || "Unknown",
+                    "Uploaded By": item.uploaded_by || currentUserName || "Admin",
                     "QA Score": item.score || 0,
                     "WPM": item.wpm || 0,
                     "Duration (sec)": Math.round(item.duration || 0),
@@ -835,7 +912,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function viewHistoryDetails(index) {
-            var item = historyDataList[index];
+            var item = filteredHistoryList[index];
             if(!item) return;
 
             var metricsInfo = "";
@@ -846,17 +923,18 @@ HTML_CONTENT = """<!DOCTYPE html>
                 metricsInfo += `\n• ${m.label}: ${statusStr}`;
             });
 
-            var detailText = `📁 File: ${item.filename}\n👤 Uploaded By: ${item.uploaded_by || 'Unknown'}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
+            var uName = item.uploaded_by || currentUserName || 'Admin';
+            var detailText = `📁 File: ${item.filename}\n👤 Uploaded By: ${uName}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
             alert(detailText);
         }
 
         function downloadSingleHistoryExcel(index) {
-            var item = historyDataList[index];
+            var item = filteredHistoryList[index];
             if(!item) return;
 
             var row = {
                 "File Name": item.filename || "N/A",
-                "Uploaded By": item.uploaded_by || "Unknown",
+                "Uploaded By": item.uploaded_by || currentUserName || "Admin",
                 "QA Score": item.score || 0,
                 "WPM": item.wpm || 0,
                 "Duration (sec)": Math.round(item.duration || 0),
@@ -890,10 +968,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetchAuth(`/api/history/${auditId}`, { method: 'DELETE' });
                 if(!res.ok) throw new Error("Delete failed on server side.");
 
-                historyDataList.splice(index, 1);
-                selectedAuditIds.delete(auditId);
-                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
-                renderHistoryTable();
+                await loadHistory();
                 alert("Record deleted successfully!");
             } catch(err) {
                 alert("Error deleting record: " + err.message);
@@ -1226,10 +1301,15 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict], user
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         created_time = datetime.now(ist_tz).isoformat()
 
-        # Extract uploader name or email
+        # Extract Name/Email from Firebase Token Payload safely
         uploader_name = "Admin"
-        if user_info:
-            uploader_name = user_info.get("name") or user_info.get("email", "").split("@")[0] or "Admin"
+        if user_info and isinstance(user_info, dict):
+            email = user_info.get("email", "")
+            name = user_info.get("name", "")
+            if name:
+                uploader_name = name
+            elif email:
+                uploader_name = email.split("@")[0]
 
         if db:
             try:
