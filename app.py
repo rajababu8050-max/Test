@@ -232,7 +232,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS & YES/NO FILTER -->
+        <!-- FIREBASE CLOUD HISTORY TABLE WITH GLOBAL BULK ACTIONS & METRIC FILTER -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-2">
@@ -259,11 +259,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- METRICS FILTER DROPDOWN BAR WITH YES / NO CHOICE -->
+            <!-- METRICS FILTER DROPDOWN BAR -->
             <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex items-center justify-between flex-wrap gap-3">
-                <div class="flex items-center gap-2 text-xs flex-wrap">
-                    <span class="font-bold text-blue-400 flex items-center gap-1">🔍 Filter Metric Status:</span>
-                    <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-600 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer min-w-[240px]">
+                <div class="flex items-center gap-2 text-xs">
+                    <span class="font-bold text-blue-400 flex items-center gap-1">🔍 Filter by Metric:</span>
+                    <select id="metricFilterSelect" onchange="applyMetricFilter()" class="card-bg border border-slate-600 text-slate-200 text-xs rounded-lg px-3 py-1.5 focus:outline-none focus:border-blue-500 cursor-pointer min-w-[200px]">
                         <option value="ALL">All Metrics (Show All)</option>
                     </select>
                 </div>
@@ -437,14 +437,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             } catch(e) { console.error(e); }
         }
 
-        // Populates BOTH YES & NO Options for each metric
         function populateMetricFilterDropdown() {
             var select = document.getElementById('metricFilterSelect');
             select.innerHTML = '<option value="ALL">All Metrics (Show All)</option>';
             if(activeMetrics && activeMetrics.length > 0) {
                 activeMetrics.forEach(m => {
-                    select.innerHTML += `<option value="${m.key}:YES">✅ ${m.label} = YES</option>`;
-                    select.innerHTML += `<option value="${m.key}:NO">❌ ${m.label} = NO</option>`;
+                    select.innerHTML += `<option value="${m.key}">${m.label} = YES</option>`;
                 });
             }
         }
@@ -683,34 +681,25 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        // ================= Enhanced YES / NO Metric Filter Logic =================
+        // ================= Metric Filter Logic =================
 
         function applyMetricFilter() {
-            var filterValue = document.getElementById('metricFilterSelect').value;
+            var selectedMetricKey = document.getElementById('metricFilterSelect').value;
             var statusBadge = document.getElementById('filterStatusBadge');
 
-            if(filterValue === "ALL") {
+            if(selectedMetricKey === "ALL") {
                 filteredHistoryList = [...historyDataList];
                 statusBadge.innerText = `Showing All (${filteredHistoryList.length}) Records`;
                 statusBadge.className = "text-xs text-sub font-medium";
             } else {
-                var parts = filterValue.split(":");
-                var key = parts[0];
-                var targetBool = (parts[1] === "YES");
-
                 filteredHistoryList = historyDataList.filter(item => {
                     var evalMetrics = item.evaluated_metrics || {};
-                    var metricVal = (evalMetrics[key] === true);
-                    return metricVal === targetBool;
+                    return evalMetrics[selectedMetricKey] === true;
                 });
-
-                var mObj = activeMetrics.find(m => m.key === key);
-                var labelName = mObj ? mObj.label : key;
-                var colorClass = targetBool ? "text-emerald-400" : "text-rose-400";
-                var boolText = targetBool ? "YES" : "NO";
-                
-                statusBadge.innerText = `Filtered: ${filteredHistoryList.length} calls with "${labelName} = ${boolText}"`;
-                statusBadge.className = `text-xs font-bold ${colorClass}`;
+                var mObj = activeMetrics.find(m => m.key === selectedMetricKey);
+                var labelName = mObj ? mObj.label : selectedMetricKey;
+                statusBadge.innerText = `Filtered: ${filteredHistoryList.length} calls with "${labelName} = YES"`;
+                statusBadge.className = "text-xs text-emerald-400 font-bold";
             }
 
             currentPage = 1;
