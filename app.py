@@ -232,12 +232,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- FIREBASE CLOUD HISTORY TABLE WITH BULK ACTIONS -->
+        <!-- FIREBASE CLOUD HISTORY TABLE WITH BULK ACTIONS & TOTAL UNLIMITED DATA -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                     <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
-                    <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total</span>
+                    <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total Records</span>
                 </div>
                 <!-- BULK ACTIONS CONTROL -->
                 <div class="flex gap-2 flex-wrap items-center">
@@ -268,7 +268,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="6" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="6" class="p-3 text-center text-slate-500">Loading full history...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -625,13 +625,14 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 if (!auth.currentUser) return;
                 idToken = await auth.currentUser.getIdToken(true);
-                var res = await fetchAuth("/api/history?limit=100");
+                // Limit query removed to load ALL database documents
+                var res = await fetchAuth("/api/history");
                 if(!res.ok) throw new Error("HTTP error " + res.status);
                 var list = await res.json();
                 historyDataList = list || [];
                 selectedAuditIds.clear();
                 document.getElementById('selectAllCheckbox').checked = false;
-                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Loaded";
+                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
@@ -681,7 +682,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </tr>`;
             });
 
-            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} items)`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
         }
@@ -822,7 +823,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 historyDataList.splice(index, 1);
                 selectedAuditIds.delete(auditId);
-                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Loaded";
+                document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Total Records";
                 renderHistoryTable();
                 alert("Record deleted successfully!");
             } catch(err) {
@@ -1227,13 +1228,17 @@ async def analyze_audio_batch(
     return {"results": results}
 
 @app.get("/api/history")
-async def get_history(limit: int = 100, user: dict = Depends(verify_firebase_token)):
+async def get_history(limit: Optional[int] = None, user: dict = Depends(verify_firebase_token)):
     if not db:
         return []
     try:
         loop = asyncio.get_running_loop()
         def fetch_db():
-            docs = db.collection("audits").order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit).stream()
+            query = db.collection("audits").order_by("created_at", direction=firestore.Query.DESCENDING)
+            if limit and limit > 0:
+                query = query.limit(limit)
+            
+            docs = query.stream()
             history = []
             for doc in docs:
                 data = doc.to_dict()
