@@ -1791,8 +1791,3 @@ async def delete_audit_history(
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-
-
-
-Es code me jb mai export to excel kru chaahe single kru ya all ya fir kahi se firebase cloud history se Excel file download kru to sara data usme show ho ekdm acche se jo jo UI ke front pr show hota h.. text center
