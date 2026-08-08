@@ -119,14 +119,14 @@ async def verify_firebase_token(request: Request):
             detail=f"Unauthorized: Invalid or expired token ({str(e)})"
         )
 
-# ================= HTML Content (Arrowhead AI Pro Theme) =================
+# ================= HTML Content (Owlbrain AI Pro Theme) =================
 
 HTML_CONTENT = """<!DOCTYPE html>
 <html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Call Quality Auditor Pro | Arrowhead AI Edition</title>
+    <title>AI Call Quality Auditor Pro | Owlbrain AI Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -134,7 +134,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             theme: {
                 extend: {
                     colors: {
-                        arrowhead: {
+                        Owlbrain: {
                             bg: '#060913',
                             surface: '#0d1322',
                             border: '#1a243b',
@@ -178,11 +178,11 @@ HTML_CONTENT = """<!DOCTYPE html>
             box-shadow: 0 0 20px -5px rgba(6, 182, 212, 0.4);
         }
         
-        .arrowhead-btn {
+        .Owlbrain-btn {
             background: linear-gradient(135deg, #06b6d4 0%, #2563eb 100%);
             transition: all 0.25s ease;
         }
-        .arrowhead-btn:hover {
+        .Owlbrain-btn:hover {
             box-shadow: 0 0 20px 2px rgba(6, 182, 212, 0.5);
             transform: translateY(-1px);
         }
@@ -201,7 +201,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div class="w-16 h-16 border-4 border-cyan-500/20 border-t-cyan-400 rounded-full animate-spin"></div>
             <div class="absolute text-cyan-400 font-extrabold text-xs tracking-widest">AI</div>
         </div>
-        <p class="text-xs font-semibold text-cyan-500/80 uppercase tracking-widest animate-pulse">ARROWHEAD AI ENGINE INITIALIZING...</p>
+        <p class="text-xs font-semibold text-cyan-500/80 uppercase tracking-widest animate-pulse">Owlbrain AI ENGINE INITIALIZING...</p>
     </div>
 
     <!-- ADMIN LOGIN MODAL -->
@@ -213,21 +213,21 @@ HTML_CONTENT = """<!DOCTYPE html>
                     ▲
                 </div>
                 <h2 class="text-2xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-slate-200 to-slate-400">
-                    Arrowhead Portal
+                    Owlbrain Portal
                 </h2>
                 <p class="text-xs text-sub">Sign in with authorized admin credentials</p>
             </div>
             <form onsubmit="handleLogin(event)" class="space-y-4 relative z-10">
                 <div>
                     <label class="block text-[10px] font-bold text-sub mb-1.5 uppercase tracking-wider">Admin Email</label>
-                    <input type="email" id="adminEmail" required placeholder="admin@arrowhead.ai" class="w-full inner-bg border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition">
+                    <input type="email" id="adminEmail" required placeholder="admin@Owlbrain.ai" class="w-full inner-bg border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition">
                 </div>
                 <div>
                     <label class="block text-[10px] font-bold text-sub mb-1.5 uppercase tracking-wider">Password</label>
                     <input type="password" id="adminPassword" required placeholder="••••••••" class="w-full inner-bg border border-slate-700/80 rounded-xl px-4 py-2.5 text-xs text-slate-100 focus:outline-none focus:border-cyan-500 transition">
                 </div>
                 <div id="authError" class="text-rose-400 text-xs text-center hidden font-medium p-2 bg-rose-500/10 rounded-lg border border-rose-500/20"></div>
-                <button type="submit" id="loginBtn" class="w-full arrowhead-btn text-white font-bold py-3 rounded-xl text-xs transition shadow-lg tracking-wider">
+                <button type="submit" id="loginBtn" class="w-full Owlbrain-btn text-white font-bold py-3 rounded-xl text-xs transition shadow-lg tracking-wider">
                     AUTHENTICATE
                 </button>
             </form>
@@ -246,7 +246,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </div>
                     <div>
                         <h1 onclick="goToHome()" class="text-2xl md:text-3xl font-black tracking-tight cursor-pointer text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-teal-300 to-blue-500 hover:opacity-90 transition">
-                            Arrowhead.AI <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 align-middle">PRO</span>
+                            Owlbrain.AI <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 align-middle">PRO</span>
                         </h1>
                         <p class="text-xs text-sub font-medium">Enterprise Audio Quality Intelligence & Bulk Auditor</p>
                     </div>
@@ -291,7 +291,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-700 hover:border-cyan-500/50 font-semibold px-5 py-2.5 rounded-xl text-xs transition text-slate-200">
                         📁 Browse Audio
                     </button>
-                    <button type="button" onclick="uploadAudioBatch()" class="arrowhead-btn text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-lg tracking-wide">
+                    <button type="button" onclick="uploadAudioBatch()" class="Owlbrain-btn text-white font-bold px-6 py-2.5 rounded-xl text-xs transition shadow-lg tracking-wide">
                         🚀 Start Bulk Analysis
                     </button>
                 </div>
@@ -352,7 +352,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         <div class="card-bg rounded-2xl p-6 space-y-6 shadow-2xl border border-slate-800/80">
             <div class="flex justify-between items-center border-b border-slate-800 pb-4 flex-wrap gap-3">
                 <div class="flex items-center gap-3 flex-wrap">
-                    <h3 class="text-xs font-extrabold text-slate-300 uppercase tracking-widest">🔥 Arrowhead Cloud Audits History</h3>
+                    <h3 class="text-xs font-extrabold text-slate-300 uppercase tracking-widest">🔥 Owlbrain Cloud Audits History</h3>
                     <span id="totalHistoryBadge" class="bg-cyan-500/10 text-cyan-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-cyan-500/30">0 Records</span>
                     <span id="selectedCountBadge" class="bg-emerald-500/10 text-emerald-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition">
                         Selected: 0
@@ -460,7 +460,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
                 <div class="flex justify-end gap-2 pt-2">
                     <button type="button" onclick="resetMetricForm()" class="inner-bg border border-slate-700 text-slate-300 text-xs px-3 py-1.5 rounded-lg">Clear</button>
-                    <button type="submit" class="arrowhead-btn text-white font-bold text-xs px-4 py-1.5 rounded-lg transition">Save Metric</button>
+                    <button type="submit" class="Owlbrain-btn text-white font-bold text-xs px-4 py-1.5 rounded-lg transition">Save Metric</button>
                 </div>
             </form>
             <div class="space-y-3">
@@ -656,7 +656,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             var dashboardHtml = `<table border="1">
                 <thead>
-                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#060913; color:#06b6d4; font-weight:bold; font-size:16px; padding:10px;">📊 ARROWHEAD AI BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
+                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#060913; color:#06b6d4; font-weight:bold; font-size:16px; padding:10px;">📊 Owlbrain AI BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
                     <tr>
                         <th style="text-align:center; background-color:#0d1322; color:#ffffff;">KPI Metric Name</th>
                         <th style="text-align:center; background-color:#0d1322; color:#ffffff;">Positive Count</th>
