@@ -465,7 +465,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             return item.wpm ?? item.data?.metrics?.wpm ?? 0;
         }
 
-        // DYNAMIC HELPER TO BUILD EXCEL ROWS AUTOMATICALLY (WITH SAFE N/A LOGIC)
+        // DYNAMIC HELPER TO BUILD EXCEL ROWS AUTOMATICALLY (WITH ADVANCED FORMATTING & N/A LOGIC)
         function buildExcelRow(item, isBatchResult = false) {
             var fileName = isBatchResult ? item.filename : (item.filename || "N/A");
             var uName = isBatchResult ? currentUserName : (item.uploaded_by || currentUserName || "Admin");
@@ -476,6 +476,10 @@ HTML_CONTENT = """<!DOCTYPE html>
             var strengthsList = isBatchResult ? (item.data?.evaluation?.strengths || []) : (item.strengths || []);
             var improvementsList = isBatchResult ? (item.data?.evaluation?.improvements || []) : (item.improvements || []);
 
+            // Format lists cleanly with bullet points & line breaks for Excel cells
+            var formattedStrengths = strengthsList.length > 0 ? strengthsList.map(s => `• ${s}`).join("\n") : "None";
+            var formattedImprovements = improvementsList.length > 0 ? improvementsList.map(i => `• ${i}`).join("\n") : "None";
+
             var row = {
                 "File Name": fileName,
                 "Uploaded By": uName,
@@ -484,8 +488,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "Duration (sec)": extractDuration(item),
                 "Total Words": extractTotalWords(item),
                 "Date & Time (IST)": createdAt,
-                "Strengths": strengthsList.join("; "),
-                "Areas for Improvement": improvementsList.join("; "),
+                "Strengths": formattedStrengths,
+                "Areas for Improvement": formattedImprovements,
                 "Summary": summary
             };
 
@@ -501,6 +505,34 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
 
             return row;
+        }
+
+        // HELPER TO AUTO-FIT COLUMNS AND APPLY STYLING IN EXCEL SHEET
+        function exportStyledWorkbook(exportData, sheetName, fileName) {
+            var workbook = XLSX.utils.book_new();
+            var worksheet = XLSX.utils.json_to_sheet(exportData);
+
+            if (exportData.length > 0) {
+                // Auto-fit Column Widths based on maximum content length
+                var colWidths = Object.keys(exportData[0]).map(key => {
+                    var maxLen = key.length;
+                    exportData.forEach(row => {
+                        var val = row[key] ? row[key].toString() : "";
+                        // Handle multiline string max line length calculation
+                        var lines = val.split("\n");
+                        lines.forEach(l => {
+                            if (l.length > maxLen) maxLen = l.length;
+                        });
+                    });
+                    // Cap column widths between 12 and 60 for optimal layout
+                    return { wch: Math.min(Math.max(maxLen + 4, 12), 60) };
+                });
+
+                worksheet["!cols"] = colWidths;
+            }
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            XLSX.writeFile(workbook, fileName);
         }
 
         auth.onAuthStateChanged(async (user) => {
@@ -986,11 +1018,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(targetItems.length === 0) return;
 
             var exportData = targetItems.map(item => buildExcelRow(item, false));
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Selected Cloud Audits");
-            XLSX.writeFile(workbook, `Selected_Audits_Export_${targetItems.length}.xlsx`);
+            exportStyledWorkbook(exportData, "Selected Cloud Audits", `Selected_Audits_Export_${targetItems.length}.xlsx`);
         }
 
         // Bulk Delete Selected (Marked) Audits
@@ -1025,11 +1053,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
 
             var exportData = targetItems.map(item => buildExcelRow(item, false));
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Filtered Audits");
-            XLSX.writeFile(workbook, `Filtered_Audits_Export_${targetItems.length}.xlsx`);
+            exportStyledWorkbook(exportData, "Filtered Audits", `Filtered_Audits_Export_${targetItems.length}.xlsx`);
         }
 
         // Export ALL History Data to Excel
@@ -1037,11 +1061,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
             
             var exportData = historyDataList.map(item => buildExcelRow(item, false));
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, sheet, "All Cloud Audit History");
-            XLSX.writeFile(workbook, `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`);
+            exportStyledWorkbook(exportData, "All Cloud Audit History", `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`);
         }
 
         // DELETE ALL DATA IN FIRESTORE
@@ -1158,11 +1178,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(!item) return;
 
             var row = buildExcelRow(item, false);
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet([row]);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Audit Details");
-            XLSX.writeFile(workbook, `${item.filename || 'Single'}_Audit.xlsx`);
+            exportStyledWorkbook([row], "Audit Details", `${item.filename || 'Single'}_Audit.xlsx`);
         }
 
         async function deleteHistoryItem(auditId, index) {
@@ -1190,11 +1206,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data!");
             
             var exportData = currentBatchResults.map(i => buildExcelRow(i, true));
-
-            var workbook = XLSX.utils.book_new();
-            var summarySheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
-            XLSX.writeFile(workbook, "Detailed_Call_Audit_Report.xlsx");
+            exportStyledWorkbook(exportData, "Batch Summary", "Detailed_Call_Audit_Report.xlsx");
         }
 
         function downloadPDF() {
