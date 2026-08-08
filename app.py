@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import io
 import asyncio
 import itertools
 import httpx
@@ -11,6 +12,8 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Dep
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+
+from pydub import AudioSegment
 
 import firebase_admin
 from firebase_admin import credentials, firestore, auth
@@ -717,7 +720,7 @@ async def serve_ai_page():
     else:
         return HTMLResponse("<h1>ai.html File missing in project root folder!</h1>", status_code=404)
 
-# ================= Groq ONLY Audio Transcribe & Diarize API =================
+# ================= Groq ONLY Audio Transcribe & Diarize API (Auto Convert Non-Supported Formats) =================
 
 @app.post("/api/groq-transcribe-eval")
 async def groq_transcribe_eval(
@@ -725,7 +728,7 @@ async def groq_transcribe_eval(
     user: dict = Depends(verify_firebase_token)
 ):
     """
-    Dedicated endpoint ONLY for ai.html - Uses strictly GROQ API (Whisper + LLaMA-3)
+    Dedicated endpoint ONLY for ai.html - Converts unsupported formats (.awb, etc) to MP3 and uses Groq API.
     """
     if not GROQ_API_KEY:
         raise HTTPException(
@@ -735,10 +738,27 @@ async def groq_transcribe_eval(
 
     try:
         audio_bytes = await file.read()
-        
-        # 1. Direct Groq Whisper Audio Transcription Call
+        filename = file.filename.lower()
+        content_type = file.content_type or "audio/mpeg"
+
+        # Allowed formats by Groq API
+        allowed_extensions = ('.flac', '.mp3', '.mp4', '.mpeg', '.mpga', '.m4a', '.ogg', '.opus', '.wav', '.webm')
+
+        # Auto-Convert Unsupported Formats (Like .awb, .amr, etc.) to .mp3 using pydub
+        if not filename.endswith(allowed_extensions):
+            try:
+                audio = AudioSegment.from_file(io.BytesIO(audio_bytes))
+                mp3_buffer = io.BytesIO()
+                audio.export(mp3_buffer, format="mp3")
+                audio_bytes = mp3_buffer.getvalue()
+                filename = "converted_audio.mp3"
+                content_type = "audio/mpeg"
+            except Exception as conv_err:
+                raise HTTPException(status_code=400, detail=f"Audio conversion failed for '{file.filename}': {str(conv_err)}")
+
+        # Direct Groq Whisper Audio Transcription Call
         async with httpx.AsyncClient(timeout=300.0) as client:
-            files_payload = {"file": (file.filename, audio_bytes, file.content_type or "audio/mpeg")}
+            files_payload = {"file": (filename, audio_bytes, content_type)}
             data_payload = {
                 "model": "whisper-large-v3",
                 "language": "hi",
@@ -759,7 +779,7 @@ async def groq_transcribe_eval(
 
             raw_transcript = whisper_res.json().get("text", "").strip()
 
-            # 2. Direct Groq LLaMA-3 Diarization Call
+            # Direct Groq LLaMA-3 Diarization Call
             llm_prompt = f"""
 You are an expert Call Center QA Auditor.
 Below is a full raw transcript of a customer service call in Hindi/Hinglish/English:
