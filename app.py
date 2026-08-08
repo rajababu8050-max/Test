@@ -548,7 +548,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             } catch (error) {
                 errorDiv.innerText = error.message;
                 errorDiv.classList.remove('hidden');
-            } font-medium {
+            } finally {
                 loginBtn.innerText = "Sign In";
             }
         }
