@@ -129,7 +129,13 @@ HTML_CONTENT = """<!DOCTYPE html>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
 
-    <!-- ADMIN LOGIN MODAL (HIDDEN BY DEFAULT TO PREVENT FLICKER FOR LOGGED-IN USERS) -->
+    <!-- INITIAL AUTH CHECK LOADING SCREEN (PREVENTS BLANK / FLICKER ISSUES) -->
+    <div id="initialAppLoader" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center space-y-4 z-[200]">
+        <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-xs font-semibold text-blue-400 uppercase tracking-widest">Verifying Portal Authentication...</p>
+    </div>
+
+    <!-- ADMIN LOGIN MODAL -->
     <div id="authModal" class="hidden fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-[100]">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-6 shadow-2xl">
             <div class="text-center space-y-2">
@@ -507,6 +513,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
+        // PERFECT HORIZONTAL & VERTICAL CENTER ALIGNMENT VIA HTML TABLE CONVERSION
         function exportStyledWorkbook(exportData, sheetName, fileName) {
             if (!exportData || exportData.length === 0) return;
 
@@ -549,7 +556,9 @@ HTML_CONTENT = """<!DOCTYPE html>
             XLSX.writeFile(workbook, fileName);
         }
 
+        // FLICKER-FREE AUTH STATE HANDLING
         auth.onAuthStateChanged(async (user) => {
+            var loader = document.getElementById('initialAppLoader');
             var authModal = document.getElementById('authModal');
             var dashContent = document.getElementById('dashboardContent');
 
@@ -560,12 +569,19 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 if (authModal) authModal.classList.add('hidden');
                 if (dashContent) dashContent.classList.remove('hidden');
+                
+                // Hide Loader Screen Smoothly
+                if (loader) loader.classList.add('hidden');
+                
                 await fetchMetrics();
                 loadHistory();
             } else {
                 idToken = "";
                 if (dashContent) dashContent.classList.add('hidden');
                 if (authModal) authModal.classList.remove('hidden');
+                
+                // Hide Loader Screen Smoothly
+                if (loader) loader.classList.add('hidden');
             }
         });
 
