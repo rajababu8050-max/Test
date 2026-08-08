@@ -348,7 +348,7 @@
     // -------------------------------------------------------------
     // GROQ API KEY & FIREBASE CONFIGURATION
     // -------------------------------------------------------------
-    const GROQ_API_KEY = "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";
+    GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 
     const firebaseConfig = {
       apiKey: "AIzaSyA-X-5ifk7q9suZzDuUzScnGIMgKKXlQ5U",
