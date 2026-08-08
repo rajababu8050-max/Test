@@ -245,12 +245,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <div class="flex items-center gap-2 flex-wrap">
                     <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
                     <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total Records</span>
-                    <!-- DYNAMIC SELECTION BADGE -->
                     <span id="selectedCountBadge" class="bg-emerald-500/20 text-emerald-400 text-xs font-bold px-2.5 py-0.5 rounded-full border border-emerald-500/30 transition">
                         Selected: 0
                     </span>
                 </div>
-                <!-- GLOBAL & BULK ACTIONS CONTROL -->
                 <div class="flex gap-2 flex-wrap items-center">
                     <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
                         📊 Export ALL Data to Excel
@@ -270,7 +268,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 </div>
             </div>
 
-            <!-- METRIC FILTER CONTROL BAR -->
             <div class="inner-bg p-3 rounded-xl border border-slate-700/60 flex items-center gap-3 flex-wrap text-xs">
                 <span class="font-bold text-blue-400 flex items-center gap-1">🔍 Filter By Metric:</span>
                 
@@ -288,7 +285,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     Reset Filter
                 </button>
 
-                <!-- EXPORT FILTERED EXCEL BUTTON -->
                 <button type="button" onclick="exportFilteredExcel()" class="bg-indigo-700 hover:bg-indigo-600 text-white font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1 shadow-lg shadow-indigo-700/20">
                     📥 Export Filtered Data
                 </button>
@@ -365,7 +361,6 @@ HTML_CONTENT = """<!DOCTYPE html>
     <!-- VIEW AUDIT DETAILS CUSTOM SCROLLABLE MODAL -->
     <div id="viewDetailsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-3xl p-6 space-y-5 shadow-2xl max-h-[90vh] flex flex-col">
-            <!-- MODAL HEADER -->
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-shrink-0">
                 <div>
                     <h3 id="viewModalFileName" class="text-lg font-bold text-blue-400">📁 Audit Details</h3>
@@ -375,14 +370,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
             
             <div class="space-y-4 overflow-y-auto pr-2 flex-grow">
-                <!-- PACE / DURATION / WORDS METRICS BADGES -->
                 <div class="grid grid-cols-3 gap-2 text-center text-xs">
                     <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">PACE</span><span id="viewModalWPM" class="font-bold text-blue-400">0 WPM</span></div>
                     <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">DURATION</span><span id="viewModalDuration" class="font-bold text-indigo-400">0s</span></div>
                     <div class="inner-bg p-2 rounded-lg border border-slate-700/60"><span class="text-sub block text-[10px]">WORDS</span><span id="viewModalWords" class="font-bold text-amber-400">0</span></div>
                 </div>
 
-                <!-- ALL EVALUATED METRICS GRID CONTAINER -->
                 <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-3">
                     <div class="font-bold text-emerald-400 text-xs uppercase tracking-wider flex justify-between items-center">
                         <span>💊 Call Metrics Evaluation</span>
@@ -391,7 +384,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     <div id="viewModalMetricsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs"></div>
                 </div>
 
-                <!-- STRENGTHS AND IMPROVEMENTS SECTION -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                     <div class="inner-bg p-3.5 rounded-xl border border-emerald-500/30 space-y-2">
                         <div class="font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
@@ -407,13 +399,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </div>
                 </div>
 
-                <!-- CALL SUMMARY -->
                 <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-2">
                     <div class="font-bold text-blue-300 text-xs uppercase tracking-wider">Detailed Call Summary</div>
                     <p id="viewModalSummary" class="text-xs text-sub leading-relaxed whitespace-pre-wrap"></p>
                 </div>
 
-                <!-- DIARIZED TRANSCRIPT SECTION -->
                 <details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs" open>
                     <summary class="font-bold text-sub cursor-pointer">📄 Full Diarized Transcript</summary>
                     <div id="viewModalTranscript" class="mt-3 space-y-2 max-h-60 overflow-y-auto pr-2 pt-2 border-t border-slate-800"></div>
@@ -452,7 +442,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         var itemsPerPage = 10;
         var selectedAuditIds = new Set();
 
-        // Safe Data Helpers for Audio Metrics
         function extractDuration(item) {
             return Math.round(item.duration ?? item.data?.metrics?.duration ?? 0);
         }
@@ -465,7 +454,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             return item.wpm ?? item.data?.metrics?.wpm ?? 0;
         }
 
-        // DYNAMIC HELPER TO BUILD EXCEL ROWS AUTOMATICALLY (WITH SAFE N/A LOGIC)
         function buildExcelRow(item, isBatchResult = false) {
             var fileName = isBatchResult ? item.filename : (item.filename || "N/A");
             var uName = isBatchResult ? currentUserName : (item.uploaded_by || currentUserName || "Admin");
@@ -476,6 +464,9 @@ HTML_CONTENT = """<!DOCTYPE html>
             var strengthsList = isBatchResult ? (item.data?.evaluation?.strengths || []) : (item.strengths || []);
             var improvementsList = isBatchResult ? (item.data?.evaluation?.improvements || []) : (item.improvements || []);
 
+            var formattedStrengths = strengthsList.length > 0 ? strengthsList.map(s => "• " + s).join("\\r\\n") : "None";
+            var formattedImprovements = improvementsList.length > 0 ? improvementsList.map(i => "• " + i).join("\\r\\n") : "None";
+
             var row = {
                 "File Name": fileName,
                 "Uploaded By": uName,
@@ -484,14 +475,13 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "Duration (sec)": extractDuration(item),
                 "Total Words": extractTotalWords(item),
                 "Date & Time (IST)": createdAt,
-                "Strengths": strengthsList.join("; "),
-                "Areas for Improvement": improvementsList.join("; "),
+                "Strengths": formattedStrengths,
+                "Areas for Improvement": formattedImprovements,
                 "Summary": summary
             };
 
             var evalMetrics = isBatchResult ? (item.data?.evaluation?.evaluated_metrics || {}) : (item.evaluated_metrics || {});
 
-            // DYNAMICALLY ADD ACTIVE METRICS; USE 'N/A' IF NOT EVALUATED IN OLD AUDITS
             activeMetrics.forEach(m => {
                 if (evalMetrics.hasOwnProperty(m.key)) {
                     row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
@@ -503,10 +493,33 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
+        function exportStyledWorkbook(exportData, sheetName, fileName) {
+            var workbook = XLSX.utils.book_new();
+            var worksheet = XLSX.utils.json_to_sheet(exportData);
+
+            if (exportData.length > 0) {
+                var colWidths = Object.keys(exportData[0]).map(key => {
+                    var maxLen = key.length;
+                    exportData.forEach(row => {
+                        var val = row[key] ? row[key].toString() : "";
+                        var lines = val.split("\\r\\n");
+                        lines.forEach(l => {
+                            if (l.length > maxLen) maxLen = l.length;
+                        });
+                    });
+                    return { wch: Math.min(Math.max(maxLen + 4, 12), 60) };
+                });
+
+                worksheet["!cols"] = colWidths;
+            }
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+            XLSX.writeFile(workbook, fileName);
+        }
+
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 idToken = await user.getIdToken(true);
-                
                 currentUserName = user.displayName || (user.email ? user.email.split('@')[0] : "Admin");
                 document.getElementById('userDisplayName').innerText = currentUserName;
 
@@ -535,7 +548,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             } catch (error) {
                 errorDiv.innerText = error.message;
                 errorDiv.classList.remove('hidden');
-            } finally {
+            } font-medium {
                 loginBtn.innerText = "Sign In";
             }
         }
@@ -788,7 +801,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">${dynamicCardsHtml}</div>
                     </div>
                     
-                    <!-- STRENGTHS AND IMPROVEMENTS (AUDIO UPLOAD LIVE DISPLAY) -->
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                         <div class="inner-bg p-3 rounded-xl border border-emerald-500/30 space-y-1.5">
                             <div class="font-bold text-emerald-400 text-[11px] uppercase">💪 Agent Strengths</div>
@@ -832,8 +844,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        // ================= METRIC FILTER LOGIC (EXCLUDES N/A FROM NO FILTER) =================
-
         function applyMetricFilter() {
             var selectedMetricKey = document.getElementById('metricFilterSelect').value;
             var selectedValue = document.getElementById('metricFilterValue').value;
@@ -845,7 +855,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 filteredHistoryList = historyDataList.filter(item => {
                     var evalMetrics = item.evaluated_metrics || {};
                     
-                    // IF METRIC WAS NOT EVALUATED IN AN OLD CALL, DO NOT COUNT IT AS 'NO'
                     if (!evalMetrics.hasOwnProperty(selectedMetricKey)) {
                         return false;
                     }
@@ -855,9 +864,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     if (selectedValue === "YES") {
                         return metricVal === true;
                     } else if (selectedValue === "NO") {
-                        return metricVal === false; // STRICT NO MATCH
+                        return metricVal === false;
                     } else {
-                        return true; // Status ALL chosen
+                        return true;
                     }
                 });
                 document.getElementById('filterCountBadge').innerText = `Showing ${filteredHistoryList.length} of ${historyDataList.length} items`;
@@ -897,7 +906,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var globalIndex = startIndex + index;
                 var isChecked = selectedAuditIds.has(item.id) ? "checked" : "";
                 
-                // Fallback Logic for Uploader Name
                 var uploadedUser = item.uploaded_by;
                 if (!uploadedUser || uploadedUser === "Unknown") {
                     uploadedUser = currentUserName || "Admin";
@@ -935,8 +943,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function changePage(direction) { currentPage += direction; renderHistoryTable(); }
-
-        // ================= Checkbox Multi-Select & Counter Logic =================
 
         function updateSelectedCounter() {
             var count = selectedAuditIds.size;
@@ -976,7 +982,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             updateSelectedCounter();
         }
 
-        // Export Selected (Marked) Items to Excel
         function exportSelectedExcel() {
             if(selectedAuditIds.size === 0) {
                 return alert("Pehle items mark/select karein!");
@@ -986,14 +991,9 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(targetItems.length === 0) return;
 
             var exportData = targetItems.map(item => buildExcelRow(item, false));
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Selected Cloud Audits");
-            XLSX.writeFile(workbook, `Selected_Audits_Export_${targetItems.length}.xlsx`);
+            exportStyledWorkbook(exportData, "Selected Cloud Audits", `Selected_Audits_Export_${targetItems.length}.xlsx`);
         }
 
-        // Bulk Delete Selected (Marked) Audits
         async function deleteSelectedAudits() {
             if(selectedAuditIds.size === 0) {
                 return alert("Pehle delete karne ke liye records mark/select karein!");
@@ -1017,7 +1017,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             await loadHistory();
         }
 
-        // Export Filtered Items to Excel
         function exportFilteredExcel() {
             var targetItems = filteredHistoryList || [];
             if(targetItems.length === 0) {
@@ -1025,26 +1024,16 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
 
             var exportData = targetItems.map(item => buildExcelRow(item, false));
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Filtered Audits");
-            XLSX.writeFile(workbook, `Filtered_Audits_Export_${targetItems.length}.xlsx`);
+            exportStyledWorkbook(exportData, "Filtered Audits", `Filtered_Audits_Export_${targetItems.length}.xlsx`);
         }
 
-        // Export ALL History Data to Excel
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
             
             var exportData = historyDataList.map(item => buildExcelRow(item, false));
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, sheet, "All Cloud Audit History");
-            XLSX.writeFile(workbook, `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`);
+            exportStyledWorkbook(exportData, "All Cloud Audit History", `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`);
         }
 
-        // DELETE ALL DATA IN FIRESTORE
         async function deleteAllHistoryData() {
             if(!historyDataList || historyDataList.length === 0) {
                 return alert("Pehle se hi koi record nahi hai!");
@@ -1065,7 +1054,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        // VIEW DETAILS MODAL OPEN & CLOSE LOGIC (WITH N/A DISPLAY FOR UN-EVALUATED METRICS)
         function viewHistoryDetails(index) {
             var item = filteredHistoryList[index];
             if(!item) return;
@@ -1073,7 +1061,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             var evalMetrics = item.evaluated_metrics || {};
             var uName = item.uploaded_by || currentUserName || 'Admin';
 
-            // Populate Modal Header & Stat Badges
             document.getElementById('viewModalFileName').innerText = "📁 " + (item.filename || "Audit Details");
             document.getElementById('viewModalMeta').innerText = `👤 Uploaded By: ${uName} | ⭐ Score: ${item.score || 0}/100 | Date: ${formatDateDisplay(item.created_at)}`;
             
@@ -1083,7 +1070,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             document.getElementById('viewModalSummary').innerText = item.summary || "No summary available.";
 
-            // Strengths and Improvements Rendering
             var strengthsList = item.strengths || [];
             var improvementsList = item.improvements || [];
 
@@ -1098,7 +1084,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 ? improvementsList.map(i => `<li>${i}</li>`).join('') 
                 : '<li class="italic">None listed</li>';
 
-            // Dynamic Metrics Rendering (Shows N/A for Metrics Not Evaluated in Older Calls)
             var gridContainer = document.getElementById('viewModalMetricsGrid');
             gridContainer.innerHTML = "";
 
@@ -1127,7 +1112,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             document.getElementById('viewMetricsCount').innerText = `${metricsCount} Metrics Evaluated`;
 
-            // Diarized Transcript Rendering
             var transcriptContainer = document.getElementById('viewModalTranscript');
             transcriptContainer.innerHTML = "";
 
@@ -1141,7 +1125,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
             }
 
-            // Open Modal
             var modal = document.getElementById('viewDetailsModal');
             modal.classList.remove('hidden');
             modal.classList.add('flex');
@@ -1158,11 +1141,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(!item) return;
 
             var row = buildExcelRow(item, false);
-
-            var workbook = XLSX.utils.book_new();
-            var sheet = XLSX.utils.json_to_sheet([row]);
-            XLSX.utils.book_append_sheet(workbook, sheet, "Audit Details");
-            XLSX.writeFile(workbook, `${item.filename || 'Single'}_Audit.xlsx`);
+            exportStyledWorkbook([row], "Audit Details", `${item.filename || 'Single'}_Audit.xlsx`);
         }
 
         async function deleteHistoryItem(auditId, index) {
@@ -1190,11 +1169,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data!");
             
             var exportData = currentBatchResults.map(i => buildExcelRow(i, true));
-
-            var workbook = XLSX.utils.book_new();
-            var summarySheet = XLSX.utils.json_to_sheet(exportData);
-            XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
-            XLSX.writeFile(workbook, "Detailed_Call_Audit_Report.xlsx");
+            exportStyledWorkbook(exportData, "Batch Summary", "Detailed_Call_Audit_Report.xlsx");
         }
 
         function downloadPDF() {
@@ -1502,7 +1477,6 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict], user
         ist_tz = timezone(timedelta(hours=5, minutes=30))
         created_time = datetime.now(ist_tz).isoformat()
 
-        # Extract Name/Email from Firebase Token Payload safely
         uploader_name = "Admin"
         if user_info and isinstance(user_info, dict):
             email = user_info.get("email", "")
@@ -1512,7 +1486,6 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict], user
             elif email:
                 uploader_name = email.split("@")[0]
 
-        # Explicit numeric extraction
         calc_duration = round(float(metrics.get("duration", 0.0)), 2)
         calc_total_words = int(metrics.get("total_words", 0))
         calc_wpm = int(metrics.get("wpm", 0))
