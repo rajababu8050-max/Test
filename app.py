@@ -613,13 +613,25 @@ HTML_CONTENT = """<!DOCTYPE html>
             var metricStats = [];
             var avgScore = 0;
             var totalScore = 0;
+            var totalDurationSum = 0;
+            var totalWordsSum = 0;
+            var passCount = 0;
 
             validItems.forEach(i => {
                 var score = isBatchResult ? (i.data?.evaluation?.overall_score || 0) : (i.score || 0);
                 totalScore += score;
+                if (score >= 80) passCount++;
+                totalDurationSum += extractDuration(i);
+                totalWordsSum += extractTotalWords(i);
             });
 
             avgScore = totalCalls > 0 ? Math.round(totalScore / totalCalls) : 0;
+            var passRate = totalCalls > 0 ? Math.round((passCount / totalCalls) * 100) : 0;
+            var avgDuration = totalCalls > 0 ? Math.round(totalDurationSum / totalCalls) : 0;
+            var avgWords = totalCalls > 0 ? Math.round(totalWordsSum / totalCalls) : 0;
+
+            var highestMetric = { label: "N/A", pct: -1 };
+            var lowestMetric = { label: "N/A", pct: 101 };
 
             activeMetrics.forEach(m => {
                 var yesCount = 0;
@@ -630,6 +642,9 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 var pct = totalCalls > 0 ? Math.round((yesCount / totalCalls) * 100) : 0;
                 
+                if (pct > highestMetric.pct) { highestMetric = { label: m.label, pct: pct }; }
+                if (pct < lowestMetric.pct) { lowestMetric = { label: m.label, pct: pct }; }
+
                 var filledBars = Math.round(pct / 10);
                 var emptyBars = 10 - filledBars;
                 var visualChart = "█".repeat(filledBars) + "░".repeat(emptyBars) + ` ${pct}%`;
@@ -643,15 +658,77 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
             });
 
+            // ================= 1. EXECUTIVE CRISP SUMMARY SHEET (MANAGEMENT TAB) =================
+            var execSummaryHtml = `<table border="1">
+                <thead>
+                    <tr><th colspan="4" style="text-align:center; vertical-align:middle; background-color:#0f172a; color:#38bdf8; font-weight:bold; font-size:18px; padding:12px;">📊 OWLBRAIN.AI EXECUTIVE CALL QUALITY SUMMARY & STRATEGIC DASHBOARD</th></tr>
+                    <tr><th colspan="4" style="text-align:center; background-color:#1e293b; color:#94a3b8; font-size:11px;">Generated on: ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST | Confidential Leadership Report</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td colspan="4" style="background-color:#0284c7; color:#ffffff; font-weight:bold; font-size:13px; text-align:left; padding:6px;">📈 EXECUTIVE SCORECARD & HIGH-LEVEL KPIS</td></tr>
+                    <tr>
+                        <td style="font-weight:bold; background-color:#f1f5f9; width:30%;">Total Calls Evaluated</td>
+                        <td style="font-weight:bold; text-align:center; width:20%;">${totalCalls} Calls</td>
+                        <td style="font-weight:bold; background-color:#f1f5f9; width:30%;">Overall Quality Pass Rate (>=80%)</td>
+                        <td style="font-weight:bold; text-align:center; color:${passRate >= 75 ? '#10b981' : '#e11d48'}; width:20%;">${passRate}% (${passCount}/${totalCalls})</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold; background-color:#f1f5f9;">Average Quality Index Score</td>
+                        <td style="font-weight:bold; text-align:center; color:#0284c7; font-size:14px;">${avgScore} / 100</td>
+                        <td style="font-weight:bold; background-color:#f1f5f9;">Avg Call Duration / Words</td>
+                        <td style="font-weight:bold; text-align:center;">${avgDuration}s / ${avgWords} words</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold; background-color:#f1f5f9;">Top Performing KPI Area</td>
+                        <td style="font-weight:bold; text-align:center; color:#10b981;">${highestMetric.label} (${highestMetric.pct < 0 ? 0 : highestMetric.pct}%)</td>
+                        <td style="font-weight:bold; background-color:#f1f5f9;">Key Operational Friction Point</td>
+                        <td style="font-weight:bold; text-align:center; color:#e11d48;">${lowestMetric.label} (${lowestMetric.pct > 100 ? 0 : lowestMetric.pct}%)</td>
+                    </tr>
+                    
+                    <tr><td colspan="4" style="height:10px; background-color:#ffffff;"></td></tr>
+                    <tr><td colspan="4" style="background-color:#0284c7; color:#ffffff; font-weight:bold; font-size:13px; text-align:left; padding:6px;">🎯 COMPLIANCE & KPI METRICS BREAKDOWN (WITH VISUAL CHARTS)</td></tr>
+                    <tr style="background-color:#1e293b; color:#ffffff; font-weight:bold; text-align:center;">
+                        <td>Evaluated Parameter Name</td>
+                        <td>Positive Compliance</td>
+                        <td>Compliance Rate (%)</td>
+                        <td>Visual Performance Trend Bar</td>
+                    </tr>`;
+
+            metricStats.forEach(stat => {
+                var pVal = parseInt(stat["Success %"]);
+                var colorHex = pVal >= 80 ? '#10b981' : (pVal >= 50 ? '#f59e0b' : '#e11d48');
+                execSummaryHtml += `<tr>
+                    <td style="font-weight:bold;">${stat["Evaluated Metric"]}</td>
+                    <td style="text-align:center;">${stat["Total Yes / Positive"]} / ${stat["Total Calls Analyzed"]}</td>
+                    <td style="text-align:center; font-weight:bold; color:${colorHex};">${stat["Success %"]}</td>
+                    <td style="text-align:center; font-family:monospace; font-weight:bold; color:${colorHex};">${stat["Visual Performance Graph"]}</td>
+                </tr>`;
+            });
+
+            execSummaryHtml += `
+                    <tr><td colspan="4" style="height:10px; background-color:#ffffff;"></td></tr>
+                    <tr><td colspan="4" style="background-color:#0284c7; color:#ffffff; font-weight:bold; font-size:13px; text-align:left; padding:6px;">💡 C-SUITE STRATEGIC RECOMMENDATIONS & INSIGHTS</td></tr>
+                    <tr>
+                        <td style="font-weight:bold; background-color:#f8fafc;">Operational Strengths</td>
+                        <td colspan="3">Agents showed strong alignment in primary conversation flows. Average Quality Index stands at <b>${avgScore}%</b>. Top compliance metric: <b>${highestMetric.label}</b>.</td>
+                    </tr>
+                    <tr>
+                        <td style="font-weight:bold; background-color:#f8fafc;">Key Action Items</td>
+                        <td colspan="3">1. Focused coaching required on <b>${lowestMetric.label}</b> (Current rate: ${lowestMetric.pct > 100 ? 0 : lowestMetric.pct}%).<br/>2. Standardize pitch delivery to convert potential customer opportunities consistently.</td>
+                    </tr>
+                </tbody>
+            </table>`;
+
+            // ================= 2. DASHBOARD ANALYTICS TABLE =================
             var dashboardHtml = `<table border="1">
                 <thead>
-                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0284c7; color:#ffffff; font-weight:bold; font-size:16px; padding:10px;">📊 OWLBRAIN AI BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
+                    <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0f172a; color:#38bdf8; font-weight:bold; font-size:16px; padding:10px;">📊 OWLBRAIN AI BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
                     <tr>
-                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">KPI Metric Name</th>
-                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Positive Count</th>
-                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Total Calls</th>
-                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Conversion %</th>
-                        <th style="text-align:center; background-color:#f1f5f9; color:#0f172a;">Visual Graph Bar</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">KPI Metric Name</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Positive Count</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Total Calls</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Conversion %</th>
+                        <th style="text-align:center; background-color:#1e293b; color:#ffffff;">Visual Graph Bar</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -673,12 +750,13 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             dashboardHtml += '</tbody></table>';
 
+            // ================= 3. INDIVIDUAL CALL DETAILS TABLE =================
             var rawRows = rawItemsList.map(item => buildExcelRow(item, isBatchResult));
             var rawKeys = Object.keys(rawRows[0]);
 
             var detailsHtml = '<table border="1"><thead><tr>';
             rawKeys.forEach(k => {
-                detailsHtml += `<th style="text-align: center; vertical-align: middle; background-color: #f1f5f9; color: #0f172a; font-weight: bold; padding: 8px;">${k}</th>`;
+                detailsHtml += `<th style="text-align: center; vertical-align: middle; background-color: #1e293b; color: #ffffff; font-weight: bold; padding: 8px;">${k}</th>`;
             });
             detailsHtml += '</tr></thead><tbody>';
 
@@ -692,13 +770,21 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
             detailsHtml += '</tbody></table>';
 
+            // ================= WORKBOOK BUILDER =================
             var parser = new DOMParser();
             var workbook = XLSX.utils.book_new();
 
+            // SHEET 1: Executive Crisp Summary (Management Level)
+            var execSheet = XLSX.utils.table_to_sheet(parser.parseFromString(execSummaryHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
+            execSheet["!cols"] = [{ wch: 32 }, { wch: 22 }, { wch: 22 }, { wch: 32 }];
+            XLSX.utils.book_append_sheet(workbook, execSheet, "👑 Executive Summary");
+
+            // SHEET 2: Metric Analytics Dashboard
             var dashSheet = XLSX.utils.table_to_sheet(parser.parseFromString(dashboardHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
             dashSheet["!cols"] = [{ wch: 32 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 32 }];
-            XLSX.utils.book_append_sheet(workbook, dashSheet, "📌 Dashboard Analytics");
+            XLSX.utils.book_append_sheet(workbook, dashSheet, "📌 KPI Analytics");
 
+            // SHEET 3: Individual Call Breakdowns
             var detailSheet = XLSX.utils.table_to_sheet(parser.parseFromString(detailsHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
             var detailWidths = rawKeys.map(key => {
                 var maxLen = key.length;
@@ -709,7 +795,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 return { wch: Math.min(Math.max(maxLen + 4, 14), 30) };
             });
             detailSheet["!cols"] = detailWidths;
-            XLSX.utils.book_append_sheet(workbook, detailSheet, "📁 Individual Call Details");
+            XLSX.utils.book_append_sheet(workbook, detailSheet, "📁 Individual Calls");
 
             XLSX.writeFile(workbook, fileName);
         }
