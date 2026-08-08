@@ -465,6 +465,40 @@ HTML_CONTENT = """<!DOCTYPE html>
             return item.wpm ?? item.data?.metrics?.wpm ?? 0;
         }
 
+        // DYNAMIC HELPER TO BUILD EXCEL ROWS AUTOMATICALLY
+        function buildExcelRow(item, isBatchResult = false) {
+            var fileName = isBatchResult ? item.filename : (item.filename || "N/A");
+            var uName = isBatchResult ? currentUserName : (item.uploaded_by || currentUserName || "Admin");
+            var score = isBatchResult ? (item.data?.evaluation?.overall_score || 0) : (item.score || 0);
+            var summary = isBatchResult ? (item.data?.evaluation?.summary || "") : (item.summary || "");
+            var createdAt = isBatchResult ? formatDateDisplay(new Date().toISOString()) : formatDateDisplay(item.created_at);
+            
+            var strengthsList = isBatchResult ? (item.data?.evaluation?.strengths || []) : (item.strengths || []);
+            var improvementsList = isBatchResult ? (item.data?.evaluation?.improvements || []) : (item.improvements || []);
+
+            var row = {
+                "File Name": fileName,
+                "Uploaded By": uName,
+                "QA Score": score,
+                "WPM": extractWPM(item),
+                "Duration (sec)": extractDuration(item),
+                "Total Words": extractTotalWords(item),
+                "Date & Time (IST)": createdAt,
+                "Strengths": strengthsList.join("; "),
+                "Areas for Improvement": improvementsList.join("; "),
+                "Summary": summary
+            };
+
+            var evalMetrics = isBatchResult ? (item.data?.evaluation?.evaluated_metrics || {}) : (item.evaluated_metrics || {});
+
+            // DYNAMICALLY ADD ALL ACTIVE METRICS AS EXCEL COLUMNS
+            activeMetrics.forEach(m => {
+                row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
+            });
+
+            return row;
+        }
+
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 idToken = await user.getIdToken(true);
@@ -941,23 +975,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             var targetItems = historyDataList.filter(item => selectedAuditIds.has(item.id));
             if(targetItems.length === 0) return;
 
-            var exportData = targetItems.map(item => {
-                var row = {
-                    "File Name": item.filename || "N/A",
-                    "Uploaded By": item.uploaded_by || currentUserName || "Admin",
-                    "QA Score": item.score || 0,
-                    "WPM": extractWPM(item),
-                    "Duration (sec)": extractDuration(item),
-                    "Total Words": extractTotalWords(item),
-                    "Date & Time (IST)": formatDateDisplay(item.created_at),
-                    "Strengths": (item.strengths || []).join("; "),
-                    "Improvements": (item.improvements || []).join("; "),
-                    "Summary": item.summary || ""
-                };
-                var evalMetrics = item.evaluated_metrics || {};
-                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
-                return row;
-            });
+            var exportData = targetItems.map(item => buildExcelRow(item, false));
 
             var workbook = XLSX.utils.book_new();
             var sheet = XLSX.utils.json_to_sheet(exportData);
@@ -996,23 +1014,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 return alert("Export karne ke liye koi filtered data nahi mila!");
             }
 
-            var exportData = targetItems.map(item => {
-                var row = {
-                    "File Name": item.filename || "N/A",
-                    "Uploaded By": item.uploaded_by || currentUserName || "Admin",
-                    "QA Score": item.score || 0,
-                    "WPM": extractWPM(item),
-                    "Duration (sec)": extractDuration(item),
-                    "Total Words": extractTotalWords(item),
-                    "Date & Time (IST)": formatDateDisplay(item.created_at),
-                    "Strengths": (item.strengths || []).join("; "),
-                    "Improvements": (item.improvements || []).join("; "),
-                    "Summary": item.summary || ""
-                };
-                var evalMetrics = item.evaluated_metrics || {};
-                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
-                return row;
-            });
+            var exportData = targetItems.map(item => buildExcelRow(item, false));
 
             var workbook = XLSX.utils.book_new();
             var sheet = XLSX.utils.json_to_sheet(exportData);
@@ -1023,23 +1025,8 @@ HTML_CONTENT = """<!DOCTYPE html>
         // Export ALL History Data to Excel
         function exportHistoryExcel() {
             if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
-            var exportData = historyDataList.map(item => {
-                var row = {
-                    "File Name": item.filename || "N/A",
-                    "Uploaded By": item.uploaded_by || currentUserName || "Admin",
-                    "QA Score": item.score || 0,
-                    "WPM": extractWPM(item),
-                    "Duration (sec)": extractDuration(item),
-                    "Total Words": extractTotalWords(item),
-                    "Date & Time (IST)": formatDateDisplay(item.created_at),
-                    "Strengths": (item.strengths || []).join("; "),
-                    "Improvements": (item.improvements || []).join("; "),
-                    "Summary": item.summary || ""
-                };
-                var evalMetrics = item.evaluated_metrics || {};
-                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
-                return row;
-            });
+            
+            var exportData = historyDataList.map(item => buildExcelRow(item, false));
 
             var workbook = XLSX.utils.book_new();
             var sheet = XLSX.utils.json_to_sheet(exportData);
@@ -1156,28 +1143,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             var item = filteredHistoryList[index];
             if(!item) return;
 
-            var row = {
-                "File Name": item.filename || "N/A",
-                "Uploaded By": item.uploaded_by || currentUserName || "Admin",
-                "QA Score": item.score || 0,
-                "WPM": extractWPM(item),
-                "Duration (sec)": extractDuration(item),
-                "Total Words": extractTotalWords(item),
-                "Date & Time (IST)": formatDateDisplay(item.created_at),
-                "Strengths": (item.strengths || []).join("; "),
-                "Improvements": (item.improvements || []).join("; "),
-                "Summary": item.summary || ""
-            };
-            
-            var evalMetrics = item.evaluated_metrics || {};
-            activeMetrics.forEach(m => {
-                row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
-            });
+            var row = buildExcelRow(item, false);
 
             var workbook = XLSX.utils.book_new();
             var sheet = XLSX.utils.json_to_sheet([row]);
             XLSX.utils.book_append_sheet(workbook, sheet, "Audit Details");
-            XLSX.writeFile(workbook, `${item.filename}_Audit.xlsx`);
+            XLSX.writeFile(workbook, `${item.filename || 'Single'}_Audit.xlsx`);
         }
 
         async function deleteHistoryItem(auditId, index) {
@@ -1203,21 +1174,9 @@ HTML_CONTENT = """<!DOCTYPE html>
 
         function downloadExcel() {
             if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data!");
-            var exportData = currentBatchResults.map(i => {
-                var row = {
-                    "File Name": i.filename,
-                    "QA Score": i.data?.evaluation?.overall_score || 0,
-                    "WPM": extractWPM(i),
-                    "Duration (sec)": extractDuration(i),
-                    "Total Words": extractTotalWords(i),
-                    "Strengths": (i.data?.evaluation?.strengths || []).join("; "),
-                    "Improvements": (i.data?.evaluation?.improvements || []).join("; "),
-                    "Summary": i.data?.evaluation?.summary || ""
-                };
-                var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
-                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
-                return row;
-            });
+            
+            var exportData = currentBatchResults.map(i => buildExcelRow(i, true));
+
             var workbook = XLSX.utils.book_new();
             var summarySheet = XLSX.utils.json_to_sheet(exportData);
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
