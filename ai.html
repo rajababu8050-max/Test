@@ -348,8 +348,8 @@
     // -------------------------------------------------------------
     // GROQ API KEY & FIREBASE CONFIGURATION
     // -------------------------------------------------------------
-    const GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
-    
+    // Vite ke case me aise read hoga:
+const GROQ_API_KEY = import.meta.env.GROQ_API_KEY;
     
     const firebaseConfig = {
       apiKey: "AIzaSyA-X-5ifk7q9suZzDuUzScnGIMgKKXlQ5U",
