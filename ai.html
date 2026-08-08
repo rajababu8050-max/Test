@@ -193,7 +193,7 @@
         <div class="card">
           <h3>Upload Call Recording File</h3>
           <p style="color: var(--text-muted); font-size: 0.875rem; margin-bottom: 20px;">
-            Audio file upload karein. Groq API (Whisper + LLaMA-3) speaker diarization & quality score evaluate karega.
+            Audio file upload karein (.mp3, .wav, .awb, etc.). Groq AI auto-convert aur process karega.
           </p>
 
           <form id="fileUploadForm">
@@ -209,7 +209,7 @@
             </div>
 
             <div class="form-group">
-              <label>Select Audio File (MP3 / WAV / M4A)</label>
+              <label>Select Audio File (MP3 / WAV / AWB / M4A)</label>
               <input type="file" id="audioFileInput" class="form-control" accept="audio/*" required>
             </div>
 
@@ -473,7 +473,6 @@
 
         if (auth.currentUser) idToken = await auth.currentUser.getIdToken(true);
 
-        // Strict endpoint calling backend Groq handler only
         const res = await fetch("/api/groq-transcribe-eval", {
           method: "POST",
           headers: { "Authorization": `Bearer ${idToken}` },
