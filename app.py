@@ -464,8 +464,8 @@ HTML_CONTENT = """<!DOCTYPE html>
             var strengthsList = isBatchResult ? (item.data?.evaluation?.strengths || []) : (item.strengths || []);
             var improvementsList = isBatchResult ? (item.data?.evaluation?.improvements || []) : (item.improvements || []);
 
-            var formattedStrengths = strengthsList.length > 0 ? strengthsList.map(s => "• " + s).join("\\r\\n") : "None";
-            var formattedImprovements = improvementsList.length > 0 ? improvementsList.map(i => "• " + i).join("\\r\\n") : "None";
+            var formattedStrengths = strengthsList.length > 0 ? strengthsList.map(s => "• " + s).join("; ") : "None";
+            var formattedImprovements = improvementsList.length > 0 ? improvementsList.map(i => "• " + i).join("; ") : "None";
 
             var row = {
                 "File Name": fileName,
@@ -493,6 +493,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
+        // FIXED EXCEL EXPORT WITH CONTROLLED COLUMN WIDTHS TO PREVENT HORIZONTAL BAR OVERFLOW
         function exportStyledWorkbook(exportData, sheetName, fileName) {
             var workbook = XLSX.utils.book_new();
             var worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -502,12 +503,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                     var maxLen = key.length;
                     exportData.forEach(row => {
                         var val = row[key] ? row[key].toString() : "";
-                        var lines = val.split("\\r\\n");
-                        lines.forEach(l => {
-                            if (l.length > maxLen) maxLen = l.length;
-                        });
+                        if (val.length > maxLen) maxLen = val.length;
                     });
-                    return { wch: Math.min(Math.max(maxLen + 4, 12), 60) };
+                    // Strict Cap on Column Widths (Min: 12, Max: 32) so Excel Table remains fit & clean
+                    return { wch: Math.min(Math.max(maxLen + 3, 12), 32) };
                 });
 
                 worksheet["!cols"] = colWidths;
