@@ -232,21 +232,34 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
+        <!-- FIREBASE CLOUD HISTORY TABLE WITH BULK ACTIONS -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
-            <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+            <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-2">
                     <h3 class="text-sm font-semibold">🔥 Firebase Cloud Audits History</h3>
                     <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total</span>
                 </div>
-                <div class="flex gap-2">
-                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">📊 Export History to Excel</button>
-                    <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">Refresh</button>
+                <!-- BULK ACTIONS CONTROL -->
+                <div class="flex gap-2 flex-wrap items-center">
+                    <button type="button" onclick="exportSelectedExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
+                        📊 Export Marked to Excel
+                    </button>
+                    <button type="button" onclick="deleteSelectedAudits()" class="text-xs bg-rose-700 hover:bg-rose-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-rose-700/20">
+                        🗑️ Delete Marked
+                    </button>
+                    <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">
+                        Refresh
+                    </button>
                 </div>
             </div>
+
             <div class="overflow-x-auto">
                 <table class="w-full text-left text-xs text-sub">
                     <thead class="inner-bg uppercase font-semibold">
                         <tr>
+                            <th class="p-2 text-center w-8">
+                                <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll(this)" class="rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer">
+                            </th>
                             <th class="p-2">File</th>
                             <th class="p-2">Score</th>
                             <th class="p-2">Summary</th>
@@ -255,10 +268,11 @@ HTML_CONTENT = """<!DOCTYPE html>
                         </tr>
                     </thead>
                     <tbody id="historyTable">
-                        <tr><td colspan="5" class="p-3 text-center text-slate-500">Loading history...</td></tr>
+                        <tr><td colspan="6" class="p-3 text-center text-slate-500">Loading history...</td></tr>
                     </tbody>
                 </table>
             </div>
+
             <div class="flex justify-between items-center pt-2 text-xs border-t border-slate-700/60">
                 <span id="pageInfoText" class="text-sub font-medium">Page 1 of 1</span>
                 <div class="flex gap-2">
@@ -326,6 +340,7 @@ HTML_CONTENT = """<!DOCTYPE html>
         var activeMetrics = [];
         var currentPage = 1;
         var itemsPerPage = 10;
+        var selectedAuditIds = new Set();
 
         auth.onAuthStateChanged(async (user) => {
             if (user) {
@@ -610,22 +625,24 @@ HTML_CONTENT = """<!DOCTYPE html>
             try {
                 if (!auth.currentUser) return;
                 idToken = await auth.currentUser.getIdToken(true);
-                var res = await fetchAuth("/api/history?limit=50");
+                var res = await fetchAuth("/api/history?limit=100");
                 if(!res.ok) throw new Error("HTTP error " + res.status);
                 var list = await res.json();
                 historyDataList = list || [];
+                selectedAuditIds.clear();
+                document.getElementById('selectAllCheckbox').checked = false;
                 document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Loaded";
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
-                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="5" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="6" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
                 return;
             }
             var totalPages = Math.ceil(historyDataList.length / itemsPerPage);
@@ -638,8 +655,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             hTable.innerHTML = "";
             pageItems.forEach((item, index) => {
                 var globalIndex = startIndex + index;
+                var isChecked = selectedAuditIds.has(item.id) ? "checked" : "";
                 hTable.innerHTML += `
                     <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
+                        <td class="p-2 text-center">
+                            <input type="checkbox" value="${item.id}" ${isChecked} onchange="toggleAuditSelect('${item.id}', this)" class="row-checkbox rounded border-slate-600 text-blue-600 focus:ring-0 cursor-pointer">
+                        </td>
                         <td class="p-2 font-medium">${item.filename || 'N/A'}</td>
                         <td class="p-2 text-emerald-400 font-bold">${item.score || 0}/100</td>
                         <td class="p-2 text-sub max-w-xs truncate">${item.summary || 'N/A'}</td>
@@ -666,6 +687,83 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function changePage(direction) { currentPage += direction; renderHistoryTable(); }
+
+        // ================= Checkbox Multi-Select Logic =================
+
+        function toggleSelectAll(masterCheckbox) {
+            var checkboxes = document.querySelectorAll('.row-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = masterCheckbox.checked;
+                if(masterCheckbox.checked) {
+                    selectedAuditIds.add(cb.value);
+                } else {
+                    selectedAuditIds.delete(cb.value);
+                }
+            });
+        }
+
+        function toggleAuditSelect(id, checkbox) {
+            if(checkbox.checked) {
+                selectedAuditIds.add(id);
+            } else {
+                selectedAuditIds.delete(id);
+                document.getElementById('selectAllCheckbox').checked = false;
+            }
+        }
+
+        // Export Selected Items to Excel
+        function exportSelectedExcel() {
+            if(selectedAuditIds.size === 0) {
+                return alert("Pehle items mark/select karein!");
+            }
+
+            var targetItems = historyDataList.filter(item => selectedAuditIds.has(item.id));
+            if(targetItems.length === 0) return;
+
+            var exportData = targetItems.map(item => {
+                var row = {
+                    "File Name": item.filename || "N/A",
+                    "QA Score": item.score || 0,
+                    "WPM": item.wpm || 0,
+                    "Duration (sec)": Math.round(item.duration || 0),
+                    "Total Words": item.total_words || 0,
+                    "Date & Time (IST)": formatDateDisplay(item.created_at),
+                    "Summary": item.summary || ""
+                };
+                var evalMetrics = item.evaluated_metrics || {};
+                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
+                return row;
+            });
+
+            var workbook = XLSX.utils.book_new();
+            var sheet = XLSX.utils.json_to_sheet(exportData);
+            XLSX.utils.book_append_sheet(workbook, sheet, "Selected Cloud Audits");
+            XLSX.writeFile(workbook, `Selected_Audits_Export_${targetItems.length}.xlsx`);
+        }
+
+        // Bulk Delete Selected Audits from Firebase
+        async function deleteSelectedAudits() {
+            if(selectedAuditIds.size === 0) {
+                return alert("Pehle delete karne ke liye records select karein!");
+            }
+
+            if(!confirm(`Kya aap sach me selected (${selectedAuditIds.size}) records ko Firestore se permanent delete karna chahte hain?`)) {
+                return;
+            }
+
+            var idsToDelete = Array.from(selectedAuditIds);
+            var successCount = 0;
+
+            for(let id of idsToDelete) {
+                try {
+                    var res = await fetchAuth(`/api/history/${id}`, { method: 'DELETE' });
+                    if(res.ok) successCount++;
+                } catch(e) { console.error(e); }
+            }
+
+            alert(`${successCount} / ${idsToDelete.length} records successfully delete ho gaye!`);
+            await loadHistory();
+        }
 
         function viewHistoryDetails(index) {
             var item = historyDataList[index];
@@ -723,6 +821,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 if(!res.ok) throw new Error("Delete failed on server side.");
 
                 historyDataList.splice(index, 1);
+                selectedAuditIds.delete(auditId);
                 document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Loaded";
                 renderHistoryTable();
                 alert("Record deleted successfully!");
@@ -1128,7 +1227,7 @@ async def analyze_audio_batch(
     return {"results": results}
 
 @app.get("/api/history")
-async def get_history(limit: int = 50, user: dict = Depends(verify_firebase_token)):
+async def get_history(limit: int = 100, user: dict = Depends(verify_firebase_token)):
     if not db:
         return []
     try:
