@@ -175,9 +175,16 @@ HTML_CONTENT = """<!DOCTYPE html>
                 <button onclick="openMetricModal()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-xl text-sm shadow-lg shadow-indigo-500/20 flex items-center gap-2">
                     ⚙️ Manage Metrics
                 </button>
-                <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-3 py-2 rounded-xl text-xs shadow-lg shadow-rose-600/20">
-                    🚪 Logout
-                </button>
+                
+                <!-- USER PROFILE BADGE & LOGOUT -->
+                <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
+                    <span class="text-xs text-emerald-400 font-bold flex items-center gap-1">
+                        👤 <span id="userDisplayName">Loading...</span>
+                    </span>
+                    <button onclick="handleLogout()" class="bg-rose-600 hover:bg-rose-500 text-white font-bold px-2.5 py-1 rounded-lg text-xs shadow-md shadow-rose-600/20 transition ml-1">
+                        🚪 Logout
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -351,6 +358,11 @@ HTML_CONTENT = """<!DOCTYPE html>
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 idToken = await user.getIdToken(true);
+                
+                // Show Name or Email Prefix on Dashboard UI
+                const userName = user.displayName || user.email.split('@')[0];
+                document.getElementById('userDisplayName').innerText = userName;
+
                 document.getElementById('authModal').classList.add('hidden');
                 document.getElementById('dashboardContent').classList.remove('hidden');
                 fetchMetrics();
