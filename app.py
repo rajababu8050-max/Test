@@ -58,25 +58,6 @@ def get_next_gemini_key():
 GEMINI_MODEL = "gemini-3.6-flash"
 semaphore = asyncio.Semaphore(3)
 
-# ================= Smart Caching Variables (Prevents 429 Quota Exceeded) =================
-cached_history_data: Optional[List[Dict[str, Any]]] = None
-cache_history_timestamp: Optional[datetime] = None
-
-cached_metrics_data: Optional[List[Dict[str, Any]]] = None
-cache_metrics_timestamp: Optional[datetime] = None
-
-CACHE_TTL_SECONDS = 60  # Cache duration for 60 seconds
-
-def invalidate_history_cache():
-    global cached_history_data, cache_history_timestamp
-    cached_history_data = None
-    cache_history_timestamp = None
-
-def invalidate_metrics_cache():
-    global cached_metrics_data, cache_metrics_timestamp
-    cached_metrics_data = None
-    cache_metrics_timestamp = None
-
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there an opportunity to pitch an upsell or add-on product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent attempt an upsell pitch during the call?"},
@@ -288,7 +269,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     <button type="button" onclick="deleteAllHistoryData()" class="text-xs bg-rose-700 hover:bg-rose-600 px-3 py-1.5 rounded-lg text-white font-bold flex items-center gap-1 shadow-lg shadow-rose-700/20">
                         🔥 Delete ALL Data
                     </button>
-                    <button type="button" onclick="loadHistory(true)" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">
+                    <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">
                         Refresh
                     </button>
                 </div>
@@ -531,12 +512,14 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
+        // GENERATE GRAPHICAL DASHBOARD ANALYTICS SHEET ALONGSIDE RAW DATA SHEET
         function exportMultiSheetExcel(rawItemsList, fileName, isBatchResult = false) {
             if (!rawItemsList || rawItemsList.length === 0) return alert("No data to export!");
 
             var totalCalls = rawItemsList.length;
             var validItems = isBatchResult ? rawItemsList.filter(i => i.status === "success") : rawItemsList;
             
+            // Build Metric Aggregates
             var metricStats = [];
             var avgScore = 0;
             var totalScore = 0;
@@ -557,6 +540,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
                 var pct = totalCalls > 0 ? Math.round((yesCount / totalCalls) * 100) : 0;
                 
+                // Graphical Visual Bar Generator (HTML & Unicode Bar Chart)
                 var filledBars = Math.round(pct / 10);
                 var emptyBars = 10 - filledBars;
                 var visualChart = "█".repeat(filledBars) + "░".repeat(emptyBars) + ` ${pct}%`;
@@ -570,6 +554,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 });
             });
 
+            // 1. DASHBOARD ANALYTICS HTML TABLE
             var dashboardHtml = `<table border="1">
                 <thead>
                     <tr><th colspan="5" style="text-align:center; vertical-align:middle; background-color:#0f172a; color:#38bdf8; font-weight:bold; font-size:16px; padding:10px;">📊 AI AUDIT BATCH ANALYTICS & METRIC DASHBOARD</th></tr>
@@ -600,6 +585,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 
             dashboardHtml += '</tbody></table>';
 
+            // 2. DETAILED RAW DATA TABLE
             var rawRows = rawItemsList.map(item => buildExcelRow(item, isBatchResult));
             var rawKeys = Object.keys(rawRows[0]);
 
@@ -615,17 +601,19 @@ HTML_CONTENT = """<!DOCTYPE html>
                     var val = row[k] !== undefined && row[k] !== null ? row[k] : "";
                     detailsHtml += `<td style="text-align: center; vertical-align: middle; padding: 6px; mso-number-format:'\@';">${val}</td>`;
                 });
-                detailsHtml += '</tr>';
+                html += '</tr>';
             });
             detailsHtml += '</tbody></table>';
 
             var parser = new DOMParser();
             var workbook = XLSX.utils.book_new();
 
+            // Create Dashboard Sheet
             var dashSheet = XLSX.utils.table_to_sheet(parser.parseFromString(dashboardHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
             dashSheet["!cols"] = [{ wch: 32 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 32 }];
             XLSX.utils.book_append_sheet(workbook, dashSheet, "📌 Dashboard Analytics");
 
+            // Create Raw Details Sheet
             var detailSheet = XLSX.utils.table_to_sheet(parser.parseFromString(detailsHtml, 'text/html').body.getElementsByTagName('table')[0], { raw: true });
             var detailWidths = rawKeys.map(key => {
                 var maxLen = key.length;
@@ -638,6 +626,48 @@ HTML_CONTENT = """<!DOCTYPE html>
             detailSheet["!cols"] = detailWidths;
             XLSX.utils.book_append_sheet(workbook, detailSheet, "📁 Individual Call Details");
 
+            XLSX.writeFile(workbook, fileName);
+        }
+
+        function exportStyledWorkbook(exportData, sheetName, fileName) {
+            if (!exportData || exportData.length === 0) return;
+
+            var keys = Object.keys(exportData[0]);
+
+            var html = '<table border="1"><thead><tr>';
+            keys.forEach(k => {
+                html += `<th style="text-align: center; vertical-align: middle; background-color: #1e293b; color: #ffffff; font-weight: bold; padding: 8px;">${k}</th>`;
+            });
+            html += '</tr></thead><tbody>';
+
+            exportData.forEach(row => {
+                html += '<tr>';
+                keys.forEach(k => {
+                    var val = row[k] !== undefined && row[k] !== null ? row[k] : "";
+                    html += `<td style="text-align: center; vertical-align: middle; padding: 6px; mso-number-format:'\@';">${val}</td>`;
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+
+            var worksheet = XLSX.utils.table_to_sheet(
+                new DOMParser().parseFromString(html, 'text/html').body.getElementsByTagName('table')[0],
+                { raw: true }
+            );
+
+            var workbook = XLSX.utils.book_new();
+
+            var colWidths = keys.map(key => {
+                var maxLen = key.length;
+                exportData.forEach(row => {
+                    var val = row[key] ? row[key].toString() : "";
+                    if (val.length > maxLen) maxLen = val.length;
+                });
+                return { wch: Math.min(Math.max(maxLen + 4, 14), 30) };
+            });
+            worksheet["!cols"] = colWidths;
+
+            XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
             XLSX.writeFile(workbook, fileName);
         }
 
@@ -860,7 +890,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
 
             setTimeout(() => { document.getElementById('progressContainer').classList.add('hidden'); }, 2000);
-            setTimeout(() => loadHistory(true), 1000);
+            setTimeout(loadHistory, 1000);
         }
 
         function renderBatchResults(results) {
@@ -958,13 +988,12 @@ HTML_CONTENT = """<!DOCTYPE html>
             });
         }
 
-        async function loadHistory(forceRefresh = false) {
+        async function loadHistory() {
             var hTable = document.getElementById('historyTable');
             try {
                 if (!auth.currentUser) return;
                 idToken = await auth.currentUser.getIdToken(true);
-                var url = forceRefresh ? "/api/history?refresh=true" : "/api/history";
-                var res = await fetchAuth(url);
+                var res = await fetchAuth("/api/history");
                 if(!res.ok) throw new Error("HTTP error " + res.status);
                 var list = await res.json();
                 historyDataList = list || [];
@@ -1148,7 +1177,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
 
             alert(`${successCount} / ${idsToDelete.length} records successfully delete ho gaye!`);
-            await loadHistory(true);
+            await loadHistory();
         }
 
         function exportFilteredExcel() {
@@ -1180,7 +1209,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 if(!res.ok) throw new Error("Failed to delete all data");
                 var resData = await res.json();
                 alert(`🔥 Success: ${resData.deleted_count} records permanently delete ho gaye!`);
-                await loadHistory(true);
+                await loadHistory();
             } catch(err) {
                 alert("Error deleting all data: " + err.message);
             }
@@ -1289,7 +1318,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetchAuth(`/api/history/${auditId}`, { method: 'DELETE' });
                 if(!res.ok) throw new Error("Delete failed on server side.");
 
-                await loadHistory(true);
+                await loadHistory();
                 alert("Record deleted successfully!");
             } catch(err) {
                 alert("Error deleting record: " + err.message);
@@ -1405,16 +1434,10 @@ Do not include markdown or explanations outside the valid JSON.
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ================= Dynamic Metrics CRUD APIs (Protected with Cache Invalidation) =================
+# ================= Dynamic Metrics CRUD APIs (Protected) =================
 
 @app.get("/api/metrics")
 async def get_metrics(user: dict = Depends(verify_firebase_token)):
-    global cached_metrics_data, cache_metrics_timestamp
-    
-    now = datetime.now()
-    if cached_metrics_data and cache_metrics_timestamp and (now - cache_metrics_timestamp).total_seconds() < CACHE_TTL_SECONDS:
-        return cached_metrics_data
-
     if not db:
         return DEFAULT_METRICS
     try:
@@ -1427,14 +1450,9 @@ async def get_metrics(user: dict = Depends(verify_firebase_token)):
                 m["id"] = doc.id
                 metrics.append(m)
             return metrics
-        
-        result = await loop.run_in_executor(None, fetch_metrics_db)
-        cached_metrics_data = result
-        cache_metrics_timestamp = now
-        return result
+        return await loop.run_in_executor(None, fetch_metrics_db)
     except Exception as e:
-        print("❌ Firebase Fetch Metrics Error:", str(e))
-        return cached_metrics_data if cached_metrics_data else DEFAULT_METRICS
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/metrics")
 async def create_metric(
@@ -1465,7 +1483,6 @@ async def create_metric(
         return doc_ref[1].id
 
     doc_id = await loop.run_in_executor(None, save_to_db)
-    invalidate_metrics_cache()
     return {"status": "success", "id": doc_id}
 
 @app.put("/api/metrics/{metric_id}")
@@ -1488,7 +1505,6 @@ async def update_metric(
         "label": label,
         "description": description
     }))
-    invalidate_metrics_cache()
     return {"status": "success"}
 
 @app.delete("/api/metrics/{metric_id}")
@@ -1501,7 +1517,6 @@ async def delete_metric(
     
     loop = asyncio.get_running_loop()
     await loop.run_in_executor(None, lambda: db.collection("metrics").document(metric_id).delete())
-    invalidate_metrics_cache()
     return {"status": "success"}
 
 # ================= Core Transcription Logic (App Main Flow) =================
@@ -1652,7 +1667,6 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict], user
                 }
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(None, lambda: db.collection("audits").add(audit_data))
-                invalidate_history_cache()
             except Exception as fe:
                 print("❌ Firebase Write Error:", fe)
 
@@ -1676,7 +1690,7 @@ async def process_single_file_limited(file: UploadFile, active_metrics: List[Dic
     async with semaphore:
         return await process_single_file(file, active_metrics, user_info)
 
-# ================= Batch Analysis & History APIs (Protected with Cache) =================
+# ================= Batch Analysis & History APIs =================
 
 @app.post("/api/analyze-batch")
 async def analyze_audio_batch(
@@ -1694,17 +1708,10 @@ async def analyze_audio_batch(
 
     tasks = [process_single_file_limited(file, active_metrics, user) for file in files]
     results = await asyncio.gather(*tasks)
-    invalidate_history_cache()
     return {"results": results}
 
 @app.get("/api/history")
-async def get_history(limit: Optional[int] = None, refresh: Optional[bool] = False, user: dict = Depends(verify_firebase_token)):
-    global cached_history_data, cache_history_timestamp
-
-    now = datetime.now()
-    if not refresh and cached_history_data and cache_history_timestamp and (now - cache_history_timestamp).total_seconds() < CACHE_TTL_SECONDS:
-        return cached_history_data[:limit] if limit else cached_history_data
-
+async def get_history(limit: Optional[int] = None, user: dict = Depends(verify_firebase_token)):
     if not db:
         return []
     try:
@@ -1723,13 +1730,10 @@ async def get_history(limit: Optional[int] = None, refresh: Optional[bool] = Fal
                     history.append(data)
             return history
 
-        result = await loop.run_in_executor(None, fetch_db)
-        cached_history_data = result
-        cache_history_timestamp = now
-        return result
+        return await loop.run_in_executor(None, fetch_db)
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
-        return cached_history_data if cached_history_data else []
+        return []
 
 @app.delete("/api/history/delete-all")
 async def delete_all_history_data(user: dict = Depends(verify_firebase_token)):
@@ -1747,7 +1751,6 @@ async def delete_all_history_data(user: dict = Depends(verify_firebase_token)):
             return count
 
         deleted_count = await loop.run_in_executor(None, wipe_collection)
-        invalidate_history_cache()
         return {"status": "success", "message": "All audits deleted successfully", "deleted_count": deleted_count}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -1763,7 +1766,6 @@ async def delete_audit_history(
     try:
         loop = asyncio.get_running_loop()
         await loop.run_in_executor(None, lambda: db.collection("audits").document(audit_id).delete())
-        invalidate_history_cache()
         return {"status": "success", "message": "Audit record deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
