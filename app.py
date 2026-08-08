@@ -391,6 +391,22 @@ HTML_CONTENT = """<!DOCTYPE html>
                     <div id="viewModalMetricsGrid" class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs"></div>
                 </div>
 
+                <!-- STRENGTHS AND IMPROVEMENTS SECTION -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                    <div class="inner-bg p-3.5 rounded-xl border border-emerald-500/30 space-y-2">
+                        <div class="font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>💪 Agent Strengths</span>
+                        </div>
+                        <ul id="viewModalStrengths" class="list-disc list-inside text-sub space-y-1"></ul>
+                    </div>
+                    <div class="inner-bg p-3.5 rounded-xl border border-amber-500/30 space-y-2">
+                        <div class="font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <span>🎯 Areas for Improvement</span>
+                        </div>
+                        <ul id="viewModalImprovements" class="list-disc list-inside text-sub space-y-1"></ul>
+                    </div>
+                </div>
+
                 <!-- CALL SUMMARY -->
                 <div class="inner-bg p-4 rounded-xl border border-slate-700/60 space-y-2">
                     <div class="font-bold text-blue-300 text-xs uppercase tracking-wider">Detailed Call Summary</div>
@@ -698,6 +714,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var evalData = data.evaluation || {};
                 var evalMetrics = evalData.evaluated_metrics || {};
                 var transcript = data.transcript || [];
+                var strengths = evalData.strengths || [];
+                var improvements = evalData.improvements || [];
                 
                 var card = document.createElement('div');
                 card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
@@ -714,6 +732,9 @@ HTML_CONTENT = """<!DOCTYPE html>
                     dynamicCardsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}:${fmt}</div>`;
                 });
 
+                var strengthsHtml = strengths.length > 0 ? strengths.map(s => `<li>${s}</li>`).join('') : '<li class="italic">None listed</li>';
+                var improvementsHtml = improvements.length > 0 ? improvements.map(i => `<li>${i}</li>`).join('') : '<li class="italic">None listed</li>';
+
                 card.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                         <h3 class="font-bold text-blue-400 text-sm">📁 ${item.filename}</h3>
@@ -728,6 +749,19 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <div class="font-bold text-emerald-400 text-[11px] uppercase">💊 Call Metrics Evaluation</div>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">${dynamicCardsHtml}</div>
                     </div>
+                    
+                    <!-- STRENGTHS AND IMPROVEMENTS (AUDIO UPLOAD LIVE DISPLAY) -->
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                        <div class="inner-bg p-3 rounded-xl border border-emerald-500/30 space-y-1.5">
+                            <div class="font-bold text-emerald-400 text-[11px] uppercase">💪 Agent Strengths</div>
+                            <ul class="list-disc list-inside text-sub space-y-0.5">${strengthsHtml}</ul>
+                        </div>
+                        <div class="inner-bg p-3 rounded-xl border border-amber-500/30 space-y-1.5">
+                            <div class="font-bold text-amber-400 text-[11px] uppercase">🎯 Areas for Improvement</div>
+                            <ul class="list-disc list-inside text-sub space-y-0.5">${improvementsHtml}</ul>
+                        </div>
+                    </div>
+
                     <div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">
                         <div class="font-bold text-blue-300 text-[11px] uppercase">Detailed Call Summary</div>
                         <p class="text-sub leading-relaxed">${evalData.summary || "N/A"}</p>
@@ -916,6 +950,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Duration (sec)": extractDuration(item),
                     "Total Words": extractTotalWords(item),
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
+                    "Strengths": (item.strengths || []).join("; "),
+                    "Improvements": (item.improvements || []).join("; "),
                     "Summary": item.summary || ""
                 };
                 var evalMetrics = item.evaluated_metrics || {};
@@ -969,6 +1005,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Duration (sec)": extractDuration(item),
                     "Total Words": extractTotalWords(item),
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
+                    "Strengths": (item.strengths || []).join("; "),
+                    "Improvements": (item.improvements || []).join("; "),
                     "Summary": item.summary || ""
                 };
                 var evalMetrics = item.evaluated_metrics || {};
@@ -994,6 +1032,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Duration (sec)": extractDuration(item),
                     "Total Words": extractTotalWords(item),
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
+                    "Strengths": (item.strengths || []).join("; "),
+                    "Improvements": (item.improvements || []).join("; "),
                     "Summary": item.summary || ""
                 };
                 var evalMetrics = item.evaluated_metrics || {};
@@ -1045,6 +1085,21 @@ HTML_CONTENT = """<!DOCTYPE html>
             document.getElementById('viewModalWords').innerText = extractTotalWords(item);
 
             document.getElementById('viewModalSummary').innerText = item.summary || "No summary available.";
+
+            // Strengths and Improvements Rendering
+            var strengthsList = item.strengths || [];
+            var improvementsList = item.improvements || [];
+
+            var strengthsContainer = document.getElementById('viewModalStrengths');
+            var improvementsContainer = document.getElementById('viewModalImprovements');
+
+            strengthsContainer.innerHTML = strengthsList.length > 0 
+                ? strengthsList.map(s => `<li>${s}</li>`).join('') 
+                : '<li class="italic">None listed</li>';
+
+            improvementsContainer.innerHTML = improvementsList.length > 0 
+                ? improvementsList.map(i => `<li>${i}</li>`).join('') 
+                : '<li class="italic">None listed</li>';
 
             // Dynamic Metrics Rendering (Matches Card Layout)
             var gridContainer = document.getElementById('viewModalMetricsGrid');
@@ -1109,6 +1164,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "Duration (sec)": extractDuration(item),
                 "Total Words": extractTotalWords(item),
                 "Date & Time (IST)": formatDateDisplay(item.created_at),
+                "Strengths": (item.strengths || []).join("; "),
+                "Improvements": (item.improvements || []).join("; "),
                 "Summary": item.summary || ""
             };
             
@@ -1153,6 +1210,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "WPM": extractWPM(i),
                     "Duration (sec)": extractDuration(i),
                     "Total Words": extractTotalWords(i),
+                    "Strengths": (i.data?.evaluation?.strengths || []).join("; "),
+                    "Improvements": (i.data?.evaluation?.improvements || []).join("; "),
                     "Summary": i.data?.evaluation?.summary || ""
                 };
                 var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
@@ -1416,8 +1475,8 @@ async def evaluate_quality_async(transcript, metrics_list):
         "overall_score": 85,
         "summary": "Detailed call summary...",
         "evaluated_metrics": {json.dumps(evaluated_metrics_json)},
-        "strengths": ["Strong point"],
-        "improvements": ["Improvement point"]
+        "strengths": ["Strong point 1", "Strong point 2"],
+        "improvements": ["Improvement point 1", "Improvement point 2"]
     }}
     """
 
