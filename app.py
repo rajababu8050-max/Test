@@ -600,10 +600,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     dynamicCardsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}:${fmt}</div>`;
                 });
 
-                // Strengths and Improvements lists HTML
-                var strengthsList = (evalData.strengths || []).map(s => `<li>• ${s}</li>`).join('') || "<li>• None noted</li>";
-                var improvementsList = (evalData.improvements || []).map(i => `<li>• ${i}</li>`).join('') || "<li>• None noted</li>";
-
                 card.innerHTML = `
                     <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                         <h3 class="font-bold text-blue-400 text-sm">📁 ${item.filename}</h3>
@@ -618,23 +614,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                         <div class="font-bold text-emerald-400 text-[11px] uppercase">💊 Call Metrics Evaluation</div>
                         <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">${dynamicCardsHtml}</div>
                     </div>
-                    <div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-2">
+                    <div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">
                         <div class="font-bold text-blue-300 text-[11px] uppercase">Detailed Call Summary</div>
                         <p class="text-sub leading-relaxed">${evalData.summary || "N/A"}</p>
                     </div>
-                    
-                    <!-- STRENGTHS & IMPROVEMENTS SECTION -->
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                        <div class="inner-bg p-3 rounded-xl border border-emerald-500/30 space-y-1">
-                            <div class="font-bold text-emerald-400 text-[11px] uppercase flex items-center gap-1">💪 Agent Strengths</div>
-                            <ul class="text-sub space-y-1 leading-relaxed">${strengthsList}</ul>
-                        </div>
-                        <div class="inner-bg p-3 rounded-xl border border-amber-500/30 space-y-1">
-                            <div class="font-bold text-amber-400 text-[11px] uppercase flex items-center gap-1">🎯 Areas of Improvement</div>
-                            <ul class="text-sub space-y-1 leading-relaxed">${improvementsList}</ul>
-                        </div>
-                    </div>
-
                     <details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">
                         <summary class="font-bold text-sub cursor-pointer">📄 Full Diarized Transcript</summary>
                         <div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">${transcriptHtml}</div>
@@ -751,9 +734,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Duration (sec)": Math.round(item.duration || 0),
                     "Total Words": item.total_words || 0,
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
-                    "Summary": item.summary || "",
-                    "Agent Strengths": (item.strengths || []).join(" | "),
-                    "Areas of Improvement": (item.improvements || []).join(" | ")
+                    "Summary": item.summary || ""
                 };
                 var evalMetrics = item.evaluated_metrics || {};
                 activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
@@ -777,9 +758,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Duration (sec)": Math.round(item.duration || 0),
                     "Total Words": item.total_words || 0,
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
-                    "Summary": item.summary || "",
-                    "Agent Strengths": (item.strengths || []).join(" | "),
-                    "Areas of Improvement": (item.improvements || []).join(" | ")
+                    "Summary": item.summary || ""
                 };
                 var evalMetrics = item.evaluated_metrics || {};
                 activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
@@ -849,10 +828,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 metricsInfo += `\n• ${m.label}: ${statusStr}`;
             });
 
-            var strengthsStr = (item.strengths || []).map(s => `\n • ${s}`).join('') || "\n • None";
-            var improvementsStr = (item.improvements || []).map(i => `\n • ${i}`).join('') || "\n • None";
-
-            var detailText = `📁 File: ${item.filename}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💪 Agent Strengths:${strengthsStr}\n\n🎯 Areas of Improvement:${improvementsStr}\n\n💊 Evaluated Metrics:${metricsInfo}`;
+            var detailText = `📁 File: ${item.filename}\n⭐ Quality Score: ${item.score}/100\n⏱️ Duration: ${Math.round(item.duration || 0)}s | WPM: ${item.wpm || 0}\n\n📝 Summary:\n${item.summary}\n\n💊 Evaluated Metrics:${metricsInfo}`;
             alert(detailText);
         }
 
@@ -867,9 +843,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 "Duration (sec)": Math.round(item.duration || 0),
                 "Total Words": item.total_words || 0,
                 "Date & Time (IST)": formatDateDisplay(item.created_at),
-                "Summary": item.summary || "",
-                "Agent Strengths": (item.strengths || []).join(" | "),
-                "Areas of Improvement": (item.improvements || []).join(" | ")
+                "Summary": item.summary || ""
             };
             
             var evalMetrics = item.evaluated_metrics || {};
@@ -916,9 +890,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "WPM": i.data?.metrics?.wpm || 0,
                     "Duration (sec)": Math.round(i.data?.metrics?.duration || 0),
                     "Total Words": i.data?.metrics?.total_words || 0,
-                    "Summary": i.data?.evaluation?.summary || "",
-                    "Agent Strengths": (i.data?.evaluation?.strengths || []).join(" | "),
-                    "Areas of Improvement": (i.data?.evaluation?.improvements || []).join(" | ")
+                    "Summary": i.data?.evaluation?.summary || ""
                 };
                 var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
                 activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
@@ -1181,8 +1153,8 @@ async def evaluate_quality_async(transcript, metrics_list):
         "overall_score": 85,
         "summary": "Detailed call summary...",
         "evaluated_metrics": {json.dumps(evaluated_metrics_json)},
-        "strengths": ["Strong point 1", "Strong point 2"],
-        "improvements": ["Improvement point 1", "Improvement point 2"]
+        "strengths": ["Strong point"],
+        "improvements": ["Improvement point"]
     }}
     """
 
