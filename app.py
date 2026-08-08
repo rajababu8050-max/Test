@@ -493,7 +493,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             return row;
         }
 
-        // FIXED CENTER ALIGNMENT & CONTROLLED COLUMN WIDTHS IN EXCEL WORKSHEET
+        // MIDDLE & CENTER ALIGNMENT FOR ALL CELLS AND HEADERS IN EXCEL
         function exportStyledWorkbook(exportData, sheetName, fileName) {
             var workbook = XLSX.utils.book_new();
             var worksheet = XLSX.utils.json_to_sheet(exportData);
@@ -501,7 +501,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             if (exportData.length > 0) {
                 var range = XLSX.utils.decode_range(worksheet['!ref']);
                 
-                // Iterate through every cell in sheet and apply CENTER alignment
+                // Set Middle Vertical and Center Horizontal Alignment for ALL Cells
                 for (var R = range.s.r; R <= range.e.r; ++R) {
                     for (var C = range.s.c; C <= range.e.c; ++C) {
                         var cell_address = XLSX.utils.encode_cell({ r: R, c: C });
@@ -516,7 +516,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     }
                 }
 
-                // Strict Column Width Limit so the Excel layout stays clean without horizontal bar overflow
                 var colWidths = Object.keys(exportData[0]).map(key => {
                     var maxLen = key.length;
                     exportData.forEach(row => {
