@@ -1,4 +1,4 @@
-Import os
+import os
 import json
 import re
 import asyncio
@@ -58,15 +58,15 @@ def get_next_gemini_key():
 GEMINI_MODEL = "gemini-3.6-flash"
 semaphore = asyncio.Semaphore(3)
 
-# ================= Smart Caching Variables (Prevents 429 Quota Exceeded) =================
+# ================= Smart Caching Variables =================
 cached_history_data: Optional[List[Dict[str, Any]]] = None
 cache_history_timestamp: Optional[datetime] = None
 
 cached_metrics_data: Optional[List[Dict[str, Any]]] = None
 cache_metrics_timestamp: Optional[datetime] = None
 
-HISTORY_CACHE_TTL_SECONDS = 60  # Cache history for 60 seconds
-METRICS_CACHE_TTL_SECONDS = 300 # Cache metrics for 5 minutes (300 seconds)
+HISTORY_CACHE_TTL_SECONDS = 60  
+METRICS_CACHE_TTL_SECONDS = 300 
 
 def invalidate_history_cache():
     global cached_history_data, cache_history_timestamp
@@ -149,7 +149,7 @@ HTML_CONTENT = """<!DOCTYPE html>
 </head>
 <body class="min-h-screen p-4 md:p-8 font-sans">
 
-    <!-- INITIAL FULLSCREEN APP LOADER (PREVENTS BLANK & LOGIN MODAL FLICKER) -->
+    <!-- INITIAL FULLSCREEN APP LOADER -->
     <div id="initialAppLoader" class="fixed inset-0 bg-slate-950 flex flex-col items-center justify-center space-y-4 z-[200]">
         <div class="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
         <p class="text-xs font-semibold text-blue-400 uppercase tracking-widest">Loading Dashboard...</p>
@@ -186,7 +186,6 @@ HTML_CONTENT = """<!DOCTYPE html>
     <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
-                <!-- SMART HOME NAV (SMOOTH RESET WITHOUT LOGIN FLICKER) -->
                 <h1 onclick="goToHome()" class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400 cursor-pointer hover:opacity-90 transition" title="Go to Dashboard Home">
                     AI Call Quality Auditor Pro
                 </h1>
@@ -203,7 +202,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     ⚙️ Manage Metrics
                 </button>
                 
-                <!-- USER PROFILE BADGE & LOGOUT -->
                 <div class="flex items-center gap-2 bg-slate-800/80 border border-slate-700 px-3 py-1.5 rounded-xl">
                     <span class="text-xs text-emerald-400 font-bold flex items-center gap-1">
                         👤 <span id="userDisplayName">Loading...</span>
@@ -266,7 +264,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- FIREBASE CLOUD HISTORY TABLE WITH SELECTION ACTIONS & METRIC FILTER -->
+        <!-- FIREBASE CLOUD HISTORY TABLE -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3 flex-wrap gap-2">
                 <div class="flex items-center gap-2 flex-wrap">
@@ -277,7 +275,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </span>
                 </div>
                 <div class="flex gap-2 flex-wrap items-center">
-                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
+                    <button type="button" id="exportAllBtn" onclick="exportHistoryExcel(event)" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
                         📊 Export ALL Data to Excel
                     </button>
                     <button type="button" onclick="exportSelectedExcel()" class="text-xs bg-teal-700 hover:bg-teal-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-teal-700/20">
@@ -444,16 +442,15 @@ HTML_CONTENT = """<!DOCTYPE html>
     </div>
 
     <script>
-        // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-const firebaseConfig = {
-  apiKey: "AIzaSyDRGZaIWz6IJvHsZrbJ1KJHXMWuc4FthV8",
-  authDomain: "call-data-91e5e.firebaseapp.com",
-  projectId: "call-data-91e5e",
-  storageBucket: "call-data-91e5e.firebasestorage.app",
-  messagingSenderId: "978960309837",
-  appId: "1:978960309837:web:88edf5b11cc83c42870604",
-  measurementId: "G-B3P5T684DG"
-};
+        const firebaseConfig = {
+          apiKey: "AIzaSyDRGZaIWz6IJvHsZrbJ1KJHXMWuc4FthV8",
+          authDomain: "call-data-91e5e.firebaseapp.com",
+          projectId: "call-data-91e5e",
+          storageBucket: "call-data-91e5e.firebasestorage.app",
+          messagingSenderId: "978960309837",
+          appId: "1:978960309837:web:88edf5b11cc83c42870604",
+          measurementId: "G-B3P5T684DG"
+        };
 
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
@@ -469,9 +466,8 @@ const firebaseConfig = {
         var itemsPerPage = 10;
         var selectedAuditIds = new Set();
         
-        // Client-Side Fetch Throttle Timer to protect Firebase Read Quotas
         var lastFetchTime = 0;
-        var FETCH_COOL_DOWN = 30000; // 30 seconds debounce
+        var FETCH_COOL_DOWN = 30000;
 
         function goToHome() {
             if (auth.currentUser) {
@@ -646,7 +642,6 @@ const firebaseConfig = {
             XLSX.writeFile(workbook, fileName);
         }
 
-        // SMOOTH FLICKER-FREE AUTH CHECK LOGIC
         auth.onAuthStateChanged(async (user) => {
             var loader = document.getElementById('initialAppLoader');
             var authModal = document.getElementById('authModal');
@@ -971,8 +966,6 @@ const firebaseConfig = {
 
         async function loadHistory(forceRefresh = false) {
             var now = Date.now();
-            
-            // Client-side debounce check to prevent unnecessary requests
             if (!forceRefresh && historyDataList.length > 0 && (now - lastFetchTime < FETCH_COOL_DOWN)) {
                 renderHistoryTable();
                 return;
@@ -1010,20 +1003,12 @@ const firebaseConfig = {
             } else {
                 filteredHistoryList = historyDataList.filter(item => {
                     var evalMetrics = item.evaluated_metrics || {};
-                    
-                    if (!evalMetrics.hasOwnProperty(selectedMetricKey)) {
-                        return false;
-                    }
+                    if (!evalMetrics.hasOwnProperty(selectedMetricKey)) return false;
 
                     var metricVal = evalMetrics[selectedMetricKey];
-
-                    if (selectedValue === "YES") {
-                        return metricVal === true;
-                    } else if (selectedValue === "NO") {
-                        return metricVal === false;
-                    } else {
-                        return true;
-                    }
+                    if (selectedValue === "YES") return metricVal === true;
+                    if (selectedValue === "NO") return metricVal === false;
+                    return true;
                 });
                 document.getElementById('filterCountBadge').innerText = `Showing ${filteredHistoryList.length} of ${historyDataList.length} items`;
             }
@@ -1138,13 +1123,40 @@ const firebaseConfig = {
             updateSelectedCounter();
         }
 
+        // ================= FULL DATABASE EXPORT (NO LIMIT) =================
+        async function exportHistoryExcel(evt) {
+            var btn = evt ? (evt.target || document.getElementById('exportAllBtn')) : document.getElementById('exportAllBtn');
+            var originalText = btn ? btn.innerText : "📊 Export ALL Data to Excel";
+            if (btn) btn.innerText = "⏳ Fetching Complete Database...";
+
+            try {
+                if (auth.currentUser) {
+                    idToken = await auth.currentUser.getIdToken(true);
+                }
+                var res = await fetchAuth("/api/history?limit=0&refresh=true");
+                if (!res.ok) throw new Error("Failed to fetch full history data");
+                var allDbData = await res.json();
+
+                if (!allDbData || allDbData.length === 0) {
+                    if (btn) btn.innerText = originalText;
+                    return alert("Database me koi record nahi mila!");
+                }
+
+                exportMultiSheetExcel(allDbData, `Complete_Database_Export_${allDbData.length}_Records.xlsx`, false);
+                if (btn) btn.innerText = originalText;
+            } catch (err) {
+                alert("Export error: " + err.message);
+                if (btn) btn.innerText = originalText;
+            }
+        }
+
         function exportSelectedExcel() {
             if(selectedAuditIds.size === 0) {
                 return alert("Pehle items mark/select karein!");
             }
 
             var targetItems = historyDataList.filter(item => selectedAuditIds.has(item.id));
-            if(targetItems.length === 0) return;
+            if(targetItems.length === 0) return alert("Selected records local view me nahi mile!");
 
             exportMultiSheetExcel(targetItems, `Selected_Audits_Export_${targetItems.length}.xlsx`, false);
         }
@@ -1179,12 +1191,6 @@ const firebaseConfig = {
             }
 
             exportMultiSheetExcel(targetItems, `Filtered_Audits_Export_${targetItems.length}.xlsx`, false);
-        }
-
-        function exportHistoryExcel() {
-            if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
-            
-            exportMultiSheetExcel(historyDataList, `Complete_Cloud_Audit_History_${historyDataList.length}.xlsx`, false);
         }
 
         async function deleteAllHistoryData() {
@@ -1344,7 +1350,7 @@ async def serve_ai_page():
     else:
         return HTMLResponse("<h1>ai.html File missing in project root folder!</h1>", status_code=404)
 
-# ================= Groq ONLY Audio Transcribe & Diarize API =================
+# ================= Groq Audio Transcribe & Diarize API =================
 
 @app.post("/api/groq-transcribe-eval")
 async def groq_transcribe_eval(
@@ -1426,7 +1432,7 @@ Do not include markdown or explanations outside the valid JSON.
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ================= Dynamic Metrics CRUD APIs (Protected with Cache Invalidation) =================
+# ================= Dynamic Metrics CRUD APIs =================
 
 @app.get("/api/metrics")
 async def get_metrics(user: dict = Depends(verify_firebase_token)):
@@ -1525,7 +1531,7 @@ async def delete_metric(
     invalidate_metrics_cache()
     return {"status": "success"}
 
-# ================= Core Transcription Logic (App Main Flow) =================
+# ================= Core Transcription Logic =================
 
 async def transcribe_bytes_async(audio_bytes: bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
@@ -1697,7 +1703,7 @@ async def process_single_file_limited(file: UploadFile, active_metrics: List[Dic
     async with semaphore:
         return await process_single_file(file, active_metrics, user_info)
 
-# ================= Batch Analysis & History APIs (Protected with Cache & Hard Limits) =================
+# ================= Batch Analysis & History APIs =================
 
 @app.post("/api/analyze-batch")
 async def analyze_audio_batch(
@@ -1723,7 +1729,7 @@ async def get_history(limit: Optional[int] = 50, refresh: Optional[bool] = False
     global cached_history_data, cache_history_timestamp
 
     now = datetime.now()
-    if not refresh and cached_history_data and cache_history_timestamp and (now - cache_history_timestamp).total_seconds() < HISTORY_CACHE_TTL_SECONDS:
+    if not refresh and limit != 0 and cached_history_data and cache_history_timestamp and (now - cache_history_timestamp).total_seconds() < HISTORY_CACHE_TTL_SECONDS:
         return cached_history_data[:limit] if limit else cached_history_data
 
     if not db:
@@ -1731,9 +1737,12 @@ async def get_history(limit: Optional[int] = 50, refresh: Optional[bool] = False
     try:
         loop = asyncio.get_running_loop()
         def fetch_db():
-            fetch_limit = limit if (limit and limit > 0) else 50
-            query = db.collection("audits").order_by("created_at", direction=firestore.Query.DESCENDING).limit(fetch_limit)
+            query = db.collection("audits").order_by("created_at", direction=firestore.Query.DESCENDING)
             
+            # Jab limit=0 maanga ho to hard limit bypass hokar SAARA DATA aayega
+            if limit and limit > 0:
+                query = query.limit(limit)
+                
             docs = query.stream()
             history = []
             for doc in docs:
@@ -1744,8 +1753,11 @@ async def get_history(limit: Optional[int] = 50, refresh: Optional[bool] = False
             return history
 
         result = await loop.run_in_executor(None, fetch_db)
-        cached_history_data = result
-        cache_history_timestamp = now
+        
+        if limit == 50:
+            cached_history_data = result
+            cache_history_timestamp = now
+            
         return result
     except Exception as e:
         print("❌ Firebase Fetch Error:", str(e))
