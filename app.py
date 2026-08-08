@@ -7,7 +7,7 @@ import httpx
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone, timedelta
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Depends, status
+from fastapi import FastAPI, UploadFile, File, HTTPException, Body, Request, Depends, status, Form
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -23,6 +23,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ================= Environment Keys =================
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
 
 # ================= Firebase Setup =================
 firebase_json_env = os.environ.get("FIREBASE_CREDENTIALS")
@@ -41,29 +45,19 @@ else:
     db = None
     print("❌ FIREBASE_CREDENTIALS Environment Variable missing!")
 
-DEEPGRAM_API_KEY = os.environ.get("DEEPGRAM_API_KEY", "")
-
-# ================= Gemini High-Speed API Key Rotation Setup =================
+# ================= Gemini Setup =================
 raw_gemini_keys = os.environ.get("GEMINI_KEYS", os.environ.get("GEMINI_API_KEY", ""))
 GEMINI_KEYS = [k.strip() for k in raw_gemini_keys.split(",") if k.strip()]
-
-if not GEMINI_KEYS:
-    print("⚠️ Warning: No GEMINI_KEYS or GEMINI_API_KEY found in environment variables!")
-
 key_cycle = itertools.cycle(GEMINI_KEYS) if GEMINI_KEYS else None
 
 def get_next_gemini_key():
-    """Rotates Gemini API Keys automatically across requests"""
     if key_cycle:
         return next(key_cycle)
     return ""
 
 GEMINI_MODEL = "gemini-3.6-flash"
-
-# Safe Semaphore for 10 Concurrent Users: 3 active parallel streams
 semaphore = asyncio.Semaphore(3)
 
-# Default metrics to seed in Firestore if empty
 DEFAULT_METRICS = [
     {"key": "upsell_opportunity_available", "label": "Upsell Opportunity Available", "description": "Was there an opportunity to pitch an upsell or add-on product?"},
     {"key": "upsell_pitch_done", "label": "Upsell Pitch Done", "description": "Did the agent attempt an upsell pitch during the call?"},
@@ -74,7 +68,6 @@ DEFAULT_METRICS = [
 ]
 
 def init_default_metrics():
-    """Seed initial metrics if collection is empty"""
     if db:
         try:
             docs = list(db.collection("metrics").limit(1).stream())
@@ -120,8 +113,6 @@ HTML_CONTENT = """<!DOCTYPE html>
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    
-    <!-- Firebase Web SDK Integration -->
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
 
@@ -167,7 +158,6 @@ HTML_CONTENT = """<!DOCTYPE html>
 
     <!-- MAIN PROTECTED DASHBOARD CONTENT -->
     <div id="dashboardContent" class="hidden max-w-6xl mx-auto space-y-6">
-        
         <div class="flex justify-between items-center border-b border-slate-700/60 pb-4 flex-wrap gap-3">
             <div>
                 <h1 class="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
@@ -191,49 +181,32 @@ HTML_CONTENT = """<!DOCTYPE html>
             </div>
         </div>
 
-        <!-- Upload Card -->
         <div class="card-bg border-2 border-dashed border-slate-600 rounded-2xl p-6 text-center shadow-lg">
             <div class="space-y-3">
                 <div class="w-12 h-12 bg-blue-500/10 text-blue-400 rounded-full flex items-center justify-center mx-auto text-xl font-bold">🎙️</div>
                 <p id="fileName" class="text-sm font-medium">Select Audio File(s) (.mp3, .wav, .awb)</p>
                 <input type="file" id="audioInput" accept="audio/*" multiple class="hidden" onchange="fileSelected(event)">
-                
                 <div class="flex justify-center gap-3">
-                    <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-600 font-medium px-4 py-2 rounded-xl text-sm">
-                        Browse Files
-                    </button>
-                    <button type="button" onclick="uploadAudioBatch()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2 rounded-xl text-sm shadow-lg shadow-blue-500/20">
-                        🚀 Start Bulk Batch Analysis
-                    </button>
+                    <button type="button" onclick="document.getElementById('audioInput').click()" class="inner-bg border border-slate-600 font-medium px-4 py-2 rounded-xl text-sm">Browse Files</button>
+                    <button type="button" onclick="uploadAudioBatch()" class="bg-blue-600 hover:bg-blue-500 text-white font-medium px-5 py-2 rounded-xl text-sm shadow-lg shadow-blue-500/20">🚀 Start Bulk Batch Analysis</button>
                 </div>
             </div>
-            
-            <!-- Progress Bar -->
             <div id="progressContainer" class="hidden mt-4 space-y-2">
                 <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
                     <div id="progressBar" class="bg-gradient-to-r from-blue-500 to-emerald-400 h-2.5 rounded-full transition-all duration-300" style="width: 0%"></div>
                 </div>
-                <div id="loaderText" class="text-xs text-blue-400 font-medium">
-                    ⚡ Auditing speech & evaluating metrics... 0 / 0 Completed
-                </div>
+                <div id="loaderText" class="text-xs text-blue-400 font-medium">⚡ Auditing speech & evaluating metrics... 0 / 0 Completed</div>
             </div>
         </div>
 
-        <!-- Multi-Results Container -->
         <div id="batchResultsContainer" class="hidden space-y-6">
             <div class="flex justify-between items-center font-semibold border-b border-slate-700/60 pb-2 flex-wrap gap-2">
                 <span class="text-lg text-emerald-400 font-bold">📊 Batch Analysis Summary Report</span>
                 <div class="flex gap-2">
-                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">
-                        📊 Export Detailed Excel (.xlsx)
-                    </button>
-                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">
-                        📥 Export PDF Report
-                    </button>
+                    <button type="button" onclick="downloadExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1 shadow-lg shadow-emerald-600/20">📊 Export Detailed Excel (.xlsx)</button>
+                    <button type="button" onclick="downloadPDF()" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-bold px-4 py-2 rounded-xl flex items-center gap-1">📥 Export PDF Report</button>
                 </div>
             </div>
-
-            <!-- Aggregate Summary Table Box -->
             <div id="summaryTableContainer" class="card-bg border border-slate-700 rounded-2xl p-5 shadow-xl space-y-4">
                 <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                     <div>
@@ -251,17 +224,14 @@ HTML_CONTENT = """<!DOCTYPE html>
                                 <th class="p-3 text-center">%</th>
                             </tr>
                         </thead>
-                        <tbody id="summaryTableBody" class="divide-y divide-slate-700/50 text-xs md:text-sm">
-                        </tbody>
+                        <tbody id="summaryTableBody" class="divide-y divide-slate-700/50 text-xs md:text-sm"></tbody>
                     </table>
                 </div>
             </div>
-
             <h3 class="text-md font-bold pt-2 border-b border-slate-700/60 pb-2">📁 Individual Call Breakdowns</h3>
             <div id="resultsList" class="space-y-4"></div>
         </div>
 
-        <!-- History Table Section -->
         <div class="card-bg border border-slate-700 rounded-2xl p-6 space-y-4 shadow-lg">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <div class="flex items-center gap-2">
@@ -269,9 +239,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                     <span id="totalHistoryBadge" class="bg-blue-500/20 text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full border border-blue-500/30">0 Total</span>
                 </div>
                 <div class="flex gap-2">
-                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">
-                        📊 Export History to Excel
-                    </button>
+                    <button type="button" onclick="exportHistoryExcel()" class="text-xs bg-emerald-700 hover:bg-emerald-600 px-3 py-1.5 rounded-lg text-white font-medium flex items-center gap-1 shadow-lg shadow-emerald-700/20">📊 Export History to Excel</button>
                     <button type="button" onclick="loadHistory()" class="text-xs bg-slate-700 hover:bg-slate-600 px-3 py-1.5 rounded-lg text-slate-300">Refresh</button>
                 </div>
             </div>
@@ -290,31 +258,23 @@ HTML_CONTENT = """<!DOCTYPE html>
                     </tbody>
                 </table>
             </div>
-
-            <!-- Pagination Controls -->
             <div class="flex justify-between items-center pt-2 text-xs border-t border-slate-700/60">
                 <span id="pageInfoText" class="text-sub font-medium">Page 1 of 1</span>
                 <div class="flex gap-2">
-                    <button id="prevPageBtn" onclick="changePage(-1)" disabled class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">
-                        ← Prev
-                    </button>
-                    <button id="nextPageBtn" onclick="changePage(1)" disabled class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">
-                        Next →
-                    </button>
+                    <button id="prevPageBtn" onclick="changePage(-1)" disabled class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">← Prev</button>
+                    <button id="nextPageBtn" onclick="changePage(1)" disabled class="inner-bg border border-slate-600 px-3 py-1 rounded-lg text-sub hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition">Next →</button>
                 </div>
             </div>
         </div>
-
     </div>
 
-    <!-- METRICS MANAGEMENT MODAL -->
+    <!-- METRICS MODAL -->
     <div id="metricsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
         <div class="card-bg border border-slate-700 rounded-2xl w-full max-w-2xl p-6 space-y-6 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center border-b border-slate-700 pb-3">
                 <h3 class="text-lg font-bold">⚙️ Configure Dynamic Metrics</h3>
                 <button onclick="closeMetricModal()" class="text-sub hover:text-white font-bold text-lg">&times;</button>
             </div>
-
             <form id="metricForm" onsubmit="saveMetric(event)" class="inner-bg p-4 rounded-xl border border-slate-700 space-y-3">
                 <input type="hidden" id="metricId" value="">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -336,7 +296,6 @@ HTML_CONTENT = """<!DOCTYPE html>
                     <button type="submit" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-4 py-1.5 rounded-lg font-bold">Save Metric</button>
                 </div>
             </form>
-
             <div class="space-y-3">
                 <h4 class="text-xs font-bold text-sub uppercase tracking-wider">Active Evaluated Metrics</h4>
                 <div id="metricsListContainer" class="space-y-2"></div>
@@ -364,7 +323,6 @@ HTML_CONTENT = """<!DOCTYPE html>
         var currentBatchResults = [];
         var historyDataList = [];
         var activeMetrics = [];
-        
         var currentPage = 1;
         var itemsPerPage = 10;
 
@@ -401,9 +359,7 @@ HTML_CONTENT = """<!DOCTYPE html>
             }
         }
 
-        function handleLogout() {
-            auth.signOut();
-        }
+        function handleLogout() { auth.signOut(); }
 
         async function fetchAuth(url, options = {}) {
             if (!options.headers) options.headers = {};
@@ -435,9 +391,7 @@ HTML_CONTENT = """<!DOCTYPE html>
                 const date = new Date(dateStr);
                 if(isNaN(date.getTime())) return dateStr;
                 return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
-            } catch(e) {
-                return dateStr;
-            }
+            } catch(e) { return dateStr; }
         }
 
         async function fetchMetrics() {
@@ -445,15 +399,13 @@ HTML_CONTENT = """<!DOCTYPE html>
                 var res = await fetchAuth("/api/metrics");
                 activeMetrics = await res.json();
                 renderMetricsList();
-            } catch(e) {
-                console.error("Error fetching metrics:", e);
-            }
+            } catch(e) { console.error(e); }
         }
 
         function renderMetricsList() {
             var container = document.getElementById('metricsListContainer');
             if (!activeMetrics || activeMetrics.length === 0) {
-                container.innerHTML = '<div class="text-xs text-sub text-center py-2">No metrics defined. Add one above.</div>';
+                container.innerHTML = '<div class="text-xs text-sub text-center py-2">No metrics defined.</div>';
                 return;
             }
             var html = '';
@@ -512,36 +464,24 @@ HTML_CONTENT = """<!DOCTYPE html>
                 label: document.getElementById('metricLabel').value.trim(),
                 description: document.getElementById('metricDesc').value.trim()
             };
-
             var url = id ? `/api/metrics/${id}` : '/api/metrics';
             var method = id ? 'PUT' : 'POST';
 
             try {
-                var res = await fetchAuth(url, {
-                    method: method,
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(payload)
-                });
-                if(!res.ok) {
-                    var err = await res.json();
-                    throw new Error(err.detail || "Failed to save metric");
-                }
+                var res = await fetchAuth(url, { method: method, headers: {'Content-Type': 'application/json'}, body: JSON.stringify(payload) });
+                if(!res.ok) throw new Error("Failed to save metric");
                 resetMetricForm();
                 await fetchMetrics();
-            } catch(err) {
-                alert("Error: " + err.message);
-            }
+            } catch(err) { alert("Error: " + err.message); }
         }
 
         async function deleteMetric(id) {
-            if(!confirm("Are you sure you want to delete this metric?")) return;
+            if(!confirm("Are you sure?")) return;
             try {
                 var res = await fetchAuth(`/api/metrics/${id}`, { method: 'DELETE' });
-                if(!res.ok) throw new Error("Failed to delete metric");
+                if(!res.ok) throw new Error("Failed");
                 await fetchMetrics();
-            } catch(err) {
-                alert("Error: " + err.message);
-            }
+            } catch(err) { alert("Error: " + err.message); }
         }
 
         function fileSelected(e) {
@@ -552,18 +492,13 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         async function uploadAudioBatch() {
-            if (selectedFiles.length === 0) {
-                alert("Pehle audio file(s) select karein!");
-                return;
-            }
-
+            if (selectedFiles.length === 0) return alert("Select audio file!");
             document.getElementById('progressContainer').classList.remove('hidden');
             document.getElementById('batchResultsContainer').classList.remove('hidden');
             
             currentBatchResults = [];
             const totalFiles = selectedFiles.length;
             const CHUNK_SIZE = 3;
-
             let completedCount = 0;
 
             for (let i = 0; i < totalFiles; i += CHUNK_SIZE) {
@@ -574,71 +509,54 @@ HTML_CONTENT = """<!DOCTYPE html>
                 try {
                     const res = await fetchAuth("/api/analyze-batch", { method: "POST", body: formData });
                     const batchData = await res.json();
-
                     if (res.ok && batchData.results) {
                         currentBatchResults.push(...batchData.results);
                         renderBatchResults(currentBatchResults);
-                    } else {
-                        console.error("Chunk Error:", batchData.detail || "Chunk failed");
                     }
-                } catch (err) {
-                    console.error("Batch processing error:", err);
-                }
+                } catch (err) { console.error(err); }
 
                 completedCount += chunk.length;
                 const progressPct = Math.round((completedCount / totalFiles) * 100);
                 document.getElementById('progressBar').style.width = progressPct + "%";
-                document.getElementById('loaderText').innerText = `⚡ Auditing speech & evaluating metrics... ${completedCount} / ${totalFiles} Completed (${progressPct}%)`;
+                document.getElementById('loaderText').innerText = `⚡ Auditing... ${completedCount} / ${totalFiles} (${progressPct}%)`;
             }
 
-            setTimeout(() => {
-                document.getElementById('progressContainer').classList.add('hidden');
-            }, 2000);
-
+            setTimeout(() => { document.getElementById('progressContainer').classList.add('hidden'); }, 2000);
             setTimeout(loadHistory, 1000);
         }
 
         function renderBatchResults(results) {
             var container = document.getElementById('resultsList');
             container.innerHTML = "";
-
-            var validResults = results.filter(function(r) { return r.status === "success"; });
+            var validResults = results.filter(r => r.status === "success");
             var totalCalls = validResults.length;
-
             var metricCounts = {};
             activeMetrics.forEach(m => metricCounts[m.key] = 0);
 
-            validResults.forEach(function(item) {
+            validResults.forEach(item => {
                 var evalMetrics = item.data?.evaluation?.evaluated_metrics || {};
                 activeMetrics.forEach(m => {
-                    if(evalMetrics[m.key]) {
-                        metricCounts[m.key] = (metricCounts[m.key] || 0) + 1;
-                    }
+                    if(evalMetrics[m.key]) metricCounts[m.key] = (metricCounts[m.key] || 0) + 1;
                 });
             });
 
-            function calcPct(val) {
-                if (totalCalls === 0) return "0%";
-                return Math.round((val / totalCalls) * 100) + "%";
-            }
+            function calcPct(val) { return totalCalls === 0 ? "0%" : Math.round((val / totalCalls) * 100) + "%"; }
 
-            document.getElementById('totalCallsBadge').innerText = "Total Calls Reviewed: " + totalCalls;
-            document.getElementById('summaryTimeSlot').innerText = "Audit Generated On: " + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+            document.getElementById('totalCallsBadge').innerText = "Total Calls: " + totalCalls;
+            document.getElementById('summaryTimeSlot').innerText = "Audit Generated: " + new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
 
-            var summaryHtml = `<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">${totalCalls}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>`;
-            
-            activeMetrics.forEach(function(m) {
+            var summaryHtml = `<tr class="hover:bg-slate-700/20"><td class="p-2.5 font-medium">Total Calls Reviewed</td><td class="p-2.5 text-center font-bold text-blue-400">${totalCalls}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">100%</td></tr>`;
+            activeMetrics.forEach(m => {
                 var cnt = metricCounts[m.key] || 0;
-                summaryHtml += `<tr class="hover:bg-slate-700/20 transition"><td class="p-2.5 font-medium">${m.label}</td><td class="p-2.5 text-center font-bold text-blue-400">${cnt}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">${calcPct(cnt)}</td></tr>`;
+                summaryHtml += `<tr class="hover:bg-slate-700/20"><td class="p-2.5 font-medium">${m.label}</td><td class="p-2.5 text-center font-bold text-blue-400">${cnt}</td><td class="p-2.5 text-center font-extrabold text-emerald-400">${calcPct(cnt)}</td></tr>`;
             });
             document.getElementById('summaryTableBody').innerHTML = summaryHtml;
 
-            results.forEach(function(item) {
+            results.forEach(item => {
                 if(item.status !== "success") {
-                    container.innerHTML += '<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed to analyze <b>' + item.filename + '</b>: ' + (item.error || 'Error') + '</div>';
+                    container.innerHTML += `<div class="bg-red-900/30 border border-red-700 p-4 rounded-xl text-red-300 text-xs">❌ Failed: ${item.filename}</div>`;
                     return;
                 }
-
                 var data = item.data || {};
                 var evalData = data.evaluation || {};
                 var evalMetrics = evalData.evaluated_metrics || {};
@@ -649,41 +567,39 @@ HTML_CONTENT = """<!DOCTYPE html>
                 card.className = "card-bg border border-slate-700 rounded-2xl p-5 shadow-lg space-y-4";
                 
                 var transcriptHtml = "";
-                transcript.forEach(function(t) {
+                transcript.forEach(t => {
                     var colorClass = t.speaker === 'Agent' ? 'text-blue-400' : 'text-emerald-400';
-                    transcriptHtml += '<div class="mb-1"><b class="' + colorClass + '">' + t.speaker + ':</b> ' + t.text + '</div>';
+                    transcriptHtml += `<div class="mb-1"><b class="${colorClass}">${t.speaker}:</b> ${t.text}</div>`;
                 });
 
                 var dynamicCardsHtml = '';
-                activeMetrics.forEach(function(m) {
-                    var isTrue = evalMetrics[m.key] === true;
-                    var fmt = isTrue ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
+                activeMetrics.forEach(m => {
+                    var fmt = evalMetrics[m.key] ? '<span class="text-emerald-400 font-bold">YES</span>' : '<span class="text-rose-400 font-bold">NO</span>';
                     dynamicCardsHtml += `<div class="inner-bg p-2 rounded border border-slate-700/40">${m.label}:${fmt}</div>`;
                 });
 
-                card.innerHTML = 
-                    '<div class="flex justify-between items-center border-b border-slate-700 pb-3">' +
-                        '<h3 class="font-bold text-blue-400 text-sm">📁 ' + item.filename + '</h3>' +
-                        '<span class="text-emerald-400 font-extrabold text-lg">' + (evalData.overall_score || 0) + '/100</span>' +
-                    '</div>' +
-                    '<div class="grid grid-cols-3 gap-2 text-center text-xs">' +
-                        '<div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">PACE</span><span class="font-bold text-blue-400">' + (metrics.wpm || 0) + ' WPM</span></div>' +
-                        '<div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">DURATION</span><span class="font-bold text-indigo-400">' + Math.round(metrics.duration || 0) + 's</span></div>' +
-                        '<div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">WORDS</span><span class="font-bold text-amber-400">' + (metrics.total_words || 0) + '</span></div>' +
-                    '</div>' +
-                    '<div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">' +
-                        '<div class="font-bold text-emerald-400 text-[11px] uppercase tracking-wide border-b border-slate-800 pb-1">💊 Dynamic Call Metrics Evaluation</div>' +
-                        '<div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">' + dynamicCardsHtml + '</div>' +
-                    '</div>' +
-                    '<div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">' +
-                        '<div class="font-bold text-blue-300 text-[11px] uppercase tracking-wide">Detailed Call Summary</div>' +
-                        '<p class="text-sub leading-relaxed">' + (evalData.summary || "N/A") + '</p>' +
-                    '</div>' +
-                    '<details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">' +
-                        '<summary class="font-bold text-sub cursor-pointer">📄 Click to view Full Diarized Transcript</summary>' +
-                        '<div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">' + transcriptHtml + '</div>' +
-                    '</details>';
-                
+                card.innerHTML = `
+                    <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+                        <h3 class="font-bold text-blue-400 text-sm">📁 ${item.filename}</h3>
+                        <span class="text-emerald-400 font-extrabold text-lg">${evalData.overall_score || 0}/100</span>
+                    </div>
+                    <div class="grid grid-cols-3 gap-2 text-center text-xs">
+                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">PACE</span><span class="font-bold text-blue-400">${metrics.wpm || 0} WPM</span></div>
+                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">DURATION</span><span class="font-bold text-indigo-400">${Math.round(metrics.duration || 0)}s</span></div>
+                        <div class="inner-bg p-2 rounded-lg"><span class="text-sub block text-[10px]">WORDS</span><span class="font-bold text-amber-400">${metrics.total_words || 0}</span></div>
+                    </div>
+                    <div class="inner-bg p-3 rounded-xl border border-slate-700/60 space-y-2">
+                        <div class="font-bold text-emerald-400 text-[11px] uppercase">💊 Call Metrics Evaluation</div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">${dynamicCardsHtml}</div>
+                    </div>
+                    <div class="text-xs inner-bg p-3 rounded-xl border border-slate-700/50 space-y-1">
+                        <div class="font-bold text-blue-300 text-[11px] uppercase">Detailed Call Summary</div>
+                        <p class="text-sub leading-relaxed">${evalData.summary || "N/A"}</p>
+                    </div>
+                    <details class="inner-bg p-3 rounded-xl border border-slate-700/50 text-xs">
+                        <summary class="font-bold text-sub cursor-pointer">📄 Full Diarized Transcript</summary>
+                        <div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-2 pt-2 border-t border-slate-800">${transcriptHtml}</div>
+                    </details>`;
                 container.appendChild(card);
             });
         }
@@ -691,75 +607,54 @@ HTML_CONTENT = """<!DOCTYPE html>
         async function loadHistory() {
             var hTable = document.getElementById('historyTable');
             try {
-                if (!auth.currentUser) {
-                    hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Please sign in again. Session expired.</td></tr>';
-                    return;
-                }
-
+                if (!auth.currentUser) return;
                 idToken = await auth.currentUser.getIdToken(true);
                 var res = await fetchAuth("/api/history?limit=50");
-
-                if (res.status === 401) {
-                    idToken = await auth.currentUser.getIdToken(true);
-                    res = await fetchAuth("/api/history?limit=50");
-                }
-
                 if(!res.ok) throw new Error("HTTP error " + res.status);
-
                 var list = await res.json();
                 historyDataList = list || [];
                 document.getElementById('totalHistoryBadge').innerText = historyDataList.length + " Loaded";
                 currentPage = 1;
                 renderHistoryTable();
             } catch(e) {
-                console.error("History load error:", e);
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history from server. Click Refresh to retry.</td></tr>';
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-rose-500">Failed to load history.</td></tr>';
             }
         }
 
         function renderHistoryTable() {
             var hTable = document.getElementById('historyTable');
             if(!historyDataList || historyDataList.length === 0) {
-                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No past audits found in Firebase.</td></tr>';
-                document.getElementById('pageInfoText').innerText = "Page 0 of 0";
-                document.getElementById('prevPageBtn').disabled = true;
-                document.getElementById('nextPageBtn').disabled = true;
+                hTable.innerHTML = '<tr><td colspan="4" class="p-3 text-center text-slate-500">No audits found.</td></tr>';
                 return;
             }
-
             var totalPages = Math.ceil(historyDataList.length / itemsPerPage);
             if(currentPage > totalPages) currentPage = totalPages;
             if(currentPage < 1) currentPage = 1;
 
             var startIndex = (currentPage - 1) * itemsPerPage;
-            var endIndex = startIndex + itemsPerPage;
-            var pageItems = historyDataList.slice(startIndex, endIndex);
+            var pageItems = historyDataList.slice(startIndex, startIndex + itemsPerPage);
 
             hTable.innerHTML = "";
-            pageItems.forEach(function(item) {
-                hTable.innerHTML += 
-                    '<tr class="border-b border-slate-700/50 hover:bg-slate-700/20 transition">' +
-                        '<td class="p-2 font-medium">' + (item.filename || 'N/A') + '</td>' +
-                        '<td class="p-2 text-emerald-400 font-bold">' + (item.score || 0) + '/100</td>' +
-                        '<td class="p-2 text-sub max-w-xs truncate">' + (item.summary || 'N/A') + '</td>' +
-                        '<td class="p-2 text-sub">' + formatDateDisplay(item.created_at) + '</td>' +
-                    '</tr>';
+            pageItems.forEach(item => {
+                hTable.innerHTML += `
+                    <tr class="border-b border-slate-700/50 hover:bg-slate-700/20">
+                        <td class="p-2 font-medium">${item.filename || 'N/A'}</td>
+                        <td class="p-2 text-emerald-400 font-bold">${item.score || 0}/100</td>
+                        <td class="p-2 text-sub max-w-xs truncate">${item.summary || 'N/A'}</td>
+                        <td class="p-2 text-sub">${formatDateDisplay(item.created_at)}</td>
+                    </tr>`;
             });
 
-            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages} (${historyDataList.length} Items)`;
+            document.getElementById('pageInfoText').innerText = `Page ${currentPage} of ${totalPages}`;
             document.getElementById('prevPageBtn').disabled = currentPage === 1;
             document.getElementById('nextPageBtn').disabled = currentPage === totalPages;
         }
 
-        function changePage(direction) {
-            currentPage += direction;
-            renderHistoryTable();
-        }
+        function changePage(direction) { currentPage += direction; renderHistoryTable(); }
 
         function exportHistoryExcel() {
-            if(!historyDataList || historyDataList.length === 0) return alert("History empty hai!");
-
-            var exportData = historyDataList.map(function(item) {
+            if(!historyDataList || historyDataList.length === 0) return alert("History empty!");
+            var exportData = historyDataList.map(item => {
                 var row = {
                     "File Name": item.filename || "N/A",
                     "QA Score": item.score || 0,
@@ -769,15 +664,8 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Date & Time (IST)": formatDateDisplay(item.created_at),
                     "Summary": item.summary || ""
                 };
-
                 var evalMetrics = item.evaluated_metrics || {};
-                activeMetrics.forEach(function(m) {
-                    row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
-                });
-
-                row["Strengths"] = Array.isArray(item.strengths) ? item.strengths.join("; ") : "";
-                row["Improvements"] = Array.isArray(item.improvements) ? item.improvements.join("; ") : "";
-
+                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
                 return row;
             });
 
@@ -788,9 +676,8 @@ HTML_CONTENT = """<!DOCTYPE html>
         }
 
         function downloadExcel() {
-            if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data to export!");
-            
-            var exportData = currentBatchResults.map(function(i) {
+            if(!currentBatchResults || currentBatchResults.length === 0) return alert("No data!");
+            var exportData = currentBatchResults.map(i => {
                 var row = {
                     "File Name": i.filename,
                     "QA Score": i.data?.evaluation?.overall_score || 0,
@@ -799,18 +686,10 @@ HTML_CONTENT = """<!DOCTYPE html>
                     "Total Words": i.data?.metrics?.total_words || 0,
                     "Summary": i.data?.evaluation?.summary || ""
                 };
-
                 var evalMetrics = i.data?.evaluation?.evaluated_metrics || {};
-                activeMetrics.forEach(function(m) {
-                    row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO";
-                });
-
-                row["Strengths"] = (i.data?.evaluation?.strengths || []).join("; ");
-                row["Improvements"] = (i.data?.evaluation?.improvements || []).join("; ");
-
+                activeMetrics.forEach(m => row[m.label] = (evalMetrics[m.key] === true) ? "YES" : "NO");
                 return row;
             });
-
             var workbook = XLSX.utils.book_new();
             var summarySheet = XLSX.utils.json_to_sheet(exportData);
             XLSX.utils.book_append_sheet(workbook, summarySheet, "Batch Summary");
@@ -822,8 +701,6 @@ HTML_CONTENT = """<!DOCTYPE html>
             html2pdf().from(element).save("Batch_Call_Audit_Report.pdf");
         }
     </script>
-
-    <p class="text-center text-sub text-[10px] mt-4">disclaimer: this is only education and testing purpose</p>
 </body>
 </html>
 """
@@ -838,17 +715,86 @@ async def serve_ai_page():
         with open("ai.html", "r", encoding="utf-8") as f:
             return f.read()
     else:
-        return """
-        <!DOCTYPE html>
-        <html>
-        <head><title>AI Quality Score</title></head>
-        <body style="background:#0f172a; color:white; font-family:sans-serif; text-align:center; padding:50px;">
-            <h1>✨ AI Quality Score Page</h1>
-            <p>Apni <b>ai.html</b> file ko same folder me rakhein!</p>
-            <a href="/" style="color:#38bdf8;">← Back to Home</a>
-        </body>
-        </html>
-        """
+        return HTMLResponse("<h1>ai.html File missing in project root folder!</h1>", status_code=404)
+
+# ================= Groq Audio Transcribe & Diarize API (SECURE BACKEND API) =================
+
+@app.post("/api/groq-transcribe-eval")
+async def groq_transcribe_eval(
+    file: UploadFile = File(...),
+    user: dict = Depends(verify_firebase_token)
+):
+    if not GROQ_API_KEY:
+        raise HTTPException(status_code=500, detail="GROQ_API_KEY environment variable missing on Render server!")
+
+    try:
+        audio_bytes = await file.read()
+        
+        # 1. Groq Whisper API Call
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            files_payload = {"file": (file.filename, audio_bytes, file.content_type or "audio/mpeg")}
+            data_payload = {
+                "model": "whisper-large-v3",
+                "language": "hi",
+                "temperature": "0",
+                "response_format": "json",
+                "prompt": "यह एक कॉल सेंटर सपोर्ट कॉल है। Agent aur Customer ke shuruat se ant tak ki saari baat ko bina kisi shabd ko chhode poora transcribe karein."
+            }
+            
+            whisper_res = await client.post(
+                "https://api.groq.com/openai/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {GROQ_API_KEY}"},
+                files=files_payload,
+                data=data_payload
+            )
+
+            if whisper_res.status_code != 200:
+                raise Exception(f"Groq Whisper Error: {whisper_res.text}")
+
+            raw_transcript = whisper_res.json().get("text", "").strip()
+
+            # 2. Groq LLaMA-3 Diarization Call
+            llm_prompt = f"""
+You are an expert Call Center QA Auditor.
+Below is a full raw transcript of a customer service call in Hindi/Hinglish/English:
+
+"{raw_transcript}"
+
+TASKS:
+1. Parse the transcript from START TO END and divide it into chronological dialogue turns between "Agent:" and "Customer:".
+2. Make sure NO PART of the conversation from start to end is omitted or summarized.
+3. Output ONLY a JSON object with this exact structure:
+{{
+  "full_diarized_transcript": "Agent: [dialogue]\\nCustomer: [dialogue]\\nAgent: [dialogue]",
+  "agent_only_speech": "Combined string of everything the Agent said from start to end"
+}}
+Do not include markdown or explanations outside the valid JSON.
+"""
+            llm_res = await client.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {GROQ_API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "llama-3.3-70b-versatile",
+                    "messages": [{"role": "user", "content": llm_prompt}],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.1
+                }
+            )
+
+            if llm_res.status_code != 200:
+                return {
+                    "full_diarized_transcript": raw_transcript,
+                    "agent_only_speech": raw_transcript
+                }
+
+            content = llm_res.json()['choices'][0]['message']['content']
+            return json.loads(content)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ================= Dynamic Metrics CRUD APIs (Protected) =================
 
@@ -935,7 +881,7 @@ async def delete_metric(
     await loop.run_in_executor(None, lambda: db.collection("metrics").document(metric_id).delete())
     return {"status": "success"}
 
-# ================= Async Transcribe & Evaluate Core Logic =================
+# ================= Core Transcription Logic =================
 
 async def transcribe_bytes_async(audio_bytes: bytes):
     url = "https://api.deepgram.com/v1/listen?model=nova-2&language=hi&detect_language=true&diarize=true&punctuate=true&utterances=true"
@@ -1025,13 +971,11 @@ async def evaluate_quality_async(transcript, metrics_list):
 
             try:
                 response = await client.post(url, headers=headers, json=payload)
-                
                 if response.status_code == 200:
                     res_data = response.json()
                     raw_text = res_data['candidates'][0]['content']['parts'][0]['text']
                     clean_json = re.sub(r'```(?:json)?\n?', '', raw_text).replace('```', '').strip()
                     return json.loads(clean_json)
-                
                 elif response.status_code in [429, 500, 503]:
                     await asyncio.sleep(retry_delay)
                     retry_delay += 2.0
@@ -1039,7 +983,6 @@ async def evaluate_quality_async(transcript, metrics_list):
                     await asyncio.sleep(1.0)
                 else:
                     raise Exception(f"Gemini Error ({response.status_code}): {response.text}")
-
             except (httpx.TimeoutException, httpx.RequestError):
                 await asyncio.sleep(retry_delay)
                 retry_delay += 2.0
@@ -1071,13 +1014,11 @@ async def process_single_file(file: UploadFile, active_metrics: List[Dict]):
                 }
                 loop = asyncio.get_running_loop()
                 await loop.run_in_executor(None, lambda: db.collection("audits").add(audit_data))
-                print(f"✅ Document added to Firebase for {file.filename}")
             except Exception as fe:
                 print("❌ Firebase Write Error:", fe)
 
         return {"status": "success", "filename": file.filename, "data": {"metrics": metrics, "transcript": transcript, "evaluation": evaluation}}
     except Exception as e:
-        print(f"❌ Error processing {file.filename}: {str(e)}")
         return {"status": "error", "filename": file.filename, "error": str(e)}
 
 async def process_single_file_limited(file: UploadFile, active_metrics: List[Dict]):
@@ -1110,7 +1051,6 @@ async def get_history(limit: int = 50, user: dict = Depends(verify_firebase_toke
         return []
     try:
         loop = asyncio.get_running_loop()
-        
         def fetch_db():
             docs = db.collection("audits").order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit).stream()
             history = []
